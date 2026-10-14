@@ -80,8 +80,8 @@ CURL=(curl --fail --silent --show-error --location --retry 3 --connect-timeout 1
 echo "正在读取 ${REPOSITORY} 的 Release 信息……"
 "${CURL[@]}" "$RELEASE_ENDPOINT" -o "$RELEASE_JSON" || die "无法读取 GitHub Release，请检查网络。"
 
-read -r RELEASE_TAG ASSET_NAME ASSET_URL CHECKSUM_URL <<EOF
-$(python3 - "$RELEASE_JSON" "$ARCH" <<'PY'
+RELEASE_FIELDS="$TMP_DIR/release-fields"
+python3 - "$RELEASE_JSON" "$ARCH" > "$RELEASE_FIELDS" <<'PY' || die "Release 信息不完整或没有匹配当前架构的安装包。"
 import json
 import re
 import sys
@@ -99,7 +99,8 @@ if not asset_url or not checksum_url:
     raise SystemExit(f"Release {tag} 缺少 {asset_name} 或 SHA256SUMS")
 print(tag, asset_name, asset_url, checksum_url)
 PY
-)
+IFS=' ' read -r RELEASE_TAG ASSET_NAME ASSET_URL CHECKSUM_URL < "$RELEASE_FIELDS"
+[[ -n "$RELEASE_TAG" && -n "$ASSET_NAME" && -n "$ASSET_URL" && -n "$CHECKSUM_URL" ]] || die "Release 信息解析失败。"
 
 echo "将安装 ${RELEASE_TAG}（Linux ${ARCH}）到 ${INSTALL_DIR}"
 echo "正在下载并校验程序……"
