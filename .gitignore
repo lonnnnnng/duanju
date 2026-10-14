@@ -1,0 +1,19 @@
+# 运行数据与构建产物
+/data/
+/data/**
+/dist/
+/bin/
+/logs/
+*.log
+
+# 本地下载目录
+/短剧下载/
+
+# 系统垃圾
+.DS_Store
+**/.DS_Store
+Thumbs.db
+__MACOSX/
+
+# 本地环境变量
+.env

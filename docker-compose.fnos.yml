@@ -1,0 +1,26 @@
+services:
+  duanju:
+    image: ghcr.io/qiancheng817/duanju:latest@sha256:c75ed9b3eaed0601a30489d132eebf81dbe70bf8bb30c71a55da5e4875ff8a39
+    container_name: duanju
+    ports:
+      - "${DUANJU_BIND_ADDRESS:-0.0.0.0}:${DUANJU_PORT:-3333}:3333"
+    environment:
+      - TZ=Asia/Shanghai
+      - DUANJU_ADMIN_USER=
+      - DUANJU_ADMIN_PASSWORD=
+    volumes:
+      - /vol1/1000/docker/duanju/data:/data
+      - /vol1/1000/docker/duanju/downloads:/downloads
+    restart: always
+    stop_grace_period: 30s
+    healthcheck:
+      test: ["CMD", "curl", "--noproxy", "*", "--fail", "--silent", "--output", "/dev/null", "http://127.0.0.1:3333/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

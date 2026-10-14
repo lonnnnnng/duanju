@@ -1,0 +1,24 @@
+[Unit]
+Description=短剧
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=lee
+WorkingDirectory=/home/lee/duanju
+EnvironmentFile=-/home/lee/duanju/.env
+Environment=DUANJU_AUTO_RESTART=1
+ExecStart=/home/lee/duanju/duanju -open=false -listen 0.0.0.0:3333 -data-dir /home/lee/duanju/data -out /home/lee/duanju/短剧下载
+Restart=on-failure
+RestartSec=5s
+KillSignal=SIGTERM
+TimeoutStopSec=45s
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ReadWritePaths=/home/lee/duanju
+
+[Install]
+WantedBy=multi-user.target

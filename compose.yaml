@@ -1,0 +1,32 @@
+name: duanju
+services:
+  app:
+    image: ${DUANJU_IMAGE:-duanju:local}
+    pull_policy: build
+    build:
+      context: .
+      args:
+        GO_IMAGE: ${DUANJU_GO_IMAGE:-golang:1.26-bookworm@sha256:a688600ca24f8a4d3ca77f95b0dd40704a9fc787c826660eb7ba0b641b8b175d}
+        RUNTIME_IMAGE: ${DUANJU_RUNTIME_IMAGE:-debian:bookworm-slim@sha256:3783cc01769c7b2b1b83a5c5ad96c815348e28ed7da68e2e3687004faa906251}
+    ports:
+      - "${DUANJU_BIND_ADDRESS:-0.0.0.0}:${DUANJU_PORT:-3333}:3333"
+    environment:
+      TZ: ${TZ:-Asia/Shanghai}
+      DUANJU_PROXY_URL: ${DUANJU_PROXY_URL:-}
+      DUANJU_ADMIN_USER: ${DUANJU_ADMIN_USER:-}
+      DUANJU_ADMIN_PASSWORD: ${DUANJU_ADMIN_PASSWORD:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - data:/data
+      - downloads:/downloads
+    restart: unless-stopped
+    stop_grace_period: 30s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+volumes:
+  data:
+  downloads:

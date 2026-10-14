@@ -1,0 +1,228 @@
+# 短剧
+
+短剧是一个单体 Go 应用，提供剧库浏览、在线播放、观看记录、追剧、下载、合并和 Emby 导出。网页资源已嵌入可执行文件，发布后的程序不需要 Node.js 或 Python；需要解密、封装、转码或下载时使用 FFmpeg。
+
+## 快速启动
+
+### 使用发布程序
+
+`dist/` 中的程序按版本、系统和架构命名：
+
+| 系统 | 程序 |
+| --- | --- |
+| macOS Apple Silicon | `duanju-vX.Y.Z-darwin-arm64` |
+| macOS Intel | `duanju-vX.Y.Z-darwin-amd64` |
+| Linux x64 | `duanju-vX.Y.Z-linux-amd64` |
+| Linux ARM64 | `duanju-vX.Y.Z-linux-arm64` |
+| Windows x64 | `duanju-vX.Y.Z-windows-amd64.exe` |
+
+macOS / Linux 首次运行可能需要 `chmod +x 程序名`。默认监听 `0.0.0.0:3333`，本机访问 `http://127.0.0.1:3333`，局域网设备访问运行主机的 IP 和端口。服务器或后台运行建议关闭自动打开浏览器：
+
+```bash
+./duanju-vX.Y.Z-linux-amd64 -open=false
+```
+
+只允许本机访问时使用 `-listen 127.0.0.1:3333`。程序、`data/` 和下载目录必须对运行用户可写。
+
+### 从源码运行
+
+需要 Go 1.21+：
+
+```bash
+go run .
+```
+
+常用参数：
+
+| 参数 | 作用 |
+| --- | --- |
+| `-listen 地址` | 修改监听地址，默认 `0.0.0.0:3333` |
+| `-open=false` | 不自动打开浏览器 |
+| `-data-dir 目录` | 配置、缓存、账号和任务目录，默认 `./data` |
+| `-out 目录` | 下载目录，默认 `./短剧下载` |
+| `-ffmpeg 路径` | 指定 FFmpeg，默认从 PATH 查找 |
+| `-admin-user` / `-admin-password` | 设置管理员凭据 |
+| `-ui=false -mode list` | 使用命令行模式查看剧库 |
+
+## 账号与权限
+
+首次启动创建 `admin` 管理员。未指定密码时，随机密码只在启动输出一次，并要求首次登录改密；也可以通过启动参数或环境变量指定：
+
+```bash
+DUANJU_ADMIN_USER=admin DUANJU_ADMIN_PASSWORD='替换为强密码' ./duanju-vX.Y.Z-linux-amd64 -open=false
+```
+
+`DUANJU_ADMIN_PASSWORD` 或 `-admin-password` 会在每次启动时重新应用。网页修改密码后，应移除旧环境变量或同步更新服务环境文件。
+
+管理员在“更多 → 用户管理”中控制：
+
+- 是否必须登录、是否允许注册；
+- 普通账号可用的站源；
+- 是否仅允许在线观看；仅在线观看会同时隐藏并拒绝下载、合并和 Emby 导出接口。
+
+观看记录、收藏、追剧和续播按账号保存；匿名记录按浏览器 Cookie 隔离。账号、会话、密钥和记录都在 `data/` 中，备份时不要遗漏。
+
+## Linux 后台运行、日志与更新
+
+### systemd
+
+把可执行文件命名为 `duanju`，与 `data/`、下载目录放在安装目录，然后生成服务文件：
+
+```bash
+bash scripts/install-systemd.sh
+sudo install -m 0644 /tmp/duanju.service /etc/systemd/system/duanju.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now duanju
+sudo systemctl status duanju
+```
+
+脚本不会自动执行 `sudo`。可用环境变量生成其他路径：`DUANJU_USER`、`DUANJU_INSTALL_DIR`、`DUANJU_DATA_DIR`、`DUANJU_OUTPUT_DIR`、`DUANJU_LISTEN`。服务模板使用 `Restart=on-failure`、优雅停止和 `DUANJU_AUTO_RESTART=1`。
+
+### 日志与健康检查
+
+- 应用诊断日志：`data/logs/app.log`；单文件 5 MiB，保留 2 个轮转文件，权限为 `0600`。
+- systemd 日志：`journalctl -u duanju -f`。
+- 健康检查：`GET /healthz`，返回 `status`、`version` 和 `commit`。
+
+```bash
+tail -n 100 data/logs/app.log
+sudo systemctl status duanju
+journalctl -u duanju --since '10 minutes ago'
+```
+
+日志记录启动、配置、网络检查、播放、下载、FFmpeg、合并和更新事件，并会隐藏密码、令牌及签名 URL。
+
+### 在线更新
+
+管理员在“更多 → 代理 / 设置 → 应用版本”检查 GitHub 正式 Release。更新器：
+
+1. 按当前 `GOOS/GOARCH` 查找 `duanju-版本号-系统-架构` 资产；Windows 资产带 `.exe`。
+2. 下载程序和 `SHA256SUMS`，校验 SHA-256。
+3. 备份当前程序后原子替换，并写入启动标记。
+4. systemd 自动重启；新程序成功监听后删除标记和备份，启动失败时下一次启动自动恢复旧程序。
+
+发布构建：
+
+```bash
+VERSION=vX.Y.Z ./scripts/build.sh
+```
+
+脚本会生成五个平台程序和 `dist/SHA256SUMS`。公开仓库不需要令牌；私有仓库才设置只读 `DUANJU_GITHUB_TOKEN`，建议写入服务用户可读的 `.env` 并设置 `chmod 600`。手动 `nohup`、源码运行和 Docker 不会自动替你重启服务；Windows 运行中的程序不能原位替换。
+
+## 剧库、播放与下载
+
+### 剧库与播放
+
+剧库支持本地筛选、联网搜索、榜单、分类推荐、收藏、想看 / 在看 / 已看和历史记录。详情页会异步补齐剧名、简介、集数、封面、日期、热度等资料，失败不阻塞播放。
+
+在线播放支持：
+
+- 分集、画质、倍速、全屏、自动下一集和续播；
+- 桌面键盘操作，手机上下滑动切集、横竖屏播放和方向感应；
+- 原始 MP4 / HLS 播放（默认关闭），兼容内容可跳过 FFmpeg；
+- 解密、换封装、音频转码和视频转码的独立并发限制；
+- Emby、本地已下载文件和在线缓冲的统一播放入口。
+
+“优先原始 MP4 / HLS 播放”及客户端直连都在管理员设置中控制。直连只是条件允许时的尝试，失败会回退到服务端中转；开启直连不会绕过账号权限。
+
+### 下载与合并
+
+下载画质支持“最高可用”或指定档位，任务会保存选择并在重启后继续。下载完成后检查视频流、尺寸和时长；默认保留源码流，不会凭空生成源站没有的分辨率。
+
+下载页支持暂停、继续、取消、重试、优先级、补新集和文件校验。合并任务在后台执行，刷新或关闭网页不会中断；兼容分集优先复制或无损换封装，必要时只处理不兼容分集。合并成功后可播放本地全集，也可以选择在校验成功后清理分集文件。
+
+默认下载目录为 `短剧下载/`，可在设置页面、`-out` 或 `DUANJU_OUTPUT_DIR` 修改。已存在任务继续使用保存时的目录。
+
+## 配置与数据
+
+配置优先级：内置默认值 < `data/duanju.json` < `DUANJU_*` 环境变量 < 启动参数。常用环境变量：
+
+| 变量 | 作用 |
+| --- | --- |
+| `DUANJU_ADMIN_USER` / `DUANJU_ADMIN_PASSWORD` | 管理员凭据 |
+| `DUANJU_OUTPUT_DIR` | 下载目录 |
+| `DUANJU_FFMPEG` | FFmpeg 路径 |
+| `DUANJU_PROXY_URL` | HTTP、HTTPS 或 SOCKS5 代理 |
+| `DUANJU_HONGGUO_URL` | 受支持站源的地址覆盖 |
+| `DUANJU_GITHUB_REPO` | 在线更新仓库，格式为 `owner/repository` |
+| `DUANJU_GITHUB_TOKEN` | 私有更新仓库的只读令牌 |
+
+主要数据文件：
+
+```text
+data/
+├── duanju.json                 # 代理、并发和下载目录
+├── accounts.json             # 账号、权限和会话
+├── library.json              # 剧库缓存
+├── ui-state.json             # 下载与合并状态
+├── viewers/                  # 观看记录和追剧清单
+├── viewer-key                # 匿名身份密钥
+├── emby-key                  # Emby 链接签名密钥
+└── logs/app.log              # 诊断日志
+短剧下载/                     # 视频文件
+```
+
+备份时同时保存 `data/` 和视频目录，尤其是 `accounts.json`、`viewer-key`、`viewers/` 与 `emby-key`。不要把真实数据、密码、令牌或视频提交到 Git。
+
+## Docker
+
+需要 Docker Engine 和 Compose v2：
+
+```bash
+./scripts/docker-up.sh
+docker compose logs --tail=100 app
+```
+
+`compose.yaml` 默认使用 `duanju:local`，端口为 `3333`，数据卷为 `data` 和 `downloads`。可在 `.env` 设置：
+
+```dotenv
+DUANJU_PORT=3333
+DUANJU_BIND_ADDRESS=0.0.0.0
+DUANJU_ADMIN_USER=admin
+DUANJU_ADMIN_PASSWORD=替换为强密码
+DUANJU_PROXY_URL=
+```
+
+升级执行同一条 `./scripts/docker-up.sh`，Compose 会重新构建并保留卷。宿主目录映射时，容器内固定使用 `/data` 和 `/downloads`，运行用户 UID/GID 1000 需要有读写权限。1Panel 或其他面板从源码构建时，构建上下文必须是完整仓库根目录。
+
+单独构建可用：
+
+```bash
+./scripts/docker-build.sh
+```
+
+## 反向代理与 Emby
+
+反向代理建议使用独立域名和 HTTPS，转发到 `http://127.0.0.1:3333`，透传 `Host`、Cookie、Set-Cookie 和 `X-Forwarded-Proto`，并关闭 API / 媒体缓存；媒体接口建议设置较长的读写超时。
+
+Emby 自动同步在“更多 → Emby 同步”中配置。程序可按追剧或下载记录生成 STRM / NFO，也可只同步已合并全集；需要自动通知扫描和补海报时填写 Emby 地址及 API Key。剧库服务运行目录和 Emby 媒体目录必须通过宿主目录或共享卷访问同一份导出文件，填写 Emby 能访问的剧库地址，不要使用容器内的 `localhost`。
+
+手动导出 ZIP 仍可在剧集详情中使用。关闭自动同步只停止后续更新，不删除已有导出文件。
+
+## 常见问题
+
+| 现象 | 排查 |
+| --- | --- |
+| 局域网无法访问 | 确认监听不是 `127.0.0.1`，放行 TCP 3333，并确认客户端未启用无线隔离 |
+| 登录后反复跳回 | 保持访问地址不变，反向代理透传 Cookie / Set-Cookie，并使用 HTTPS |
+| 播放卡顿或 CPU 高 | 先查看日志中的 `playback.plan`、`playback.mode`，限制播放处理并发；免转码中转仍消耗服务器带宽 |
+| 下载目录不可写 | 检查服务用户、容器 UID/GID 以及父目录权限；不要用无条件 `chmod -R 777` |
+| FFmpeg 不可用 | 在设置中重新检查，或设置 `-ffmpeg` / `DUANJU_FFMPEG` 指向支持 H.264/AAC 的版本 |
+| Emby 没有剧集或海报 | 检查输出目录共享、媒体库扫描、剧库地址和 API Key；查看同步面板与应用日志 |
+| 在线更新失败 | 检查 GitHub Release 是否包含精确资产名和 `SHA256SUMS`，再查看 `app.update_*` 日志事件 |
+
+日志事件是 JSON Lines，可按事件筛选：
+
+```bash
+rg '"event":"(app\\.|playback\\.|download\\.|ffmpeg\\.|media\\.)' data/logs/app.log
+```
+
+## 开发检查
+
+```bash
+go test ./...
+go vet ./...
+git diff --check
+```
+
+前端资源通过 `go:embed` 打包，修改 `internal/webui/` 后需要重新编译程序。发布前确认版本号、`dist/SHA256SUMS`、运行平台和数据目录均符合部署环境。
