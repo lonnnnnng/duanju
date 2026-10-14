@@ -230,6 +230,8 @@ DUANJU_PROXY_URL=
 
 Emby 自动同步在“更多 → Emby 同步”中配置。程序可按追剧或下载记录生成 STRM / NFO，也可只同步已合并全集；需要自动通知扫描和补海报时填写 Emby 地址及 API Key。剧库服务运行目录和 Emby 媒体目录必须通过宿主目录或共享卷访问同一份导出文件，填写 Emby 能访问的剧库地址，不要使用容器内的 `localhost`。
 
+宿主机部署中，如果 duanju 和 Emby 使用不同 Linux 用户，请执行 [`scripts/configure-emby-permissions.sh`](scripts/configure-emby-permissions.sh) 配置共享组、父目录 ACL 和 setgid 权限；完整说明见 [`docs/emby-permissions.md`](docs/emby-permissions.md)。不要直接对整个下载目录执行 `chmod -R 777`。
+
 手动导出 ZIP 仍可在剧集详情中使用。关闭自动同步只停止后续更新，不删除已有导出文件。
 
 ## 常见问题
