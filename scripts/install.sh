@@ -8,6 +8,11 @@ SERVICE_NAME="${DUANJU_SERVICE_NAME:-duanju}"
 SERVICE_USER="${DUANJU_USER:-${SUDO_USER:-$(id -un)}}"
 LISTEN_ADDRESS="${DUANJU_LISTEN:-0.0.0.0:3333}"
 
+if [[ "$(uname -s)" != "Linux" ]]; then
+  echo "安装失败：此安装器只支持 Linux。" >&2
+  exit 1
+fi
+
 if [[ -n "${DUANJU_INSTALL_DIR:-}" ]]; then
   INSTALL_DIR="$DUANJU_INSTALL_DIR"
 else
@@ -38,7 +43,6 @@ trap cleanup EXIT
 
 require_command() { command -v "$1" >/dev/null 2>&1 || die "缺少命令 $1，请先安装它后重试。"; }
 
-[[ "$(uname -s)" == "Linux" ]] || die "此安装器只支持 Linux。"
 [[ "$(ps -p 1 -o comm= 2>/dev/null | tr -d ' ')" == "systemd" ]] || die "当前系统不是 systemd，不能安装后台服务。"
 id "$SERVICE_USER" >/dev/null 2>&1 || die "服务用户不存在：$SERVICE_USER"
 SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
@@ -47,6 +51,8 @@ SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
 [[ "$REPOSITORY" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]] || die "DUANJU_REPOSITORY 格式必须为 owner/repository。"
 [[ "$SERVICE_NAME" =~ ^[A-Za-z0-9_.@-]+$ ]] || die "DUANJU_SERVICE_NAME 含有无效字符。"
 [[ "$LISTEN_ADDRESS" != *[[:space:]]* ]] || die "DUANJU_LISTEN 不能包含空格。"
+LISTEN_PORT="${LISTEN_ADDRESS##*:}"
+[[ "$LISTEN_PORT" =~ ^[0-9]+$ ]] && ((LISTEN_PORT > 0 && LISTEN_PORT < 65536)) || die "DUANJU_LISTEN 必须以有效端口结尾。"
 
 require_command curl
 require_command python3
@@ -164,9 +170,19 @@ sudo systemctl enable --now "${SERVICE_NAME}.service"
 echo "正在等待服务健康检查……"
 HEALTH_OK=0
 for _ in $(seq 1 30); do
-  if curl --fail --silent --show-error --max-time 3 "http://127.0.0.1:3333/healthz" > "$TMP_DIR/health.json"; then
-    HEALTH_OK=1
-    break
+  if curl --fail --silent --max-time 3 "http://127.0.0.1:${LISTEN_PORT}/healthz" > "$TMP_DIR/health.json"; then
+    if python3 - "$TMP_DIR/health.json" "$RELEASE_TAG" <<'PY'
+import json
+import sys
+with open(sys.argv[1], encoding="utf-8") as source:
+    health = json.load(source)
+if health.get("status") != "ok" or health.get("version") != sys.argv[2]:
+    raise SystemExit(1)
+PY
+    then
+      HEALTH_OK=1
+      break
+    fi
   fi
   sleep 1
 done
