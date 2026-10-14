@@ -43,6 +43,16 @@ trap cleanup EXIT
 
 require_command() { command -v "$1" >/dev/null 2>&1 || die "缺少命令 $1，请先安装它后重试。"; }
 
+ensure_directory() {
+  local directory="$1"
+  if sudo test -e "$directory"; then
+    sudo test -d "$directory" || die "路径已存在但不是目录：$directory"
+    return
+  fi
+  # long: 升级时保留媒体目录的共享组、ACL 与 setgid，避免覆盖 Emby 等服务已有的访问权限。
+  sudo install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$directory"
+}
+
 [[ "$(ps -p 1 -o comm= 2>/dev/null | tr -d ' ')" == "systemd" ]] || die "当前系统不是 systemd，不能安装后台服务。"
 id "$SERVICE_USER" >/dev/null 2>&1 || die "服务用户不存在：$SERVICE_USER"
 SERVICE_GROUP="$(id -gn "$SERVICE_USER")"
@@ -126,8 +136,10 @@ if sudo systemctl is-active --quiet "${SERVICE_NAME}.service"; then
   sudo systemctl stop "${SERVICE_NAME}.service"
 fi
 
-# long: 先写入临时程序再原子替换，避免服务读到半截文件；已有 data 和 downloads 会原样保留。
-sudo install -d -o "$SERVICE_USER" -g "$SERVICE_GROUP" -m 0750 "$INSTALL_DIR" "$DATA_DIR" "$OUTPUT_DIR"
+# long: 先写入临时程序再原子替换；已有 data 和 downloads 的内容及权限均保持原样。
+ensure_directory "$INSTALL_DIR"
+ensure_directory "$DATA_DIR"
+ensure_directory "$OUTPUT_DIR"
 if sudo test -f "$INSTALL_DIR/duanju"; then
   OLD_BINARY_BACKUP="$TMP_DIR/duanju.before-install"
   sudo cp -p "$INSTALL_DIR/duanju" "$OLD_BINARY_BACKUP"
