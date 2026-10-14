@@ -135,7 +135,7 @@
   <dialog id="settingsPanel" class="settings-dialog" aria-labelledby="settingsTitle">
     <div class="heading"><h2 id="settingsTitle">剧库设置</h2><button id="closeSettingsBtn" class="secondary" aria-label="关闭设置">关闭</button></div>
     <div class="settings-body"><div class="appearance-row"><div><h3>外观</h3><p class="small">选择适合当前环境的明暗模式</p></div><select id="themeSelect" aria-label="外观"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
-      <p id="serverSettingsNotice" class="small">登录管理员账号后可调整代理、保存目录与服务并发。</p><div id="serverSettings" hidden><div class="directory-input"><label class="small">下载目录<input id="downloadDirectory" type="text" placeholder="./短剧下载" autocomplete="off"></label><button id="browseDirectoryBtn" class="secondary">选择文件夹</button></div>
+      <p id="serverSettingsNotice" class="small">登录管理员账号后可调整代理、保存目录与服务并发。</p><div id="serverSettings" hidden><div class="directory-input"><label class="small">下载目录<input id="downloadDirectory" type="text" placeholder="./downloads" autocomplete="off"></label><button id="browseDirectoryBtn" class="secondary">选择文件夹</button></div>
       <p class="small" id="downloadDirectoryHint">点击按钮打开本机系统文件夹选择框，也可输入相对/绝对路径。重启后新合集使用新目录，原任务和文件保留。</p>
       <div class="settings-grid">
         <label>下载并发<input id="downloadConcurrency" type="number" min="1" max="32" value="2"></label>

@@ -37,7 +37,7 @@ func defaultConfig() Config {
 	}
 }
 
-func defaultOutputDir() string { return "短剧下载" }
+func defaultOutputDir() string { return "downloads" }
 
 func applyConfigEnvironment(config *Config) {
 	for variable, target := range map[string]*string{

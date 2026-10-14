@@ -20,7 +20,7 @@ fi
 sed -e "s#^User=.*#User=${DUANJU_USER:-$(id -un)}#" \
     -e "s#^WorkingDirectory=.*#WorkingDirectory=${INSTALL_DIR}#" \
     -e "s#^EnvironmentFile=.*#EnvironmentFile=-${INSTALL_DIR}/.env#" \
-    -e "s#^ExecStart=.*#ExecStart=${INSTALL_DIR}/duanju -open=false -listen ${DUANJU_LISTEN:-0.0.0.0:3333} -data-dir ${DUANJU_DATA_DIR:-${INSTALL_DIR}/data} -out ${DUANJU_OUTPUT_DIR:-${INSTALL_DIR}/短剧下载}#" \
+    -e "s#^ExecStart=.*#ExecStart=${INSTALL_DIR}/duanju -open=false -listen ${DUANJU_LISTEN:-0.0.0.0:3333} -data-dir ${DUANJU_DATA_DIR:-${INSTALL_DIR}/data} -out ${DUANJU_OUTPUT_DIR:-${INSTALL_DIR}/downloads}#" \
     -e "s#^ReadWritePaths=.*#ReadWritePaths=${INSTALL_DIR}#" \
     "$SERVICE_FILE" > "$TARGET_FILE"
 
@@ -30,3 +30,4 @@ echo "  sudo install -m 0644 $TARGET_FILE /etc/systemd/system/${SERVICE_NAME}.se
 echo "  sudo systemctl daemon-reload"
 echo "  sudo systemctl enable --now ${SERVICE_NAME}"
 echo "  sudo systemctl status ${SERVICE_NAME}"
+echo "  install -m 0755 ${ROOT_DIR}/scripts/duanju-service.sh ${INSTALL_DIR}/duanju-service"

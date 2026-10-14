@@ -39,7 +39,7 @@ go run .
 | `-listen 地址` | 修改监听地址，默认 `0.0.0.0:3333` |
 | `-open=false` | 不自动打开浏览器 |
 | `-data-dir 目录` | 配置、缓存、账号和任务目录，默认 `./data` |
-| `-out 目录` | 下载目录，默认 `./短剧下载` |
+| `-out 目录` | 下载目录，默认 `./downloads` |
 | `-ffmpeg 路径` | 指定 FFmpeg，默认从 PATH 查找 |
 | `-admin-user` / `-admin-password` | 设置管理员凭据 |
 | `-ui=false -mode list` | 使用命令行模式查看剧库 |
@@ -74,9 +74,25 @@ sudo install -m 0644 /tmp/duanju.service /etc/systemd/system/duanju.service
 sudo systemctl daemon-reload
 sudo systemctl enable --now duanju
 sudo systemctl status duanju
+install -m 0755 scripts/duanju-service.sh "$HOME/duanju/duanju-service"
 ```
 
 脚本不会自动执行 `sudo`。可用环境变量生成其他路径：`DUANJU_USER`、`DUANJU_INSTALL_DIR`、`DUANJU_DATA_DIR`、`DUANJU_OUTPUT_DIR`、`DUANJU_LISTEN`。服务模板使用 `Restart=on-failure`、优雅停止和 `DUANJU_AUTO_RESTART=1`。
+
+安装管理脚本后，可直接在服务器运行：
+
+```bash
+~/duanju/duanju-service status        # 状态
+~/duanju/duanju-service logs -f       # 跟踪 systemd 日志，Ctrl+C 退出
+~/duanju/duanju-service app-logs -f   # 跟踪应用诊断日志
+~/duanju/duanju-service start         # 启动
+~/duanju/duanju-service stop          # 停止
+~/duanju/duanju-service restart       # 重启
+~/duanju/duanju-service check-update  # 检查新版本
+~/duanju/duanju-service update        # 在线更新并验证重启结果
+```
+
+启停和重启会调用 `sudo systemctl`；检查和更新需 Python 3，会交互输入管理员密码。默认访问 `http://127.0.0.1:3333`，自定义端口设置 `DUANJU_SERVICE_URL`；更新时服务须处于运行状态。脚本也支持 `DUANJU_SERVICE_NAME`、`DUANJU_INSTALL_DIR`、`DUANJU_DATA_DIR` 和 `DUANJU_ADMIN_USER`。
 
 ### 日志与健康检查
 
@@ -131,7 +147,7 @@ VERSION=vX.Y.Z ./scripts/build.sh
 
 下载页支持暂停、继续、取消、重试、优先级、补新集和文件校验。合并任务在后台执行，刷新或关闭网页不会中断；兼容分集优先复制或无损换封装，必要时只处理不兼容分集。合并成功后可播放本地全集，也可以选择在校验成功后清理分集文件。
 
-默认下载目录为 `短剧下载/`，可在设置页面、`-out` 或 `DUANJU_OUTPUT_DIR` 修改。已存在任务继续使用保存时的目录。
+默认下载目录为 `downloads/`，可在设置页面、`-out` 或 `DUANJU_OUTPUT_DIR` 修改。已存在任务继续使用保存时的目录。
 
 ## 配置与数据
 
@@ -159,7 +175,7 @@ data/
 ├── viewer-key                # 匿名身份密钥
 ├── emby-key                  # Emby 链接签名密钥
 └── logs/app.log              # 诊断日志
-短剧下载/                     # 视频文件
+downloads/                    # 视频文件
 ```
 
 备份时同时保存 `data/` 和视频目录，尤其是 `accounts.json`、`viewer-key`、`viewers/` 与 `emby-key`。不要把真实数据、密码、令牌或视频提交到 Git。

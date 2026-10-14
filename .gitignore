@@ -7,7 +7,7 @@
 *.log
 
 # 本地下载目录
-/短剧下载/
+/downloads/
 
 # 系统垃圾
 .DS_Store

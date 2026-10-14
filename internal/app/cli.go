@@ -89,7 +89,7 @@ func usage() {
   -mode all|search|id|list    CLI 模式，需配合 -ui=false，默认 all
   -keyword 关键词             search 模式关键词
   -id 剧ID                    id 模式下载单部剧
-  -out 目录                   自定义下载目录，默认 ./短剧下载，支持相对或绝对路径
+  -out 目录                   自定义下载目录，默认 ./downloads，支持相对或绝对路径
   -c 并发数                   下载并发，默认 2，可在界面设置中修改
   -pages 页数                 每频道扫描页数；为 App 每批页数，默认 20
   -data-dir 目录              配置、缓存和任务目录，默认 ./data
