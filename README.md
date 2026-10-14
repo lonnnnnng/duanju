@@ -64,6 +64,23 @@ DUANJU_ADMIN_USER=admin DUANJU_ADMIN_PASSWORD='替换为强密码' ./duanju-vX.Y
 
 ## Linux 后台运行、日志与更新
 
+### 一键安装（Linux systemd）
+
+在 Linux 服务器上执行以下命令，会自动识别 CPU 架构，下载最新 Release，校验 SHA-256，安装 systemd 服务和管理脚本，并等待健康检查通过：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lonnnnnng/duanju/main/scripts/install.sh | bash
+```
+
+安装器默认使用当前用户、`~/duanju` 和 `~/duanju/downloads`。也可以先下载后执行，便于审阅脚本：
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/lonnnnnng/duanju/main/scripts/install.sh -o install-duanju.sh
+bash install-duanju.sh
+```
+
+可选环境变量：`DUANJU_VERSION=v0.1.10` 固定版本，`DUANJU_INSTALL_DIR` 修改安装目录，`DUANJU_OUTPUT_DIR` 修改下载目录，`DUANJU_LISTEN` 修改监听地址。安装完成后首次登录密码可从 `sudo journalctl -u duanju -n 30 --no-pager` 查看；登录后建议立即修改密码。
+
 ### systemd
 
 把可执行文件命名为 `duanju`，与 `data/`、下载目录放在安装目录，然后生成服务文件：

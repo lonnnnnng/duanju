@@ -2,7 +2,8 @@
 set -euo pipefail
 
 SERVICE_NAME="${DUANJU_SERVICE_NAME:-duanju}"
-INSTALL_DIR="${DUANJU_INSTALL_DIR:-$HOME/duanju}"
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)"
+INSTALL_DIR="${DUANJU_INSTALL_DIR:-$SCRIPT_DIR}"
 DATA_DIR="${DUANJU_DATA_DIR:-${INSTALL_DIR}/data}"
 ACTION="${1:-help}"
 if [[ $# -gt 0 ]]; then shift; fi
