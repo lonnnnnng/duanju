@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"sort"
 	"strconv"
@@ -17,19 +18,32 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 		return providerMedia{}, errors.New("视频 ID 无效")
 	}
 	payload := map[string]any{
-		"video_id": videoID, "content_type": 1,
-		"biz_param": map[string]any{"need_all_video_definition": true, "video_platform": 3},
+		// long: 新版预加载接口按内容类型接收分集列表；单集接口的 video_id 参数会被判为参数错误。
+		"mixed_video_id_map": map[string][]string{"1004": {videoID}}, "dr_scene": "preload",
+		"biz_param": map[string]any{
+			"detail_page_version": 0, "device_level": 3, "disable_digg_stat": false,
+			"need_all_video_definition": true, "need_mp4_align": false,
+			"use_os_player": false, "use_server_dns": false, "video_platform": 1024,
+		},
 	}
-	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/video_model/v1/", nil, payload)
+	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/multi_video_model/preload/v1/", nil, payload)
 	if err != nil {
 		return providerMedia{}, err
 	}
-	data := nestedMap(result, "data")
+	return parseHongguoAppPreloadMedia(result, videoID)
+}
+
+func parseHongguoAppPreloadMedia(result map[string]any, videoID string) (providerMedia, error) {
+	// long: 批量响应可能包含多集，必须只读取请求分集的条目，禁止回退到第一项而产生串集。
+	data := nestedMap(result, "data", videoID)
+	if len(data) == 0 {
+		return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+	}
 	model, _ := data["video_model"].(map[string]any)
 	if encoded, ok := data["video_model"].(string); ok {
 		decoder := json.NewDecoder(strings.NewReader(encoded))
 		decoder.UseNumber()
-		if err := decoder.Decode(&model); err != nil {
+		if err := decoder.Decode(&model); err != nil || decoder.Decode(new(any)) != io.EOF {
 			return providerMedia{}, errors.New(" App 播放信息格式异常")
 		}
 	}
