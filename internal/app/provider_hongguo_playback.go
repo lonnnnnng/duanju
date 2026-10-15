@@ -177,6 +177,10 @@ func hongguoContentKey(value string) ([]byte, error) {
 	if string(tag) == "app_v2" || string(tag) == "web_v2" {
 		return nil, errors.New("媒体密钥版本暂不支持")
 	}
+	web := string(tag) == "22" || string(tag) == "webdevice"
+	if !web && string(tag) != "11" && string(tag) != "appdevice" {
+		return nil, errors.New("媒体密钥版本暂不支持")
+	}
 	decoded := make([]byte, contentLength)
 	previousEven, previousOdd := byte(250), byte(85)
 	for index, current := range raw[1 : 1+contentLength] {
@@ -187,7 +191,12 @@ func hongguoContentKey(value string) ([]byte, error) {
 			previous = previousOdd
 			previousOdd = current
 		}
-		decoded[index] = byte(int(previous^current) - 21 - bits.OnesCount(uint(index)))
+		// long: 网页与 App 的密钥封装使用相反的偏移方向，必须按版本选择，否则合法网页密钥会被误判为损坏。
+		delta := 21 + bits.OnesCount(uint(index))
+		if !web {
+			delta = -delta
+		}
+		decoded[index] = byte(int(previous^current) + delta)
 	}
 	padding, err := strconv.ParseUint(string(decoded[:1]), 36, 8)
 	if err != nil || contentLength-int(padding)-1 != 32 {

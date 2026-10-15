@@ -217,7 +217,13 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 			continue
 		}
 		if len(content) == 0 || len(content) > providerMaxBodyBytes {
-			return nil, errors.New(" App 接口未返回有效数据")
+			message := " App 接口返回空正文（HTTP 200）"
+			if len(content) > providerMaxBodyBytes {
+				message = " App 接口响应超出大小限制"
+			}
+			downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.app_response", Source: sourceHongguo,
+				Host: request.URL.Hostname(), HTTPStatus: response.StatusCode, TotalBytes: int64(len(content)), Message: path + ":" + message})
+			return nil, errors.New(message)
 		}
 		var result map[string]any
 		decoder := json.NewDecoder(bytes.NewReader(content))

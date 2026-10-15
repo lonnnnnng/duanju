@@ -36,6 +36,7 @@ type hlsProxy struct {
 	assetIDs   map[string]string
 	failure    error
 	root       string
+	audio      string
 	retries    int
 	host       string
 	diagnostic func(diagnosticEvent)
@@ -69,6 +70,10 @@ func (d *Downloader) newHLSProxy(ctx context.Context, media providerMedia, key [
 		proxy.host = remote.Hostname()
 	}
 	proxy.root = proxy.addAsset(playbackRootAsset(media))
+	if media.AudioURL != "" {
+		// long: 音视频共用代理和生命周期，保证两路都沿用站源请求头、重试和取消逻辑。
+		proxy.audio = proxy.addAsset(hlsAsset{remote: media.AudioURL})
+	}
 	proxy.server = &http.Server{
 		Handler:           proxy,
 		ReadHeaderTimeout: 5 * time.Second,
@@ -80,6 +85,11 @@ func (d *Downloader) newHLSProxy(ctx context.Context, media providerMedia, key [
 		}
 	}()
 	return proxy, nil
+}
+
+func (proxy *hlsProxy) inputMedia(media providerMedia) providerMedia {
+	media.AudioURL = proxy.audio
+	return media
 }
 
 func playbackRootAsset(media providerMedia) hlsAsset {

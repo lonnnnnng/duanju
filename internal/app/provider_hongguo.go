@@ -234,6 +234,10 @@ func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, video
 	if mapString(page, "vid") != videoID || mapString(page, "series_id") != seriesID {
 		return providerMedia{}, fmt.Errorf("未返回所请求的剧集，可能仅允许网页试看；请在站点确认该集的访问权限")
 	}
+	if page["protectedPlayback"] == true {
+		// long: 新版网页只在页面中声明播放方式，媒体地址由同一分集的播放接口提供；仍先校验页面身份，避免串集。
+		return d.resolveHongguoProtectedMedia(ctx, seriesID, videoID)
+	}
 	info, _ := page["video_player_info"].(map[string]any)
 	mediaURL := mapString(info, "main_url")
 	if !isProviderHTTPMediaURL(mediaURL) {

@@ -71,6 +71,22 @@ func (downloader *Downloader) resolvePlaybackMedia(ctx context.Context, task Tas
 
 func playbackInputArgs(media providerMedia, input string, offset float64) []string {
 	args := []string{"-hide_banner", "-loglevel", "info", "-nostats", "-nostdin", "-threads", "2", "-filter_threads", "1", "-filter_complex_threads", "1"}
+	args = append(args, mediaInputArgs(media, input, offset)...)
+	return append(args, "-sn", "-dn", "-map_metadata", "-1")
+}
+
+func mediaInputArgs(media providerMedia, input string, offset float64) []string {
+	args := mediaTrackInputArgs(media, input, offset)
+	if media.AudioURL != "" {
+		// long: 分离音轨必须独立解密并同步 seek，强制映射音轨让缺声失败可见，避免生成只有画面的成功文件。
+		args = append(args, mediaTrackInputArgs(media, media.AudioURL, offset)...)
+		return append(args, "-map", "0:v:0", "-map", "1:a:0")
+	}
+	return append(args, "-map", "0:v:0", "-map", "0:a:0?")
+}
+
+func mediaTrackInputArgs(media providerMedia, input string, offset float64) []string {
+	var args []string
 	if isProviderHTTPMediaURL(input) {
 		args = append(args, "-rw_timeout", "20000000", "-protocol_whitelist", "http,https,tcp,tls,crypto,httpproxy")
 	} else {
@@ -85,7 +101,7 @@ func playbackInputArgs(media providerMedia, input string, offset float64) []stri
 	if offset > 0 {
 		args = append(args, "-ss", strconv.FormatFloat(offset, 'f', 3, 64))
 	}
-	return append(args, "-i", input, "-map", "0:v:0", "-map", "0:a:0?", "-sn", "-dn", "-map_metadata", "-1")
+	return append(args, "-i", input)
 }
 
 func playbackEncodingArgs(media providerMedia, input string, offset float64) []string {
@@ -139,6 +155,7 @@ func (app *UIApp) preparePlaybackMedia(ctx context.Context, task Task, downloadI
 			return app.mediaResources().acquire(request, "media", optional)
 		}
 		input = proxy.root
+		media = proxy.inputMedia(media)
 	}
 	return media, input, proxy, nil
 }
