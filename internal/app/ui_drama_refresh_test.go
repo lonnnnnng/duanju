@@ -16,7 +16,8 @@ import (
 
 func dramaRefreshFixture() Drama {
 	drama := coverRepairFixture()
-	drama.SortMetadata.CheckedAt = drama.SortMetadata.CheckedAt.Round(0)
+	// long: 响应和缓存会经过 JSON 往返，统一 UTC 和时钟表示，避免把相同时刻的时区差异误判为资料被修改。
+	drama.SortMetadata.CheckedAt = drama.SortMetadata.CheckedAt.UTC().Round(0)
 	return drama
 }
 

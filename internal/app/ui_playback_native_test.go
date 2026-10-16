@@ -97,6 +97,18 @@ func TestPlaybackNativeHLSSeeksRangesPrefetchAndCleanup(t *testing.T) {
 	if state.State != "ended" || state.Duration < 29.9 || state.Duration > 30.1 {
 		t.Fatalf("native run lost its full duration: %+v", state)
 	}
+	// long: 末段可读时 FFmpeg 仍可能收尾；先等转码名额释放，再验证预缓存内容，资源繁忙时主动跳过不属于缓存失败。
+	cache.mu.Lock()
+	job := cache.job
+	cache.mu.Unlock()
+	if job == nil {
+		t.Fatal("native playback did not create an encoding batch")
+	}
+	select {
+	case <-job.done:
+	case <-time.After(30 * time.Second):
+		t.Fatal("native encoding batch did not release its resources")
+	}
 	result := prefetchRequest(app, fmt.Sprintf(`{"session":"fixture","episode":2,"run":%d,"version":1}`, session.run))
 	if result.Code != http.StatusAccepted {
 		t.Fatal("native next episode was not accepted", result.Body.String())
