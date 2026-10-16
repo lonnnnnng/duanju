@@ -24,6 +24,8 @@
   let episodes = [];
   let episodeButtons = [];
   let episodePage = 0, prefetchStatusTimer = null, prefetchPreparing = false;
+  let stallRecoveryTimer = null;
+  let stallRecoveryAttempts = [];
   const completedEpisodes = new Set();
   let currentIndex = 0;
   let openingVersion = 0;
@@ -222,6 +224,8 @@
   }
 
   function stopStream() {
+    clearTimeout(stallRecoveryTimer);
+    stallRecoveryTimer = null;
     mediaLoader.destroy();
     mediaPlan = null;
     controls.reset();
@@ -251,6 +255,34 @@
     video.load();
     if (objectURL) URL.revokeObjectURL(objectURL);
     objectURL = '';
+  }
+
+  function scheduleStallRecovery() {
+    clearTimeout(stallRecoveryTimer);
+    stallRecoveryTimer = null;
+    if (loading || video.paused || video.ended || video.seeking || !panel.open || !sessionAvailable || !currentIndex || document.hidden || navigator.onLine === false) return;
+    const version = streamVersion;
+    const index = currentIndex;
+    const position = recoveryPosition();
+    stallRecoveryTimer = setTimeout(() => {
+      stallRecoveryTimer = null;
+      if (version !== streamVersion || loading || video.paused || video.ended || video.seeking || !panel.open || !sessionAvailable || currentIndex !== index || document.hidden || navigator.onLine === false) return;
+      // long: waiting 期间当前位置没有前进，说明 MSE/上游连接已停止消费；重建当前流可以释放旧连接和 FFmpeg。
+      if (Number.isFinite(video.currentTime) && video.currentTime > position + 0.25) return;
+      stallRecoveryAttempts = stallRecoveryAttempts.filter(time => Date.now() - time < 60000);
+      if (stallRecoveryAttempts.length >= 2) {
+        streamController?.abort();
+        video.pause();
+        controls.reset();
+        errorText.textContent = '播放持续缓冲，已自动重试两次；请点击“重试播放”。';
+        statusText.textContent = '播放未完成';
+        updateEpisodeControls();
+        return;
+      }
+      stallRecoveryAttempts.push(Date.now());
+      statusText.textContent = '播放停滞，正在自动恢复…';
+      playEpisode(index, recoveryPosition(), true, true);
+    }, 8000);
   }
 
   function dispose(unloading = false) {
@@ -434,6 +466,7 @@
   async function open(id, title, initialIndex = 0, offset = 0, taskID = '', resume = true, fromHistory = false) {
     dispose();
     recoveryAttempts = [];
+    stallRecoveryAttempts = [];
     recoveryBlocked = false;
     planKey = '';
     dramaID = id;
@@ -672,6 +705,7 @@
 
   async function playEpisode(index, offset = 0, shouldPlay = true, keepResumeMessage = false) {
     if (!episodes[index - 1]) return;
+    if (currentIndex !== index) stallRecoveryAttempts = [];
     const nextPlanKey = dramaID + ':' + index + ':' + quality;
     if (planKey !== nextPlanKey) {planKey = nextPlanKey; planMode = 'auto'; planFallbacks = 0; networkRefreshes = 0;}
     if (!sessionAvailable) {recoverPlayback(index, offset, shouldPlay); return;}
@@ -803,9 +837,26 @@
     seekTimer = setTimeout(() => playEpisode(currentIndex, target, !video.paused), 180);
   });
   video.addEventListener('timeupdate', () => {if (!loading && Number.isFinite(video.currentTime)) {lastPosition = video.currentTime; if (!video.paused && !video.seeking) saveHistory();} maybePrefetchNext();});
-  video.addEventListener('playing', () => {desiredPlayback = true; if (!loading && !errorText.textContent) {historyPlayed = true; historyCompleted = false; statusText.textContent = '正在播放'; saveHistory(true);} maybePrefetchNext();});
-  video.addEventListener('waiting', () => {if (!loading && !errorText.textContent) statusText.textContent = '正在缓冲…';});
-  video.addEventListener('pause', () => {if (!loading && !video.error) desiredPlayback = false; if (!loading) saveHistory(true); if (!loading && !video.ended && !errorText.textContent) statusText.textContent = '已暂停';});
+  video.addEventListener('playing', () => {
+    clearTimeout(stallRecoveryTimer);
+    stallRecoveryTimer = null;
+    desiredPlayback = true;
+    if (!loading && !errorText.textContent) {historyPlayed = true; historyCompleted = false; statusText.textContent = '正在播放'; saveHistory(true);}
+    maybePrefetchNext();
+  });
+  video.addEventListener('waiting', () => {
+    if (!loading && !errorText.textContent) {
+      statusText.textContent = '正在缓冲…';
+      scheduleStallRecovery();
+    }
+  });
+  video.addEventListener('pause', () => {
+    clearTimeout(stallRecoveryTimer);
+    stallRecoveryTimer = null;
+    if (!loading && !video.error) desiredPlayback = false;
+    if (!loading) saveHistory(true);
+    if (!loading && !video.ended && !errorText.textContent) statusText.textContent = '已暂停';
+  });
   video.addEventListener('error', async () => {
     if (!video.error || !video.hasAttribute('src') || !panel.open) return;
     const version = streamVersion, code = video.error.code;
@@ -835,6 +886,7 @@
     planKey = '';
     preparedIndex = 0;
     recoveryAttempts = [];
+    stallRecoveryAttempts = [];
     recoveryBlocked = false;
     if (episodes.length && sessionAvailable) playEpisode(currentIndex || 1, lastPosition);
     else if (episodes.length) recoverPlayback(currentIndex || 1, lastPosition, true);
