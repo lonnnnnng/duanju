@@ -190,16 +190,16 @@
         <label class="wide">Emby 能访问的剧库地址<input id="embyBaseURL" type="url" maxlength="2048" placeholder="http://剧库服务器:3333"></label>
         <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required></label>
       </div>
-      <fieldset class="account-source-fieldset"><legend>同步内容</legend><label class="account-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧只显示一个“全集”，直接读取合并 MP4；切换后撤下本程序生成的旧分集入口，原视频文件保留。</small></span></label></fieldset>
+      <fieldset class="account-source-fieldset"><legend>同步内容</legend><label class="account-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
       <fieldset id="embySourceScope" class="account-source-fieldset"><legend>分集模式自动加入的范围</legend><label class="account-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>当前管理员的“在看”和“想看”，其他用户的记录独立保留。</small></span></label><label class="account-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
       <p id="embyOwner" class="small"></p>
-      <details class="emby-refresh-settings"><summary>扫描与海报同步（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知扫描，并由 Emby 获取和缓存海报，导出目录无需保存图片。已有海报会保留；本程序同步的海报随资料更新。未填写时只生成媒体库文件，使用 Emby 的实时监控或定时扫描。更换 Emby 服务器后需重新填写 API Key。</p></details>
+      <details class="emby-refresh-settings"><summary>Emby 扫描与连接（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知 Emby 扫描。本地全集模式会把海报保存到输出目录，无需 API Key；在线分集模式由 Emby 获取和缓存海报。已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换 Emby 服务器后需重新填写 API Key。</p></details>
       <div class="toolbar"><button id="embySaveBtn" type="submit">保存并应用</button><button id="embyRunBtn" class="secondary" type="button" disabled>立即同步</button></div>
     </form>
     <p id="embyFeedback" class="small" role="status" aria-live="polite"></p>
     <div class="emby-status"><strong id="embySummary">尚未同步</strong><p id="embyPosterSummary" class="small"></p><p id="embySchedule" class="small"></p><p id="embyResult" class="small" role="status"></p></div>
     <p id="embyEmpty" class="small">启用后会自动加入符合当前模式的剧集。</p><ul id="embyEntries" class="emby-entries" aria-label="Emby 同步记录"></ul>
-    <p class="small">切换同步内容会撤下本程序生成的另一种播放入口；关闭同步会停止后续更新并保留已导入文件。手动导出 ZIP 的入口仍在剧集详情中。</p>
+    <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
   </div>
 </dialog>
 <dialog id="accountPanel" class="account-dialog" aria-labelledby="accountTitle">

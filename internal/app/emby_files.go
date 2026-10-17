@@ -104,6 +104,19 @@ func writeEmbyMergedFiles(drama Drama, merge UIMergeState, base string, key []by
 }
 
 func writeEmbyShowFile(drama Drama, base string, key []byte, owner string, write func(string, []byte) error) error {
+	return writeEmbyShowMetadata(drama, embyCoverURL(drama, base, key, owner), key, write)
+}
+
+func writeEmbyLocalMergedFiles(drama Drama, merge UIMergeState, key []byte, write func(string, []byte) error) error {
+	// long: 本地全集沿用原剧集身份，但 NFO 不再引用剧库 HTTP 地址，停掉下载服务后仍可重新扫描媒体与本地海报。
+	if err := writeEmbyShowMetadata(drama, "", key, write); err != nil {
+		return err
+	}
+	title := fmt.Sprintf("全集（第%d–%d集）", merge.StartEpisode, merge.EndEpisode)
+	return writeEmbyEpisodeFile(drama.DisplayTitle(), title, 1, "Season 01/S01E001", write)
+}
+
+func writeEmbyShowMetadata(drama Drama, cover string, key []byte, write func(string, []byte) error) error {
 	title := drama.DisplayTitle()
 	type nfoValue struct {
 		Value  string `xml:",chardata"`
@@ -111,7 +124,7 @@ func writeEmbyShowFile(drama Drama, base string, key []byte, owner string, write
 		Aspect string `xml:"aspect,attr,omitempty"`
 	}
 	var thumb *nfoValue
-	if cover := embyCoverURL(drama, base, key, owner); cover != "" {
+	if cover != "" {
 		thumb = &nfoValue{Value: cover, Aspect: "poster"}
 	}
 	show := struct {

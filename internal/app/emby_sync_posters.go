@@ -25,7 +25,11 @@ type embyPosterState struct {
 }
 
 func embyPosterDestination(settings embySyncSettings, key []byte) string {
-	digest := sha256.Sum256([]byte(settings.ServerURL + "\x00" + settings.OutputDir + "\x00" + embyMetadataID(key, "instance")))
+	mode := "remote"
+	if settings.MergedOnly {
+		mode = "local"
+	}
+	digest := sha256.Sum256([]byte(mode + "\x00" + settings.ServerURL + "\x00" + settings.OutputDir + "\x00" + embyMetadataID(key, "instance")))
 	return hex.EncodeToString(digest[:])
 }
 
@@ -69,7 +73,7 @@ func (manager *embySyncManager) preparePosters(document *embySyncDocument, targe
 		}
 		if remote == "" {
 			poster.Status, poster.Error = "missing", ""
-		} else if document.Settings.ServerURL == "" {
+		} else if document.Settings.ServerURL == "" && !document.Settings.MergedOnly {
 			poster.Status, poster.Error = "unconfigured", ""
 		} else if poster.Status == "" || poster.Status == "missing" || poster.Status == "unconfigured" {
 			poster.Status = "pending"
@@ -95,6 +99,10 @@ func (manager *embySyncManager) postponePoster(poster *embyPosterState, waiting 
 }
 
 func (manager *embySyncManager) synchronizePosters(ctx context.Context, document *embySyncDocument, targets []Drama, key []byte) {
+	if document.Settings.MergedOnly {
+		manager.synchronizeLocalPosters(ctx, document, targets)
+		return
+	}
 	if document.Settings.ServerURL == "" {
 		return
 	}
@@ -204,5 +212,5 @@ func (document *embySyncDocument) posterError() error {
 	if document.PostersFailed == 0 {
 		return nil
 	}
-	return fmt.Errorf("%d 部海报同步失败，分集文件保留，海报会自动重试；请查看下方详情", document.PostersFailed)
+	return fmt.Errorf("%d 部海报同步失败，媒体库文件保留，海报会自动重试；请查看下方详情", document.PostersFailed)
 }

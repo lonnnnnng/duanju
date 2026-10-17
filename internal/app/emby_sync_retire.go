@@ -41,10 +41,10 @@ func retireEmbyInactiveFiles(ctx context.Context, settings embySyncSettings, dra
 	if err = readEmbyJSON(marker, &manifest, 8<<20); err != nil {
 		return 0, false, err
 	}
-	if manifest.Version != 1 || manifest.DramaID != dramaID || !validEmbyManifestMode(manifest.Mode) || !validEmbyRetiredMode(manifest.RetiredMode) {
+	if manifest.Version != 1 || manifest.DramaID != dramaID || !validEmbyManifestMode(manifest.Mode) || !validEmbyRetiredMode(manifest.RetiredMode) || !validEmbyLocalManifest(manifest) {
 		return 0, false, errors.New("Emby 目录所属剧集不匹配，原内容已保留")
 	}
-	// long: 剧集不再属于同步范围时，分集和全集都要撤下本程序生成的入口；已退休的旧清单也要继续清理遗留 NFO 和空目录。
+	// long: 剧集不再属于同步范围时，撤下程序生成的入口与校验匹配的入库 MP4；原下载文件和用户修改内容始终保留。
 	removed, err := retireEmbySTRMs(ctx, target, manifest, key)
 	if err != nil {
 		return removed, false, err
@@ -88,7 +88,7 @@ func retireEmbySTRMs(ctx context.Context, folder string, manifest embyFolderMani
 		return 0, errors.New("Emby 分集目录不是普通文件夹")
 	}
 	chapters := manifest.Chapters
-	merged := manifest.Mode == "merged" || manifest.Mode == "retired" && manifest.RetiredMode == "merged"
+	merged := manifest.Mode == "merged" || manifest.Mode == embyLocalMergedMode || manifest.Mode == "retired" && (manifest.RetiredMode == "merged" || manifest.RetiredMode == embyLocalMergedMode)
 	if manifest.Mode == "retired" && manifest.RetiredMode == "" && seasonExists {
 		// long: 旧版本把全集退休后只把清单模式写成 retired；读取剩余入口可恢复其单入口语义，避免按分集校验而误保留。
 		path := filepath.Join(season, "S01E001.strm")
@@ -104,6 +104,35 @@ func retireEmbySTRMs(ctx context.Context, folder string, manifest embyFolderMani
 		chapters = []embyChapter{{ID: "merged", Number: 1}}
 	}
 	var paths []string
+	if manifest.Media != nil || manifest.PendingMedia != nil {
+		actual, _, err := checkEmbyLocalMedia(ctx, folder, manifest)
+		if err != nil {
+			return 0, err
+		}
+		if actual != nil {
+			paths = append(paths, filepath.Join(folder, filepath.FromSlash(embyLocalMergedName)))
+		}
+	}
+	// long: Emby 或用户换过的海报属于用户内容，只有仍与发布清单一致的本地海报才随全集撤下。
+	seenPosters := map[string]bool{}
+	for _, poster := range []*embyLocalFile{manifest.Poster, manifest.PendingPoster} {
+		if poster == nil || seenPosters[poster.Name] {
+			continue
+		}
+		path := filepath.Join(folder, poster.Name)
+		info, err := os.Lstat(path)
+		if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxCoverBytes {
+			continue
+		}
+		actual, _, err := hashEmbyLocalFile(ctx, path, poster.Name)
+		if err != nil {
+			return 0, err
+		}
+		if sameEmbyLocalFile(actual, manifest.Poster) || sameEmbyLocalFile(actual, manifest.PendingPoster) {
+			paths = append(paths, path)
+			seenPosters[poster.Name] = true
+		}
+	}
 	seen := make(map[int]bool, len(chapters))
 	for _, chapter := range chapters {
 		if !validEmbyIdentity(manifest.DramaID, chapter.ID) || chapter.Number < 1 || chapter.Number > 2000 || seen[chapter.Number] {

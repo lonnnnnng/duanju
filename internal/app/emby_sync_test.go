@@ -84,7 +84,7 @@ func TestEmbySyncFilesIdempotentStableAndNonDestructive(t *testing.T) {
 	}
 }
 
-func TestEmbySyncMergedOnlySwitchAndLocalRange(t *testing.T) {
+func TestEmbySyncMergedOnlySwitchAndDirectFiles(t *testing.T) {
 	app, admin := administratorFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
@@ -126,33 +126,15 @@ func TestEmbySyncMergedOnlySwitchAndLocalRange(t *testing.T) {
 		t.Fatal("全集模式同步失败", manager.document.Error, entry.Error, entry.Episodes)
 	}
 	links := embyTestSTRMs(t, season)
-	if len(links) != 1 || filepath.Base(links[0]) != "S01E001.strm" {
+	if len(links) != 0 {
 		t.Fatal("全集模式仍保留分集播放入口", links)
 	}
-	body, err := os.ReadFile(links[0])
-	if err != nil || !strings.Contains(string(body), "/api/emby/merged.mp4?") {
-		t.Fatal("全集入口没有指向本地合并文件", err)
+	media := filepath.Join(season, "S01E001.mp4")
+	if body, err := os.ReadFile(media); err != nil || string(body) != "0123456789" {
+		t.Fatal("全集没有作为真实 MP4 发布", err)
 	}
-	request := httptest.NewRequest(http.MethodGet, strings.TrimSpace(string(body)), nil)
-	request.Header.Set("Range", "bytes=2-5")
-	writer := httptest.NewRecorder()
-	app.handleEmbyMerged(writer, request)
-	if writer.Code != http.StatusPartialContent || writer.Body.String() != "2345" {
-		t.Fatal("全集没有按本地 MP4 Range 播放", writer.Code, writer.Body.String())
-	}
-	head := httptest.NewRecorder()
-	app.handleEmbyMerged(head, httptest.NewRequest(http.MethodHead, strings.TrimSpace(string(body)), nil))
-	if head.Code != http.StatusOK || head.Body.Len() != 0 || head.Header().Get("Content-Type") != "video/mp4" {
-		t.Fatal("全集 HEAD 元数据不正确", head.Code, head.Body.Len())
-	}
-	badLink, _ := url.Parse(strings.TrimSpace(string(body)))
-	badQuery := badLink.Query()
-	badQuery.Set("key", strings.Repeat("0", 64))
-	badLink.RawQuery = badQuery.Encode()
-	forbidden := httptest.NewRecorder()
-	app.handleEmbyMerged(forbidden, httptest.NewRequest(http.MethodGet, badLink.String(), nil))
-	if forbidden.Code != http.StatusForbidden {
-		t.Fatal("全集播放入口接受了无效签名", forbidden.Code)
+	if body, err := os.ReadFile(filepath.Join(output, entry.Folder, "tvshow.nfo")); err != nil || strings.Contains(string(body), "/api/emby/") {
+		t.Fatal("本地全集元数据仍依赖剧库地址", err)
 	}
 	app.mu.Lock()
 	app.merges[historyFixtureDramaID].Status = "failed"
@@ -161,6 +143,9 @@ func TestEmbySyncMergedOnlySwitchAndLocalRange(t *testing.T) {
 	links = embyTestSTRMs(t, season)
 	if len(links) != 0 || manager.document.Entries[historyFixtureDramaID].Episodes != 0 {
 		t.Fatal("失效全集仍在 Emby 输出目录中", links)
+	}
+	if _, err := os.Stat(media); !os.IsNotExist(err) {
+		t.Fatal("失效全集的入库 MP4 没有撤下", err)
 	}
 	if _, err := os.Stat(filepath.Join(output, entry.Folder)); !os.IsNotExist(err) {
 		t.Fatal("失效全集的空剧集目录仍被保留", err)
@@ -291,7 +276,7 @@ func TestEmbyRetireCleansLegacyMergedNFOWithoutSTRM(t *testing.T) {
 	if err := os.WriteFile(mergedPath, []byte("video"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	folder, _, _, err := syncEmbyMergedFiles(context.Background(), settings, drama, UIMergeState{
+	folder, _, _, err := syncEmbyLegacyMergedFilesForTest(context.Background(), settings, drama, UIMergeState{
 		DramaID: drama.ID, Status: "success", StartEpisode: 1, EndEpisode: 3, OutputPath: mergedPath,
 	}, "", key, "owner")
 	if err != nil {
@@ -329,7 +314,7 @@ func TestEmbyRetirePreservesModifiedMergedNFOAcrossRetry(t *testing.T) {
 	if err := os.WriteFile(mergedPath, []byte("video"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	folder, _, _, err := syncEmbyMergedFiles(context.Background(), settings, drama, UIMergeState{
+	folder, _, _, err := syncEmbyLegacyMergedFilesForTest(context.Background(), settings, drama, UIMergeState{
 		DramaID: drama.ID, Status: "success", StartEpisode: 1, EndEpisode: 3, OutputPath: mergedPath,
 	}, "", key, "owner")
 	if err != nil {

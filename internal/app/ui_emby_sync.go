@@ -114,6 +114,9 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 	document.Error = ""
 	if settings.ServerURL == "" {
 		document.RefreshPending = false
+	} else if settings.Enabled && (!manager.document.Settings.Enabled || settings.ServerURL != manager.document.Settings.ServerURL || settings.OutputDir != manager.document.Settings.OutputDir) {
+		// long: 首次接入或切换 Emby 时，即使 MP4 和 NFO 已完整存在，也必须主动安排新服务器扫描。
+		document.RefreshPending = true
 	}
 	if err = writeEmbyJSON(manager.path, document, 0600); err == nil {
 		manager.document = document

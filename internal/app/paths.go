@@ -55,11 +55,15 @@ func checkOutputDirectory(directory string) error {
 }
 
 func ensureSharedMediaDirectory(path string) error {
-	if err := os.MkdirAll(path, 0o2775); err != nil {
+	if err := os.MkdirAll(path, os.ModeSetgid|0775); err != nil {
 		return err
 	}
-	// long: 下载目录要让剧库和 Emby 共享删除权限，并通过 SGID 让新剧集继承共享组。
-	if err := os.Chmod(path, 0o2775); err != nil && !errors.Is(err, os.ErrPermission) {
+	info, err := os.Stat(path)
+	if err != nil {
+		return err
+	}
+	// long: 下载目录通过共享组和 SGID 供两项服务访问，同时保留部署已有的其他用户权限边界，例如 2770。
+	if err := os.Chmod(path, info.Mode().Perm()|os.ModeSetgid|0070); err != nil && !errors.Is(err, os.ErrPermission) {
 		return err
 	}
 	return nil

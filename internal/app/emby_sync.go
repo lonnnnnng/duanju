@@ -131,7 +131,7 @@ func (settings *embySyncSettings) normalize() error {
 		return errors.New("Emby 输出目录无效")
 	}
 	settings.OutputDir = directory
-	if settings.Enabled || settings.BaseURL != "" {
+	if settings.Enabled && !settings.MergedOnly || settings.BaseURL != "" {
 		settings.BaseURL, err = embyBaseURL(settings.BaseURL)
 		if err != nil {
 			return err
@@ -143,7 +143,7 @@ func (settings *embySyncSettings) normalize() error {
 			return errors.New("请输入有效的 Emby 服务器 HTTP/HTTPS 地址")
 		}
 		if settings.Enabled && settings.APIKey == "" {
-			return errors.New("填写 Emby 服务器后，需要同时填写 API Key 才能通知扫描和同步海报")
+			return errors.New("填写 Emby 服务器后，需要同时填写 API Key 才能连接并通知扫描")
 		}
 	}
 	if len(settings.APIKey) > 2048 || strings.ContainsAny(settings.APIKey, "\x00\r\n") {
@@ -385,6 +385,13 @@ func (manager *embySyncManager) runOnce(parent context.Context) {
 			document.Error = "同步状态保存失败：" + manager.safeError(err, document.Settings.APIKey)
 		}
 		manager.document = document
+	} else if (document.RefreshPending || document.WrittenFiles > 0) && manager.document.Settings.ServerURL != "" &&
+		manager.document.Settings.ServerURL == document.Settings.ServerURL && manager.document.Settings.OutputDir == document.Settings.OutputDir {
+		// long: 合并清理再次通知时可能取消已经发布文件的旧轮次；文件没有回滚，扫描待办必须交给新轮次并落盘，避免重启后漏扫。
+		manager.document.RefreshPending = true
+		if err = writeEmbyJSON(manager.path, manager.document, 0600); err != nil {
+			manager.document.Error = "同步状态保存失败：" + manager.safeError(err, manager.document.Settings.APIKey)
+		}
 	}
 	manager.mu.Unlock()
 }
@@ -485,7 +492,12 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 			}
 			entry := document.Entries[drama.ID]
 			entry.Title, entry.CheckedAt = drama.DisplayTitle(), time.Now()
-			dramaCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+			timeout := 90 * time.Second
+			if document.Settings.MergedOnly {
+				// long: 跨磁盘发布全集需要完整复制大文件，沿用在线元数据的 90 秒上限会让正常入库反复中断。
+				timeout = 10 * time.Minute
+			}
+			dramaCtx, cancel := context.WithTimeout(ctx, timeout)
 			var written, episodes int
 			var fetchErr error
 			if document.Settings.MergedOnly {
@@ -495,8 +507,13 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 				if state != nil {
 					merge = *state
 				}
+				// long: 目标列表与实际发布之间可能发生重新合并或删除，复制前必须重新确认当前全集仍属于受管理的下载目录。
+				_, path, pathErr := manager.app.mergedPlaybackTaskLocked(mergedPlaybackPrefix + drama.ID)
+				merge.OutputPath, fetchErr = path, pathErr
 				manager.app.mu.Unlock()
-				entry.Folder, written, episodes, fetchErr = syncEmbyMergedFiles(dramaCtx, document.Settings, drama, merge, entry.Folder, key, owner.ID)
+				if fetchErr == nil {
+					entry.Folder, written, episodes, fetchErr = syncEmbyMergedFiles(dramaCtx, document.Settings, drama, merge, entry.Folder, key, owner.ID)
+				}
 			} else {
 				var title string
 				var chapters []Chapter
@@ -508,7 +525,8 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 			}
 			if fetchErr == nil {
 				document.WrittenFiles += written
-				if written > 0 {
+				// long: 首次入库可能在文件发布后、同步记录保存前中断；恢复时文件无需重写，但 Emby 仍需要收到扫描通知。
+				if written > 0 || entry.SyncedAt.IsZero() {
 					document.RefreshPending = document.Settings.ServerURL != ""
 				}
 				entry.Title, entry.Episodes, entry.SyncedAt = drama.DisplayTitle(), episodes, time.Now()
@@ -531,13 +549,19 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 		document.RefreshPending = document.Settings.ServerURL != ""
 	}
 	manager.preparePosters(document, targets, key)
+	if document.Settings.MergedOnly {
+		// long: 本地海报先落盘再通知扫描，Emby 不必等下载服务提供图片接口即可读到完整媒体目录。
+		manager.synchronizePosters(ctx, document, targets, key)
+	}
 	if document.RefreshPending && document.Settings.ServerURL != "" {
 		if err := notifyEmbyLibrary(ctx, document.Settings); err != nil {
 			return fmt.Errorf("文件已保留，通知 Emby 扫描失败：%w", err)
 		}
 		document.RefreshPending = false
 	}
-	manager.synchronizePosters(ctx, document, targets, key)
+	if !document.Settings.MergedOnly {
+		manager.synchronizePosters(ctx, document, targets, key)
+	}
 	document.countPosters(targets)
 	if document.Failed > 0 {
 		return fmt.Errorf("%d 部同步失败，已导入内容保留，可查看下方详情或稍后重试", document.Failed)

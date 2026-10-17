@@ -19,7 +19,15 @@ export function createEmby(app) {
     $('embyServerURL').value = settings.serverUrl || '';
     $('embyAPIKey').value = '';
     $('embyAPIKey').placeholder = state.hasAPIKey ? '已保存，留空保留' : '在 Emby 控制台创建 API Key';
-    $('embyBaseURL').required = settings.enabled;
+    sourceFields();
+  }
+
+  function sourceFields() {
+    const local = $('embyMergedOnly').checked;
+    // long: 本地全集由 Emby 读取共享目录，只有在线分集模式才需要可访问的剧库播放地址。
+    $('embyBaseURL').disabled = local;
+    $('embyBaseURL').required = $('embyEnabled').checked && !local;
+    $('embySourceScope').disabled = local;
   }
 
   function render() {
@@ -30,7 +38,7 @@ export function createEmby(app) {
     $('embyRunBtn').textContent = state.running ? '正在同步…' : '立即同步';
     $('embyOwner').textContent = state.owner ? (state.settings.mergedOnly ? '同步账号：' : '追剧账号：') + state.owner : '保存后使用当前管理员账号。';
     $('embySummary').textContent = '已导入 ' + imported + ' 部 · ' + (state.episodes || 0) + (state.settings.mergedOnly ? ' 个全集' : ' 集') + (state.pending ? ' · 待处理 ' + state.pending + ' 部' : '');
-    $('embyPosterSummary').textContent = state.settings.serverUrl ? '海报已同步 ' + (state.postersSynced || 0) + ' 部' + (state.postersPending ? ' · 等待 ' + state.postersPending + ' 部' : '') + (state.postersFailed ? ' · 失败待重试 ' + state.postersFailed + ' 部' : '') : '填写 Emby 服务器地址和 API Key 后可自动同步海报。';
+    $('embyPosterSummary').textContent = state.settings.mergedOnly || state.settings.serverUrl ? (state.settings.mergedOnly ? '本地海报已同步 ' : '海报已同步 ') + (state.postersSynced || 0) + ' 部' + (state.postersPending ? ' · 等待 ' + state.postersPending + ' 部' : '') + (state.postersFailed ? ' · 失败待重试 ' + state.postersFailed + ' 部' : '') : '填写 Emby 服务器地址和 API Key 后可自动同步海报。';
     $('embySchedule').textContent = state.running ? '正在更新媒体库文件和海报状态…' : state.settings.enabled ? '最近完成：' + date(state.lastFinishedAt) + ' · 下次检查：' + date(state.nextRunAt) : '自动同步已关闭，已导入的文件保留。';
     $('embyResult').textContent = state.error || (state.lastFinishedAt && !state.lastFinishedAt.startsWith('0001') ? '最近一轮：成功 ' + state.succeeded + ' 部，失败 ' + state.failed + ' 部，更新 ' + state.writtenFiles + ' 个文件。' : '');
     $('embyResult').classList.toggle('error', Boolean(state.error));
@@ -73,7 +81,7 @@ export function createEmby(app) {
     if (saving || !state) return;
     saving = true;
     $('embySaveBtn').disabled = true;
-    const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyBaseURL').value.trim(), intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
+    const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyMergedOnly').checked ? '' : $('embyBaseURL').value.trim(), intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
     if ($('embyAPIKey').value) input.apiKey = $('embyAPIKey').value;
     try {
       state = await app.post('/api/ui/admin/emby', input);
@@ -104,8 +112,8 @@ export function createEmby(app) {
 
   function init() {
     $('embyForm').addEventListener('submit', save);
-    $('embyEnabled').addEventListener('change', () => {$('embyBaseURL').required = $('embyEnabled').checked;});
-    $('embyMergedOnly').addEventListener('change', () => {$('embySourceScope').disabled = $('embyMergedOnly').checked;});
+    $('embyEnabled').addEventListener('change', sourceFields);
+    $('embyMergedOnly').addEventListener('change', sourceFields);
     $('embyRunBtn').addEventListener('click', run);
     $('openEmbyBtn').addEventListener('click', () => {
       if (!app.viewer?.account?.admin) return;

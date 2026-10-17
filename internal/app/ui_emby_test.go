@@ -135,8 +135,28 @@ func TestEmbyMergedManualExportWorksWithoutBrowserCookie(t *testing.T) {
 	request := httptest.NewRequest(http.MethodHead, link, nil)
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)
-	if response.Code != http.StatusOK {
+	if response.Code != http.StatusOK || response.Body.Len() != 0 || response.Header().Get("Content-Type") != "video/mp4" {
 		t.Fatal("signed merged playback was blocked by browser login policy", response.Code, response.Body.String())
+	}
+	// long: 手动 ZIP 仍提供 HTTP 全集入口，自动同步改为文件后仍要保留 Emby 拖动播放的 Range 能力和签名校验。
+	request = httptest.NewRequest(http.MethodGet, link, nil)
+	request.Header.Set("Range", "bytes=1-3")
+	response = httptest.NewRecorder()
+	app.routes().ServeHTTP(response, request)
+	if response.Code != http.StatusPartialContent || response.Body.String() != "ide" {
+		t.Fatal("手动导出的全集 Range 播放失效", response.Code, response.Body.String())
+	}
+	invalid, err := url.Parse(link)
+	if err != nil {
+		t.Fatal(err)
+	}
+	query := invalid.Query()
+	query.Set("key", strings.Repeat("0", 64))
+	invalid.RawQuery = query.Encode()
+	response = httptest.NewRecorder()
+	app.routes().ServeHTTP(response, httptest.NewRequest(http.MethodGet, invalid.String(), nil))
+	if response.Code != http.StatusForbidden {
+		t.Fatal("手动导出的全集入口接受了无效签名", response.Code)
 	}
 }
 
