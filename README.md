@@ -134,13 +134,9 @@ journalctl -u duanju --since '10 minutes ago'
 3. 备份当前程序后原子替换，并写入启动标记。
 4. systemd 自动重启；新程序成功监听后删除标记和备份，启动失败时下一次启动自动恢复旧程序。
 
-发布构建：
+正式发版通过 [手动发版流水线](docs/releasing.md) 完成五个平台构建、校验和 Release 发布。仅在明确要求发版后手动触发，普通推送和标签推送均不触发。
 
-```bash
-VERSION=vX.Y.Z ./scripts/build.sh
-```
-
-脚本会生成五个平台程序和 `dist/SHA256SUMS`。公开仓库不需要令牌；私有仓库才设置只读 `DUANJU_GITHUB_TOKEN`，建议写入服务用户可读的 `.env` 并设置 `chmod 600`。手动 `nohup`、源码运行和 Docker 不会自动替你重启服务；Windows 运行中的程序不能原位替换。
+公开仓库在线更新不需要令牌；私有仓库才设置只读 `DUANJU_GITHUB_TOKEN`，建议写入服务用户可读的 `.env` 并设置 `chmod 600`。手动 `nohup`、源码运行和 Docker 不会自动替你重启服务；Windows 运行中的程序不能原位替换。
 
 ## 剧库、播放与下载
 

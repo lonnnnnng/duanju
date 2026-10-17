@@ -1,0 +1,166 @@
+name: 手动构建并发布 Release
+run-name: 发布 ${{ inputs.version }} · ${{ github.sha }}
+
+# long: 发版必须由明确的人工指令启动，普通代码和标签推送都不能发布应用。
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 正式版本号，例如 v0.1.12
+        required: true
+        type: string
+      notes:
+        description: 发布说明（可选，会附加自动生成的变更记录）
+        required: false
+        default: ''
+        type: string
+
+permissions:
+  contents: read
+
+# long: 串行发布可避免两个版本同时争抢 latest，已开始的发布不能被后续请求中断。
+concurrency:
+  group: duanju-release
+  cancel-in-progress: false
+
+jobs:
+  release:
+    if: github.repository == 'lonnnnnng/duanju' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    permissions:
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ inputs.version }}
+      GH_REPO: ${{ github.repository }}
+      GOTOOLCHAIN: local
+    steps:
+      - name: 检出触发时的确切提交
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: 检查版本与已有发布
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import subprocess
+
+          version = os.environ['VERSION']
+          pattern = r'v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)'
+          match = re.fullmatch(pattern, version)
+          if not match:
+              raise SystemExit('版本号必须为 vX.Y.Z，且数字不能有多余前导零')
+          releases = json.loads(subprocess.check_output([
+              'gh', 'release', 'list', '--limit', '1000',
+              '--json', 'tagName,isDraft,isPrerelease']))
+          # long: 正式更新会把该版本标记为 latest，因此拒绝覆盖版本及向旧版本倒退。
+          current = tuple(map(int, match.groups()))
+          for release in releases:
+              tag = release['tagName']
+              if tag == version:
+                  raise SystemExit('该版本的 Release 已存在，请检查草稿或选择新版本')
+              previous = re.fullmatch(pattern, tag)
+              if previous and not release['isDraft'] and not release['isPrerelease']:
+                  if current <= tuple(map(int, previous.groups())):
+                      raise SystemExit('版本号必须高于已发布的正式版本')
+          refs = json.loads(subprocess.check_output([
+              'gh', 'api', 'repos/' + os.environ['GH_REPO'] + '/git/matching-refs/tags/' + version]))
+          if any(ref['ref'] == 'refs/tags/' + version for ref in refs):
+              raise SystemExit('版本标签已存在，请使用新的版本号')
+          print('版本检查通过：' + version)
+          PY
+
+      - name: 安装 Go 稳定版
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version: stable
+          cache: false
+
+      - name: 安装媒体及反向代理测试依赖
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg nginx libdigest-sha-perl
+          command -v ffmpeg ffprobe nginx shasum
+          go version
+
+      - name: 测试与静态检查
+        run: |
+          go test ./... -count=1 -timeout=15m
+          go vet ./...
+          git diff --exit-code
+
+      - name: 构建五个平台程序与校验清单
+        run: bash scripts/build.sh
+
+      - name: 上传到草稿并核对全部资产
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_NOTES: ${{ inputs.notes }}
+        run: |
+          # long: 在线更新只读取正式 Release，先上传并核对完整产物后才允许公开新版本。
+          gh release create "$VERSION" \
+            "dist/duanju-${VERSION}-darwin-arm64" \
+            "dist/duanju-${VERSION}-darwin-amd64" \
+            "dist/duanju-${VERSION}-linux-amd64" \
+            "dist/duanju-${VERSION}-linux-arm64" \
+            "dist/duanju-${VERSION}-windows-amd64.exe" \
+            dist/SHA256SUMS \
+            --target "$GITHUB_SHA" --draft --title "$VERSION" \
+            --generate-notes --notes "$RELEASE_NOTES"
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import pathlib
+          import subprocess
+
+          release = json.loads(subprocess.check_output([
+              'gh', 'release', 'view', os.environ['VERSION'],
+              '--json', 'tagName,isDraft,targetCommitish,assets']))
+          assert release['isDraft'] and release['tagName'] == os.environ['VERSION']
+          assert release['targetCommitish'] == os.environ['GITHUB_SHA']
+          root = pathlib.Path('dist')
+          expected = {name: digest for digest, name in (
+              line.split() for line in (root / 'SHA256SUMS').read_text().splitlines())}
+          assert len(expected) == 5
+          assert {asset['name'] for asset in release['assets']} == set(expected) | {'SHA256SUMS'}
+          for asset in release['assets']:
+              path = root / asset['name']
+              digest = hashlib.sha256(path.read_bytes()).hexdigest()
+              assert asset['state'] == 'uploaded' and asset['size'] == path.stat().st_size
+              assert asset['digest'] == 'sha256:' + digest
+              if path.name != 'SHA256SUMS':
+                  assert expected[path.name] == digest
+          print('五个平台程序及 SHA256SUMS 的远端大小与摘要全部匹配')
+          PY
+
+      - name: 正式发布并复查最新版本
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release edit "$VERSION" --draft=false --latest
+          gh api "repos/${GH_REPO}/releases/latest" > "$RUNNER_TEMP/duanju-latest-release.json"
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          release = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'duanju-latest-release.json').read_text())
+          assert release['tag_name'] == os.environ['VERSION']
+          assert not release['draft'] and not release['prerelease']
+          assert len(release['assets']) == 6
+          with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
+              summary.write('## 发布完成\n\n')
+              summary.write('- Release：' + release['html_url'] + '\n')
+              summary.write('- 提交：`' + os.environ['GITHUB_SHA'] + '`\n')
+              summary.write('- 五个平台程序与 SHA256SUMS 均已校验。\n')
+          PY

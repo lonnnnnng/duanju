@@ -80,7 +80,11 @@ func (app *UIApp) generatePlayback(ctx context.Context, media *playbackMediaSess
 		proxy.acquire = func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) }
 		input = proxy.root
 	}
-	command := ffmpegMediaCommand(jobCtx, ffmpeg, playbackGeneratedArgs(media.media, input, directory, processing)...)
+	inputMedia := media.media
+	if proxy != nil {
+		inputMedia = proxy.inputMedia(inputMedia)
+	}
+	command := ffmpegMediaCommand(jobCtx, ffmpeg, playbackGeneratedArgs(inputMedia, input, directory, processing)...)
 	log := &playbackLog{text: cappedStringWriter{limit: 64 * 1024}, ready: make(chan struct{})}
 	command.Stderr = log
 	if err := command.Start(); err != nil {

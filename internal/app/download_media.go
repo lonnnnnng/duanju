@@ -3,11 +3,9 @@ package app
 import (
 	"bufio"
 	"context"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"io"
-	"net/url"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -79,26 +77,12 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 			return err
 		}
 		inputURL := proxy.root
-		origin, _ := url.Parse(media.Referer)
-		headers := fmt.Sprintf("User-Agent: %s\r\nReferer: %s\r\n", userAgent, media.Referer)
-		if origin != nil && origin.Host != "" {
-			headers += "Origin: " + origin.Scheme + "://" + origin.Host + "\r\n"
-		}
 		cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
 		args := []string{
 			"-hide_banner", "-loglevel", "error", "-nostats",
-			"-rw_timeout", "20000000",
-			"-protocol_whitelist", "http,https,tcp,tls,crypto,httpproxy",
-			"-headers", headers,
 		}
-		if media.Playlist != "" {
-			args = append(args, "-allowed_extensions", "ALL")
-		}
-		if len(media.CENCKey) > 0 {
-			args = append(args, "-decryption_key", hex.EncodeToString(media.CENCKey))
-		}
+		args = append(args, mediaInputArgs(proxy.inputMedia(media), inputURL, 0)...)
 		args = append(args,
-			"-i", inputURL,
 			"-c", "copy",
 			"-progress", "pipe:1",
 			"-f", "mp4",
@@ -204,9 +188,14 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 			continue
 		}
 		// long: FFmpeg 退出成功仍需确认 MP4 有可识别的视频流和时长，损坏分集不能标成已完成。
-		if _, probeErr := probeMergeMedia(ctx, ffmpeg, partPath); probeErr != nil {
+		info, probeErr := probeMergeMedia(ctx, ffmpeg, partPath)
+		if probeErr != nil {
 			lastErr = fmt.Errorf("下载视频校验失败：%w", probeErr)
 			_ = os.Remove(partPath)
+			continue
+		}
+		if media.AudioURL != "" && info.audioCodec == "" {
+			lastErr = errors.New("下载视频缺少源站提供的音轨")
 			continue
 		}
 		if err := ensureSharedMediaFile(partPath); err != nil {

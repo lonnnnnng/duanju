@@ -10,6 +10,7 @@ import (
 
 type providerMedia struct {
 	URL      string
+	AudioURL string
 	Referer  string
 	Duration time.Duration
 	Playlist string

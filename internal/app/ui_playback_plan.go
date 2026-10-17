@@ -34,7 +34,7 @@ var playbackProbeVideo = regexp.MustCompile(`Video: ([a-zA-Z0-9_]+)`)
 var playbackProbeAudio = regexp.MustCompile(`Audio: ([a-zA-Z0-9_]+)`)
 
 func (app *UIApp) probePlaybackCodecs(ctx context.Context, media *playbackMediaSession) error {
-	if media.info.Video != "" && media.info.Audio != "unknown" {
+	if media.info.Video != "" && media.info.Audio != "unknown" && media.media.AudioURL == "" {
 		return nil
 	}
 	ctx, cancel := context.WithTimeout(ctx, 12*time.Second)
@@ -59,7 +59,11 @@ func (app *UIApp) probePlaybackCodecs(ctx context.Context, media *playbackMediaS
 		proxy.acquire = func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) }
 		input = proxy.root
 	}
-	args := playbackInputArgs(media.media, input, 0)
+	inputMedia := media.media
+	if proxy != nil {
+		inputMedia = proxy.inputMedia(inputMedia)
+	}
+	args := playbackInputArgs(inputMedia, input, 0)
 	for index, value := range args {
 		if value == "-i" {
 			args = append(args[:index], append([]string{"-probesize", "2097152", "-analyzeduration", "2000000"}, args[index:]...)...)
@@ -97,7 +101,7 @@ func (app *UIApp) planMedia(ctx context.Context, media *playbackMediaSession, cl
 		media.plan.Player, media.plan.Processing, media.plan.Reason = "legacy", "video", "client_decode_failed"
 		return nil
 	}
-	convert := len(media.media.CENCKey) > 0 || mode == "compatible" || mode == "audio"
+	convert := len(media.media.CENCKey) > 0 || media.media.AudioURL != "" || mode == "compatible" || mode == "audio"
 	if !playbackCodecAllowed(client.Video, media.info.Video) {
 		convert = true
 	}

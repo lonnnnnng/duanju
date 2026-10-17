@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -181,6 +182,109 @@ func TestPlaybackRemuxCENCUsesDecryptedPackets(t *testing.T) {
 	if !reflect.DeepEqual(playbackFixturePackets(t, ffmpeg, source), playbackFixturePackets(t, ffmpeg, clear)) {
 		t.Fatal("CENC remux changed media packets")
 	}
+}
+
+func TestPlaybackRemuxSplitCENCKeepsAudio(t *testing.T) {
+	app, session := nativePlaybackFixture(t, "2", "640x360")
+	ffmpeg, source := app.downloader.cfg.FFmpeg, session.tasks[0].OutPath
+	directory := t.TempDir()
+	key := "000102030405060708090a0b0c0d0e0f"
+	for _, track := range []struct{ name, stream string }{{"video.mp4", "0:v:0"}, {"audio.mp4", "0:a:0"}} {
+		command := exec.Command(ffmpeg, "-hide_banner", "-loglevel", "error", "-nostdin", "-i", source, "-map", track.stream, "-c", "copy",
+			"-encryption_scheme", "cenc-aes-ctr", "-encryption_key", key, "-encryption_kid", "101112131415161718191a1b1c1d1e1f", filepath.Join(directory, track.name))
+		if output, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("generate split fixture: %v %s", err, output)
+		}
+	}
+	server := httptest.NewServer(http.FileServer(http.Dir(directory)))
+	defer server.Close()
+	app.downloader.client = server.Client()
+	decodedKey, _ := hex.DecodeString(key)
+	media := providerMedia{URL: server.URL + "/video.mp4", AudioURL: server.URL + "/audio.mp4", CENCKey: decodedKey}
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	proxy, err := app.downloader.newHLSProxy(ctx, media, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer proxy.Close()
+	process, err := startPlaybackProcess(ctx, ffmpeg, playbackRemuxArgs(proxy.inputMedia(media), proxy.root))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer process.Close()
+	clear, err := io.ReadAll(process.stdout)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := process.Wait(); err != nil {
+		t.Fatal(playbackStreamError(ctx, proxy, process.log, media, err, nil))
+	}
+	output := filepath.Join(t.TempDir(), "joined.mp4")
+	if err := os.WriteFile(output, clear, 0600); err != nil {
+		t.Fatal(err)
+	}
+	packets := playbackFixturePackets(t, ffmpeg, output)
+	if len(packets["1"]) == 0 || !reflect.DeepEqual(playbackFixturePackets(t, ffmpeg, source), packets) {
+		t.Fatal("split CENC remux lost or changed audio/video packets")
+	}
+	t.Run("generated HLS plan", func(t *testing.T) {
+		parent, stop := context.WithCancel(ctx)
+		defer stop()
+		planned := &playbackMediaSession{ctx: parent, cancel: stop, media: media}
+		defer planned.Close()
+		client := playbackClientCapabilities{MP4: true, HlsJS: true, Video: []string{"h264"}, Audio: []string{"aac"}}
+		if err := app.planMedia(parent, planned, client, "auto", sourceHongguo, "http://localhost", "/media/", ""); err != nil {
+			t.Fatal(err)
+		}
+		if planned.plan.Player != "hls" || planned.plan.Processing != "remux" || planned.info.Audio != "aac" {
+			t.Fatal("split tracks did not select HLS remux with audio")
+		}
+		outputServer := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { app.serveMediaSession(w, r, planned) }))
+		defer outputServer.Close()
+		if !reflect.DeepEqual(packets, playbackFixturePackets(t, ffmpeg, outputServer.URL+planned.plan.URL)) {
+			t.Fatal("generated HLS lost or changed audio/video packets")
+		}
+	})
+	t.Run("download through protected playback", func(t *testing.T) {
+		fixture := protectedPlaybackFixture(time.Now())
+		info := nestedMap(fixture, "play_info")
+		info["player_access_key"] = hongguoTestContentKey(decodedKey, "22")
+		nestedMap(info, "audio")["player_access_key"] = info["player_access_key"]
+		body, err := json.Marshal(fixture)
+		if err != nil {
+			t.Fatal(err)
+		}
+		// long: 全流程只访问本地合成音视频，验证 App 空响应回退网页后仍能下载到完整双轨 MP4。
+		app.downloader.client = &http.Client{Transport: rankingTransport(func(request *http.Request) (*http.Response, error) {
+			switch request.URL.Path {
+			case "/novel/player/multi_video_model/preload/v1/":
+				return rankingHTTPResponse(request, http.StatusOK, ""), nil
+			case "/player/700001/800001":
+				return rankingHTTPResponse(request, http.StatusOK, `<script>window._ROUTER_DATA={"loaderData":{"player_page":{"series_id":"700001","vid":"800001","protectedPlayback":true}}}</script>`), nil
+			case "/api/video/protected/play-info":
+				return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
+			case "/video.mp4", "/audio.mp4":
+				if request.URL.Hostname() != "video.example.test" || request.Header.Get("Referer") != hongguoBaseURL+"/player/700001/800001" {
+					return nil, fmt.Errorf("unexpected media host or missing referer")
+				}
+				local := request.Clone(request.Context())
+				local.URL.Scheme, local.URL.Host = "http", strings.TrimPrefix(server.URL, "http://")
+				return server.Client().Transport.RoundTrip(local)
+			default:
+				return nil, fmt.Errorf("unexpected fixture request path: %s", request.URL.Path)
+			}
+		})}
+		app.downloader.cfg.Retries = 1
+		task := Task{DramaID: "hongguo:700001", Index: 1, OutPath: filepath.Join(t.TempDir(), "download.mp4"),
+			Chapter: Chapter{Source: sourceHongguo, VideoURL: "hongguo-cenc://800001"}}
+		if err := app.downloader.downloadMediaWithProgress(ctx, task, nil); err != nil {
+			t.Fatal(err)
+		}
+		if !reflect.DeepEqual(packets, playbackFixturePackets(t, ffmpeg, task.OutPath)) {
+			t.Fatal("download lost or changed audio/video packets")
+		}
+	})
 }
 
 func TestPlaybackMP4InitBoundsAndCodecValidation(t *testing.T) {
