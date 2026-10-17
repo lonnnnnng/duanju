@@ -177,7 +177,7 @@ function renderGroupHead(group) {
   head.append(heading, progressBar(stats.percent), element('p', 'small', stats.percent + '% · 已写入 ' + formatBytes(stats.bytes) + (stats.speed > 0 ? ' · ' + formatBytes(stats.speed) + '/s' : '')));
   if (merge) {
     // long: 全集文件生成后若记录保存或分集清理失败，页面需提示“部分完成”，避免用户误以为整项操作已成功收尾。
-    const mergeStatus = merge.status === 'success' && merge.error ? '部分完成' : ({queued:'排队中', running:'进行中', success:'完成', failed:'失败'}[merge.status] || merge.status);
+    const mergeStatus = merge.waitingForSpace && merge.status === 'queued' ? '等待磁盘空间' : merge.status === 'success' && merge.error ? '部分完成' : ({queued:'排队中', running:'进行中', success:'完成', failed:'失败'}[merge.status] || merge.status);
     head.appendChild(element('p', merge.error ? 'error notice' : 'small notice', '合并：' + mergeStatus + ' ' + (merge.progress || 0) + '%' + (merge.detail ? ' · ' + merge.detail : '') + (merge.error ? ' · ' + merge.error : '')));
   }
   const actions = element('div', 'group-actions');

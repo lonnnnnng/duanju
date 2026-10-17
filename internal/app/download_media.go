@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"context"
+	"duanju/internal/diskspace"
 	"errors"
 	"fmt"
 	"io"
@@ -31,6 +32,13 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 		}
 	}
 	partPath := strings.TrimSuffix(task.OutPath, filepath.Ext(task.OutPath)) + ".part.mp4"
+	var reserve uint64
+	if task.Chapter.MediaSize > 0 {
+		reserve = uint64(task.Chapter.MediaSize)
+	}
+	if err := d.requireSpace(task.OutPath, reserve); err != nil {
+		return err
+	}
 	_ = os.Remove(partPath)
 	defer os.Remove(partPath)
 	if err := ensureSharedMediaDirectory(filepath.Dir(task.OutPath)); err != nil {
@@ -72,12 +80,16 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 			return errors.New("CENC 媒体的密钥或格式无效")
 		}
 		progress.setMediaTotal(media.Duration)
+		if err := d.requireSpace(task.OutPath, reserve); err != nil {
+			return err
+		}
 		proxy, err := d.newHLSProxy(ctx, media, nil)
 		if err != nil {
 			return err
 		}
 		inputURL := proxy.root
 		cmdCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+		spaceResult := diskspace.Watch(cmdCtx, partPath, cancel)
 		args := []string{
 			"-hide_banner", "-loglevel", "error", "-nostats",
 		}
@@ -95,6 +107,7 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 				proxy.Close()
 			}
 			cancel()
+			<-spaceResult
 			return err
 		}
 		stderr, err := cmd.StderrPipe()
@@ -103,6 +116,7 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 				proxy.Close()
 			}
 			cancel()
+			<-spaceResult
 			return err
 		}
 		if err := cmd.Start(); err != nil {
@@ -110,6 +124,7 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 				proxy.Close()
 			}
 			cancel()
+			<-spaceResult
 			lastErr = err
 			continue
 		}
@@ -155,6 +170,7 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 		stderrText := <-stderrDone
 		commandErr := cmdCtx.Err()
 		cancel()
+		spaceErr := <-spaceResult
 		var proxyErr error
 		if proxy != nil {
 			proxyErr = proxy.Err()
@@ -162,6 +178,9 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 		}
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
+		}
+		if spaceErr != nil {
+			return spaceErr
 		}
 		if commandErr != nil {
 			lastErr = commandErr
@@ -173,6 +192,9 @@ func (d *Downloader) downloadMediaWithProgress(ctx context.Context, task Task, c
 			continue
 		}
 		if waitErr != nil {
+			if spaceErr := diskspace.FFmpegError(stderrText); spaceErr != nil {
+				return spaceErr
+			}
 			lastErr = fmt.Errorf("ffmpeg failed: %v %s", waitErr, truncate(stderrText, 1000))
 			_ = os.Remove(partPath)
 			continue

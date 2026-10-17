@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/tls"
+	"duanju/internal/diskspace"
 	"errors"
 	"fmt"
 	"net/http"
@@ -25,6 +26,7 @@ type Downloader struct {
 	ffmpegMu        sync.Mutex
 	ffmpegInstaller *ffmpegInstaller
 	diagnostics     *diagnosticLog
+	spaceCheck      func(string, uint64) error
 }
 
 func NewDownloader(cfg Config) *Downloader {
@@ -70,7 +72,7 @@ func (d *Downloader) DownloadEpisode(ctx context.Context, task Task) error {
 
 func (d *Downloader) DownloadEpisodeWithProgress(ctx context.Context, task Task, callback func(DownloadProgress)) (resultErr error) {
 	defer func() {
-		if ctx.Err() == nil {
+		if ctx.Err() == nil && !diskspace.IsWaiting(resultErr) {
 			d.recordTaskFailure("download.failed", task, 0, resultErr)
 		}
 	}()

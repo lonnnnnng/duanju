@@ -46,6 +46,13 @@ type hlsProxy struct {
 
 var hlsURIAttribute = regexp.MustCompile(`URI="([^"]+)"`)
 
+func (proxy *hlsProxy) setAcquire(acquire func(context.Context) (func(), error)) {
+	// long: 代理服务创建后 HTTP 协程已经运行；资源限额回调的安装必须与请求读取同步，避免播放探测和下载并发读写。
+	proxy.mu.Lock()
+	proxy.acquire = acquire
+	proxy.mu.Unlock()
+}
+
 func (d *Downloader) newHLSProxy(ctx context.Context, media providerMedia, key []byte) (*hlsProxy, error) {
 	nonce := randomHex(16)
 	if nonce == "" {
@@ -258,6 +265,7 @@ func (proxy *hlsProxy) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 	}
 	proxy.mu.Lock()
 	asset, found := proxy.assets[request.URL.Path]
+	acquire := proxy.acquire
 	proxy.mu.Unlock()
 	if !found {
 		http.NotFound(writer, request)
@@ -265,8 +273,8 @@ func (proxy *hlsProxy) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 	}
 	body := asset.body
 	if len(body) == 0 {
-		if proxy.acquire != nil {
-			release, err := proxy.acquire(request.Context())
+		if acquire != nil {
+			release, err := acquire(request.Context())
 			if err != nil {
 				http.Error(writer, "媒体连接正在等待资源，请稍后重试", http.StatusServiceUnavailable)
 				return

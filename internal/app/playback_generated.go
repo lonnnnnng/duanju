@@ -77,7 +77,7 @@ func (app *UIApp) generatePlayback(ctx context.Context, media *playbackMediaSess
 			return err
 		}
 		defer proxy.Close()
-		proxy.acquire = func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) }
+		proxy.setAcquire(func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) })
 		input = proxy.root
 	}
 	inputMedia := media.media

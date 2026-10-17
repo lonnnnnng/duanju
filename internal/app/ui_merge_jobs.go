@@ -8,14 +8,15 @@ import (
 )
 
 type uiMergeJob struct {
-	dramaID string
-	tasks   []*UITask
-	remove  bool
-	ctx     context.Context
-	cancel  context.CancelFunc
-	done    chan struct{}
-	result  uiMergeResult
-	running bool
+	dramaID      string
+	tasks        []*UITask
+	remove       bool
+	ctx          context.Context
+	cancel       context.CancelFunc
+	done         chan struct{}
+	result       uiMergeResult
+	running      bool
+	userCanceled bool
 }
 
 func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMergeJob, error) {
@@ -44,6 +45,7 @@ func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMer
 		}
 	}
 	previous := cloneMergeStates(a.merges)
+	restoredOnly := true
 	var jobs, added []*uiMergeJob
 	for _, id := range ids {
 		job := a.mergeJobs[id]
@@ -57,16 +59,26 @@ func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMer
 				title = job.tasks[0].DramaTitle
 			}
 			a.merges[id] = &UIMergeState{DramaID: id, DramaTitle: title, Status: "queued", Detail: "已提交后台合并，可关闭或刷新页面", DeleteEpisodes: deleteEpisodes, UpdatedAt: time.Now()}
+			if old := previous[id]; old != nil && old.WaitingForSpace {
+				a.merges[id] = old
+			} else {
+				restoredOnly = false
+			}
 		}
 		jobs = append(jobs, job)
 	}
-	if err := a.saveStateLocked(); err != nil {
+	var saveErr error
+	// long: 恢复的等待意图已持久化；磁盘仍满时也先启动重试，避免必须先写状态才能等到空间恢复。
+	if !restoredOnly {
+		saveErr = a.saveStateLocked()
+	}
+	if saveErr != nil {
 		for _, job := range added {
 			delete(a.mergeJobs, job.dramaID)
 			job.cancel()
 		}
 		a.merges = previous
-		return nil, fmt.Errorf("保存合并任务失败：%w", err)
+		return nil, fmt.Errorf("保存合并任务失败：%w", saveErr)
 	}
 	if len(added) > 0 {
 		go a.runMergeJobs(added)
@@ -86,10 +98,27 @@ func (a *UIApp) runMergeJobs(jobs []*uiMergeJob) {
 		job.running = true
 		a.mu.Unlock()
 		if job.ctx.Err() == nil {
-			job.result = a.mergeDrama(job.ctx, job.dramaID, job.tasks, job.remove)
+			for {
+				job.result = a.mergeDrama(job.ctx, job.dramaID, job.tasks, job.remove)
+				if !job.result.WaitingForSpace {
+					break
+				}
+				select {
+				case <-job.ctx.Done():
+					a.recordMergeError(&job.result, context.Canceled, job.remove)
+				case <-time.After(5 * time.Second):
+					continue
+				}
+				break
+			}
 		} else {
 			job.result = uiMergeResult{DramaID: job.dramaID, Error: "合并已取消，原分集已保留"}
-			a.setMergeState(job.result, "failed", 0, false, job.remove)
+			a.mu.Lock()
+			if state := a.merges[job.dramaID]; state != nil {
+				job.result.WaitingForSpace = state.WaitingForSpace
+			}
+			a.mu.Unlock()
+			a.recordMergeError(&job.result, context.Canceled, job.remove)
 		}
 		job.cancel()
 		a.mu.Lock()
@@ -126,26 +155,36 @@ func (a *UIApp) handleMergeCancel(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	canceled := 0
+	previous := cloneMergeStates(a.merges)
+	var canceledJobs []*uiMergeJob
 	for _, id := range ids {
 		if job := a.mergeJobs[id]; job != nil {
-			job.cancel()
-			if !job.running {
-				job.result = uiMergeResult{DramaID: id, Error: "合并已取消，原分集已保留"}
-				if state := a.merges[id]; state != nil {
-					state.Status, state.Detail, state.Error = "failed", "", job.result.Error
-				}
-				delete(a.mergeJobs, id)
-				close(job.done)
+			if state := a.merges[id]; state != nil {
+				state.Status, state.Detail, state.Error = "failed", "", "合并已取消，原分集已保留"
+				state.WaitingForSpace = false
 			}
-			canceled++
+			canceledJobs = append(canceledJobs, job)
 		}
 	}
 	saveErr := a.saveStateLockedWithDiagnostic("ui.merge_cancel_save_failed")
+	if saveErr != nil {
+		a.merges = previous
+	} else {
+		// long: 先持久化用户取消意图，再中断后台合并；即使紧接着关机，取消也不能被“恢复空间等待”覆盖。
+		for _, job := range canceledJobs {
+			job.userCanceled = true
+			job.cancel()
+			if !job.running {
+				job.result = uiMergeResult{DramaID: job.dramaID, Error: "合并已取消，原分集已保留"}
+				delete(a.mergeJobs, job.dramaID)
+				close(job.done)
+			}
+		}
+	}
 	a.mu.Unlock()
 	if saveErr != nil {
 		a.writeStatePersistenceError(w, saveErr)
 		return
 	}
-	writeJSON(w, http.StatusOK, map[string]int{"canceled": canceled})
+	writeJSON(w, http.StatusOK, map[string]int{"canceled": len(canceledJobs)})
 }

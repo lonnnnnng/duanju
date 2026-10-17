@@ -70,7 +70,7 @@ function statusText(status){return {queued:'排队中',parsing:'解析中',runni
 
 function releaseText(status){return {finished:'完结',ongoing:'未完结',unknown:'状态未知'}[status]||'状态未知';}
 
-function phaseText(task){if(task.removeRequested)return '正在停止并清理';if(task.pauseRequested)return '暂停中';if(task.cancelRequested)return '取消中';return {preparing:'准备 FFmpeg',starting:'准备下载',resolving:'解析播放地址',retrying:'等待重试'}[task.phase]||statusText(task.status);}
+function phaseText(task){if(task.removeRequested)return '正在停止并清理';if(task.pauseRequested)return '暂停中';if(task.cancelRequested)return '取消中';return {preparing:'准备 FFmpeg',starting:'准备下载',resolving:'解析播放地址',retrying:'等待重试','waiting-space':'等待磁盘空间'}[task.phase]||statusText(task.status);}
 
 function progressText(task){ if(task.status==='success')return '100%';if(task.status==='running'&&!number(task.mediaTotalSeconds)&&!number(task.totalBytes))return phaseText(task)+' · 进度未知';return Math.max(0,Math.min(100,number(task.progress)))+'%'; }
 

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"duanju/internal/embycheck"
 	"errors"
 	"net/http"
 	"sort"
@@ -19,6 +20,7 @@ func (manager *embySyncManager) view() map[string]any {
 		totalEpisodes += entry.Episodes
 		entries = append(entries, map[string]any{"dramaId": id, "title": entry.Title, "episodes": entry.Episodes,
 			"folder": entry.Folder, "syncedAt": entry.SyncedAt, "checkedAt": entry.CheckedAt, "error": entry.Error,
+			"mediaStatus": entry.Media.State, "mediaError": entry.Media.Error, "mediaCheckedAt": entry.Media.CheckedAt, "mediaConfirmedAt": entry.Media.ConfirmedAt,
 			"posterStatus": entry.Poster.Status, "posterError": entry.Poster.Error, "posterSyncedAt": entry.Poster.SyncedAt})
 	}
 	sort.Slice(entries, func(i, j int) bool {
@@ -107,6 +109,7 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 	document.Entries = make(map[string]embySyncEntry, len(manager.document.Entries))
 	for id, entry := range manager.document.Entries {
 		entry.CheckedAt = time.Time{}
+		entry.Media = embycheck.Status{}
 		entry.Poster.CheckedAt, entry.Poster.RetryAt, entry.Poster.Failures = time.Time{}, time.Time{}, 0
 		document.Entries[id] = entry
 	}
@@ -121,6 +124,9 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 	if err = writeEmbyJSON(manager.path, document, 0600); err == nil {
 		manager.document = document
 		manager.generation++
+		if manager.confirmCancel != nil {
+			manager.confirmCancel()
+		}
 		manager.notify()
 		if manager.runCancel != nil {
 			manager.runCancel()
@@ -151,12 +157,18 @@ func (app *UIApp) handleEmbySyncNow(writer http.ResponseWriter, request *http.Re
 		err = errors.New("服务正在停止")
 	}
 	if err == nil && !manager.running {
+		manager.generation++
+		if manager.confirmCancel != nil {
+			manager.confirmCancel()
+		}
 		for id, entry := range manager.document.Entries {
 			entry.CheckedAt = time.Time{}
+			entry.Media = embycheck.Pending(time.Now())
 			entry.Poster.CheckedAt, entry.Poster.RetryAt, entry.Poster.Failures = time.Time{}, time.Time{}, 0
 			manager.document.Entries[id] = entry
 		}
 		manager.document.NextRunAt = time.Now()
+		manager.document.RefreshPending = manager.document.Settings.ServerURL != ""
 		manager.notify()
 	}
 	manager.mu.Unlock()

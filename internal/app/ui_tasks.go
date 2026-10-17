@@ -324,6 +324,8 @@ func (a *UIApp) handleResume(writer http.ResponseWriter, request *http.Request) 
 		}
 		task.Status = uiStatusQueued
 		task.Phase = "queued"
+		task.NextSpaceCheck = time.Time{}
+		task.Error = ""
 		task.Progress = 0
 		task.DownloadedBytes = 0
 		task.SpeedBytesPerSecond = 0

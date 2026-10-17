@@ -56,7 +56,7 @@ func (app *UIApp) probePlaybackCodecs(ctx context.Context, media *playbackMediaS
 			return err
 		}
 		defer proxy.Close()
-		proxy.acquire = func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) }
+		proxy.setAcquire(func(ctx context.Context) (func(), error) { return app.mediaResources().acquire(ctx, "media", false) })
 		input = proxy.root
 	}
 	inputMedia := media.media

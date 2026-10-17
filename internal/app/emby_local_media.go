@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/sha256"
+	"duanju/internal/diskspace"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -99,7 +100,7 @@ func checkEmbyLocalMedia(ctx context.Context, folder string, manifest embyFolder
 	return actual, info, nil
 }
 
-func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *embyFolderManifest) (bool, error) {
+func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *embyFolderManifest, guards ...func(string, uint64) error) (bool, error) {
 	wanted, sourceInfo, err := hashEmbyLocalFile(ctx, source, embyLocalMergedName)
 	if err != nil {
 		return false, err
@@ -141,6 +142,13 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 	linked := sourceInfo.Mode().Perm()&0040 != 0 && sameEmbyLocalGroup(sourceInfo, stageInfo) && os.Link(source, stage) == nil
 	staged := wanted
 	if !linked {
+		guard := diskspace.Require
+		if len(guards) > 0 && guards[0] != nil {
+			guard = guards[0]
+		}
+		if err := guard(filepath.Dir(target), uint64(sourceInfo.Size())); err != nil {
+			return false, err
+		}
 		input, err := os.Open(source)
 		if err != nil {
 			return false, err
@@ -155,7 +163,7 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 			return false, err
 		}
 		hash := sha256.New()
-		size, copyErr := io.CopyBuffer(io.MultiWriter(output, hash), embyContextReader{ctx: ctx, reader: input}, make([]byte, 128*1024))
+		size, copyErr := io.CopyBuffer(io.MultiWriter(output, hash), &diskspace.Reader{Reader: embyContextReader{ctx: ctx, reader: input}, Path: stage}, make([]byte, 128*1024))
 		if copyErr == nil {
 			copyErr = output.Sync()
 		}

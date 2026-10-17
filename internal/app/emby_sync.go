@@ -2,6 +2,8 @@ package app
 
 import (
 	"context"
+	"duanju/internal/diskspace"
+	"duanju/internal/embycheck"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -28,13 +30,14 @@ type embySyncSettings struct {
 }
 
 type embySyncEntry struct {
-	Folder    string          `json:"folder,omitempty"`
-	Title     string          `json:"title"`
-	Episodes  int             `json:"episodes"`
-	CheckedAt time.Time       `json:"checkedAt"`
-	SyncedAt  time.Time       `json:"syncedAt"`
-	Error     string          `json:"error,omitempty"`
-	Poster    embyPosterState `json:"poster"`
+	Folder    string           `json:"folder,omitempty"`
+	Title     string           `json:"title"`
+	Episodes  int              `json:"episodes"`
+	CheckedAt time.Time        `json:"checkedAt"`
+	SyncedAt  time.Time        `json:"syncedAt"`
+	Error     string           `json:"error,omitempty"`
+	Poster    embyPosterState  `json:"poster"`
+	Media     embycheck.Status `json:"media,omitempty"`
 }
 
 type embySyncDocument struct {
@@ -60,18 +63,20 @@ type embySyncDocument struct {
 }
 
 type embySyncManager struct {
-	app        *UIApp
-	path       string
-	mu         sync.Mutex
-	document   embySyncDocument
-	loadErr    error
-	running    bool
-	generation uint64
-	wake       chan struct{}
-	cancel     context.CancelFunc
-	runCancel  context.CancelFunc
-	done       chan struct{}
-	closed     bool
+	app           *UIApp
+	path          string
+	mu            sync.Mutex
+	document      embySyncDocument
+	loadErr       error
+	running       bool
+	generation    uint64
+	wake          chan struct{}
+	cancel        context.CancelFunc
+	runCancel     context.CancelFunc
+	done          chan struct{}
+	closed        bool
+	confirming    bool
+	confirmCancel context.CancelFunc
 }
 
 func (app *UIApp) embySyncer() *embySyncManager {
@@ -206,6 +211,9 @@ func (app *UIApp) notifyEmbyMerge(dramaID string) {
 	}
 	manager.document.NextRunAt = time.Now()
 	manager.generation++
+	if manager.confirmCancel != nil {
+		manager.confirmCancel()
+	}
 	if manager.runCancel != nil {
 		manager.runCancel()
 	}
@@ -216,10 +224,15 @@ func (manager *embySyncManager) loop(ctx context.Context) {
 	defer close(manager.done)
 	timer := time.NewTimer(time.Minute)
 	defer timer.Stop()
+	confirmation := time.NewTicker(15 * time.Second)
+	defer confirmation.Stop()
 	for {
 		select {
 		case <-ctx.Done():
 			return
+		case <-confirmation.C:
+			manager.confirmMedia(ctx)
+			continue
 		case <-manager.wake:
 		case <-timer.C:
 		}
@@ -459,6 +472,7 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 		document.WrittenFiles += removed
 		if retired {
 			entry.Episodes = 0
+			entry.Media = embycheck.Status{}
 		}
 		if retireErr != nil {
 			entry.Error = manager.safeError(retireErr, document.Settings.APIKey)
@@ -528,6 +542,7 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 				// long: 首次入库可能在文件发布后、同步记录保存前中断；恢复时文件无需重写，但 Emby 仍需要收到扫描通知。
 				if written > 0 || entry.SyncedAt.IsZero() {
 					document.RefreshPending = document.Settings.ServerURL != ""
+					entry.Media = embycheck.Pending(time.Now())
 				}
 				entry.Title, entry.Episodes, entry.SyncedAt = drama.DisplayTitle(), episodes, time.Now()
 			} else {
@@ -538,6 +553,9 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 			entry.Error = manager.safeError(fetchErr, document.Settings.APIKey)
 			if fetchErr == nil {
 				document.Succeeded++
+			} else if diskspace.IsWaiting(fetchErr) {
+				entry.CheckedAt = time.Time{}
+				document.Pending++
 			} else {
 				document.Failed++
 			}

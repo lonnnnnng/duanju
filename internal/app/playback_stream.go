@@ -150,10 +150,10 @@ func (app *UIApp) preparePlaybackMedia(ctx context.Context, task Task, downloadI
 		if err != nil {
 			return providerMedia{}, "", nil, err
 		}
-		proxy.acquire = func(request context.Context) (func(), error) {
+		proxy.setAcquire(func(request context.Context) (func(), error) {
 			optional, _ := ctx.Value(playbackPrefetchKey{}).(bool)
 			return app.mediaResources().acquire(request, "media", optional)
-		}
+		})
 		input = proxy.root
 		media = proxy.inputMedia(media)
 	}

@@ -37,7 +37,8 @@ export function createEmby(app) {
     $('embyRunBtn').disabled = saving || !state.settings.enabled || state.running;
     $('embyRunBtn').textContent = state.running ? '正在同步…' : '立即同步';
     $('embyOwner').textContent = state.owner ? (state.settings.mergedOnly ? '同步账号：' : '追剧账号：') + state.owner : '保存后使用当前管理员账号。';
-    $('embySummary').textContent = '已导入 ' + imported + ' 部 · ' + (state.episodes || 0) + (state.settings.mergedOnly ? ' 个全集' : ' 集') + (state.pending ? ' · 待处理 ' + state.pending + ' 部' : '');
+    const confirmed=entries.filter(entry=>entry.mediaStatus==='confirmed').length;
+    $('embySummary').textContent = '文件已发布 ' + imported + ' 部 · ' + (state.episodes || 0) + (state.settings.mergedOnly ? ' 个全集' : ' 集') + (state.settings.mergedOnly&&state.settings.serverUrl?' · Emby 已识别 '+confirmed+' 部':'') + (state.pending ? ' · 待处理 ' + state.pending + ' 部' : '');
     $('embyPosterSummary').textContent = state.settings.mergedOnly || state.settings.serverUrl ? (state.settings.mergedOnly ? '本地海报已同步 ' : '海报已同步 ') + (state.postersSynced || 0) + ' 部' + (state.postersPending ? ' · 等待 ' + state.postersPending + ' 部' : '') + (state.postersFailed ? ' · 失败待重试 ' + state.postersFailed + ' 部' : '') : '填写 Emby 服务器地址和 API Key 后可自动同步海报。';
     $('embySchedule').textContent = state.running ? '正在更新媒体库文件和海报状态…' : state.settings.enabled ? '最近完成：' + date(state.lastFinishedAt) + ' · 下次检查：' + date(state.nextRunAt) : '自动同步已关闭，已导入的文件保留。';
     $('embyResult').textContent = state.error || (state.lastFinishedAt && !state.lastFinishedAt.startsWith('0001') ? '最近一轮：成功 ' + state.succeeded + ' 部，失败 ' + state.failed + ' 部，更新 ' + state.writtenFiles + ' 个文件。' : '');
@@ -46,6 +47,11 @@ export function createEmby(app) {
     for (const entry of entries.slice(0, 100)) {
       const row = element('li', 'emby-entry');
       row.append(element('strong', '', entry.title || entry.dramaId), element('span', 'small', entry.episodes + (state.settings.mergedOnly ? ' 个全集 · ' : ' 集 · ') + date(entry.syncedAt)));
+      if(state.settings.mergedOnly){
+        const mediaLabel=!state.settings.serverUrl?'未连接 Emby，文件可手动扫描':entry.mediaStatus==='confirmed'?'Emby 已识别 · '+date(entry.mediaConfirmedAt):entry.mediaStatus==='error'?'Emby 入库待处理':'等待 Emby 扫描确认';
+        row.append(element('p','small',mediaLabel));
+        if(entry.mediaError)row.append(element('p','error',entry.mediaError));
+      }
       if (posterStates[entry.posterStatus]) row.append(element('p', 'small', posterStates[entry.posterStatus]));
       if (entry.error) row.append(element('p', 'error', entry.error));
       if (entry.posterError) row.append(element('p', entry.posterStatus === 'failed' ? 'error' : 'small', entry.posterError));

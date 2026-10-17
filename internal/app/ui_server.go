@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"crypto/sha256"
+	"duanju/internal/diskspace"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
@@ -109,6 +110,7 @@ type uiState struct {
 }
 
 type UIMergeState struct {
+	WaitingForSpace bool      `json:"waitingForSpace,omitempty"`
 	PlaybackTaskID  string    `json:"playbackTaskId,omitempty"`
 	DeleteRequested bool      `json:"deleteRequested,omitempty"`
 	DramaID         string    `json:"dramaId"`
@@ -129,21 +131,23 @@ type UIMergeState struct {
 }
 
 type uiMergeResult struct {
-	DramaID        string   `json:"dramaId"`
-	DramaTitle     string   `json:"dramaTitle,omitempty"`
-	OK             bool     `json:"ok"`
-	PersistFailed  bool     `json:"-"`
-	Skipped        bool     `json:"skipped,omitempty"`
-	Merged         int      `json:"merged"`
-	StartEpisode   int      `json:"startEpisode,omitempty"`
-	EndEpisode     int      `json:"endEpisode,omitempty"`
-	OutputPath     string   `json:"outputPath,omitempty"`
-	Detail         string   `json:"detail,omitempty"`
-	Error          string   `json:"error,omitempty"`
-	CleanupPending []string `json:"cleanupPending,omitempty"`
+	WaitingForSpace bool     `json:"-"`
+	DramaID         string   `json:"dramaId"`
+	DramaTitle      string   `json:"dramaTitle,omitempty"`
+	OK              bool     `json:"ok"`
+	PersistFailed   bool     `json:"-"`
+	Skipped         bool     `json:"skipped,omitempty"`
+	Merged          int      `json:"merged"`
+	StartEpisode    int      `json:"startEpisode,omitempty"`
+	EndEpisode      int      `json:"endEpisode,omitempty"`
+	OutputPath      string   `json:"outputPath,omitempty"`
+	Detail          string   `json:"detail,omitempty"`
+	Error           string   `json:"error,omitempty"`
+	CleanupPending  []string `json:"cleanupPending,omitempty"`
 }
 
 type UITask struct {
+	NextSpaceCheck       time.Time `json:"nextSpaceCheck,omitempty"`
 	ID                   string    `json:"id"`
 	DramaID              string    `json:"dramaId"`
 	DramaTitle           string    `json:"dramaTitle"`
@@ -229,6 +233,15 @@ func NewUIApp(d *Downloader) *UIApp {
 	a.loadState()
 	a.loadLibrary()
 	a.startWorkers()
+	a.mu.Lock()
+	for id, state := range a.merges {
+		if state != nil && state.WaitingForSpace && state.Status == "queued" {
+			if _, err := a.enqueueMergesLocked([]string{id}, state.DeleteEpisodes); err != nil {
+				state.Error = "恢复空间等待任务失败：" + a.redactError(err)
+			}
+		}
+	}
+	a.mu.Unlock()
 	return a
 }
 
@@ -419,6 +432,7 @@ func (a *UIApp) worker() {
 		a.mu.Lock()
 		var task *UITask
 		for task == nil && !a.closed {
+			var retryDelay time.Duration
 			if a.activeDownloads >= a.cfg.Concurrency {
 				a.cond.Wait()
 				continue
@@ -426,12 +440,29 @@ func (a *UIApp) worker() {
 			for _, id := range a.taskOrder {
 				candidate := a.tasks[id]
 				if candidate != nil && candidate.Status == uiStatusQueued {
+					if delay := time.Until(candidate.NextSpaceCheck); delay > 0 {
+						if retryDelay == 0 || delay < retryDelay {
+							retryDelay = delay
+						}
+						continue
+					}
 					task = candidate
 					break
 				}
 			}
 			if task == nil && !a.closed {
-				a.cond.Wait()
+				if retryDelay > 0 {
+					timer := time.AfterFunc(retryDelay, func() {
+						// long: 定时唤醒与队列检查使用同一把锁，防止通知早于 Wait 而让空间等待任务永久休眠。
+						a.mu.Lock()
+						a.cond.Broadcast()
+						a.mu.Unlock()
+					})
+					a.cond.Wait()
+					timer.Stop()
+				} else {
+					a.cond.Wait()
+				}
 			}
 		}
 		if a.closed {
@@ -439,6 +470,14 @@ func (a *UIApp) worker() {
 			return
 		}
 
+		if info, err := os.Stat(task.Source.OutPath); err != nil || !info.Mode().IsRegular() || info.Size() == 0 {
+			if err := a.downloader.requireSpace(task.Source.OutPath, 0); err != nil {
+				task.Phase, task.Error, task.NextSpaceCheck = "waiting-space", err.Error(), time.Now().Add(30*time.Second)
+				_ = a.saveStateLockedWithDiagnostic("ui.space_wait_save_failed")
+				a.mu.Unlock()
+				continue
+			}
+		}
 		now := time.Now()
 		before := *task
 		a.activeDownloads++
@@ -453,6 +492,7 @@ func (a *UIApp) worker() {
 		task.MediaElapsedSeconds = 0
 		task.RemainingSeconds = 0
 		task.Phase = "starting"
+		task.NextSpaceCheck = time.Time{}
 		task.Attempt++
 		task.UpdatedAt = now
 		taskID := task.ID
@@ -514,6 +554,13 @@ func (a *UIApp) worker() {
 				current.Progress = 0
 				current.Error = "已取消"
 				current.Phase = "canceled"
+			} else if diskspace.IsWaiting(err) {
+				current.Status, current.Phase, current.Error = uiStatusQueued, "waiting-space", err.Error()
+				current.Progress, current.DownloadedBytes = 0, 0
+				current.NextSpaceCheck = time.Now().Add(30 * time.Second)
+				if current.Attempt > 0 {
+					current.Attempt--
+				}
 			} else if err != nil {
 				current.Status = uiStatusFailed
 				current.Progress = 0
@@ -719,7 +766,7 @@ func (a *UIApp) loadState() {
 			changed = true
 			continue
 		}
-		if state != nil && (state.Status == "running" || state.Status == "queued") {
+		if state != nil && (state.Status == "running" || state.Status == "queued") && !state.WaitingForSpace {
 			state.Status, state.Detail, state.Error = "failed", "", "服务已重启，合并已中断；原分集已保留，可重新合并"
 			changed = true
 		}
@@ -1632,6 +1679,7 @@ func (a *UIApp) handleRetry(w http.ResponseWriter, r *http.Request) {
 		task.SpeedBytesPerSecond = 0
 		task.RemainingSeconds = 0
 		task.Phase = "queued"
+		task.NextSpaceCheck = time.Time{}
 		task.UpdatedAt = now
 		changed = true
 	}
@@ -1930,14 +1978,26 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 	}
 
 	paths := make([]string, 0, len(valid))
+	var reserve uint64
 	for _, task := range valid {
 		paths = append(paths, task.Path)
+		info, err := os.Stat(task.Path)
+		if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 {
+			res.Error = "合并前分集文件已变化，原文件已保留"
+			a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+			return res
+		}
+		reserve += uint64(info.Size())
+	}
+	// long: 空间不足返回后台队列等待，合并的两小时超时只计算实际处理时间。
+	if err := a.downloader.requireSpace(dir, reserve); err != nil {
+		a.recordMergeError(&res, err, deleteEpisodes)
+		return res
 	}
 	// long: 每次合并使用独立临时文件，不能清掉用户目录里碰巧同名的 .part.mp4。
 	partFile, err := os.CreateTemp(dir, ".duanju-merge-*.part.mp4")
 	if err != nil {
-		res.Error = "创建合并临时文件失败：" + a.redactError(err)
-		a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+		a.recordMergeError(&res, fmt.Errorf("创建合并临时文件失败：%w", err), deleteEpisodes)
 		return res
 	}
 	partPath := partFile.Name()
@@ -1951,28 +2011,38 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 		return res
 	}
 	cmdCtx, cancel := context.WithTimeout(ctx, 2*time.Hour)
-	defer cancel()
+	spaceResult := diskspace.Watch(cmdCtx, dir, cancel)
+	defer func() { cancel(); <-spaceResult }()
 	res.Detail = "正在准备 FFmpeg"
-	a.setMergeState(res, "running", 0, false, deleteEpisodes)
+	if err := a.setMergeState(res, "running", 0, false, deleteEpisodes); err != nil {
+		a.recordMergeError(&res, err, deleteEpisodes)
+		return res
+	}
 	ffmpeg, err := a.downloader.ensureFFmpeg(cmdCtx)
 	if err != nil {
-		res.Error = a.redactError(err)
-		a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+		cancel()
+		if spaceErr := <-spaceResult; spaceErr != nil {
+			err = spaceErr
+		}
+		a.recordMergeError(&res, err, deleteEpisodes)
 		return res
 	}
 	method, err := mergeMediaFiles(cmdCtx, ffmpeg, paths, partPath, func(progress int, detail string) {
 		res.Detail = detail
 		a.setMergeState(res, "running", progress, false, deleteEpisodes)
 	})
+	commandErr := cmdCtx.Err()
+	cancel()
+	if spaceErr := <-spaceResult; spaceErr != nil {
+		err = spaceErr
+	}
 	if err != nil {
-		res.Error = a.redactError(err)
-		a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+		a.recordMergeError(&res, err, deleteEpisodes)
 		return res
 	}
 	res.Detail = method
-	if err := cmdCtx.Err(); err != nil {
-		res.Error = "合并已取消，原分集已保留"
-		a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+	if commandErr != nil || ctx.Err() != nil {
+		a.recordMergeError(&res, context.Canceled, deleteEpisodes)
 		return res
 	}
 	if ok, _ := existingGood(partPath, a.cfg.SkipBytes); !ok {
@@ -1982,6 +2052,10 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 	}
 	// long: 发布全集不能覆盖合并期间出现的同名文件；优先原子链接，不支持硬链接的存储改为独占复制。
 	if err := publishMergedFile(partPath, outPath); err != nil {
+		if diskspace.IsWaiting(err) {
+			a.recordMergeError(&res, err, deleteEpisodes)
+			return res
+		}
 		if errors.Is(err, os.ErrExist) {
 			res.Error = "合并期间出现同名全集文件，未覆盖；请检查该文件后重试"
 		} else {
@@ -2006,6 +2080,13 @@ func publishMergedFile(source, target string) error {
 		return err
 	}
 	defer input.Close()
+	info, err := input.Stat()
+	if err != nil {
+		return err
+	}
+	if err := diskspace.Require(target, uint64(info.Size())); err != nil {
+		return err
+	}
 	output, err := os.OpenFile(target, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o644)
 	if err != nil {
 		return err
@@ -2021,7 +2102,7 @@ func publishMergedFile(source, target string) error {
 			_ = os.Remove(target)
 		}
 	}()
-	_, copyErr := io.Copy(output, input)
+	_, copyErr := io.Copy(output, &diskspace.Reader{Reader: input, Path: target})
 	if copyErr == nil {
 		copyErr = output.Sync()
 	}
@@ -2125,10 +2206,11 @@ func mergeOutputName(title string, start, end int) string {
 
 func (a *UIApp) setMergeState(res uiMergeResult, status string, progress int, skipped, deleteEpisodes bool) error {
 	state := &UIMergeState{
-		DramaID: res.DramaID, DramaTitle: res.DramaTitle, Status: status, Progress: progress,
+		WaitingForSpace: res.WaitingForSpace,
+		DramaID:         res.DramaID, DramaTitle: res.DramaTitle, Status: status, Progress: progress,
 		Merged: res.Merged, StartEpisode: res.StartEpisode, EndEpisode: res.EndEpisode,
 		Total: res.Merged, OutputPath: res.OutputPath, Detail: res.Detail, Error: res.Error, Skipped: skipped,
-		DeleteEpisodes: deleteEpisodes && status == "success" && len(res.CleanupPending) == 0,
+		DeleteEpisodes: deleteEpisodes && (res.WaitingForSpace || status == "success" && len(res.CleanupPending) == 0),
 		CleanupPending: append([]string(nil), res.CleanupPending...), UpdatedAt: time.Now(),
 	}
 	a.mu.Lock()

@@ -3,6 +3,7 @@ package app
 import (
 	"bufio"
 	"context"
+	"duanju/internal/diskspace"
 	"fmt"
 	"os"
 	"os/exec"
@@ -56,6 +57,9 @@ func runMergeFFmpeg(ctx context.Context, ffmpeg string, args []string, progress 
 		return ctx.Err()
 	}
 	if err != nil {
+		if spaceErr := diskspace.FFmpegError(diagnostics.String()); spaceErr != nil {
+			return spaceErr
+		}
 		return fmt.Errorf("FFmpeg 处理失败：%w %s", err, truncate(diagnostics.String(), 1500))
 	}
 	return scanner.Err()
