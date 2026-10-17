@@ -104,13 +104,18 @@ func retireEmbySTRMs(ctx context.Context, folder string, manifest embyFolderMani
 		chapters = []embyChapter{{ID: "merged", Number: 1}}
 	}
 	var paths []string
+	verifiedFiles := make(map[string]os.FileInfo)
+	verifiedHashes := make(map[string]*embyLocalFile)
 	if manifest.Media != nil || manifest.PendingMedia != nil {
-		actual, _, err := checkEmbyLocalMedia(ctx, folder, manifest)
+		actual, verified, err := checkEmbyLocalMedia(ctx, folder, manifest)
 		if err != nil {
 			return 0, err
 		}
 		if actual != nil {
-			paths = append(paths, filepath.Join(folder, filepath.FromSlash(embyLocalMergedName)))
+			path := filepath.Join(folder, filepath.FromSlash(embyLocalMergedName))
+			paths = append(paths, path)
+			verifiedFiles[path] = verified
+			verifiedHashes[path] = actual
 		}
 	}
 	// long: Emby 或用户换过的海报属于用户内容，只有仍与发布清单一致的本地海报才随全集撤下。
@@ -124,12 +129,14 @@ func retireEmbySTRMs(ctx context.Context, folder string, manifest embyFolderMani
 		if err != nil || !info.Mode().IsRegular() || info.Size() <= 0 || info.Size() > maxCoverBytes {
 			continue
 		}
-		actual, _, err := hashEmbyLocalFile(ctx, path, poster.Name)
+		actual, verified, err := hashEmbyLocalFile(ctx, path, poster.Name)
 		if err != nil {
 			return 0, err
 		}
 		if sameEmbyLocalFile(actual, manifest.Poster) || sameEmbyLocalFile(actual, manifest.PendingPoster) {
 			paths = append(paths, path)
+			verifiedFiles[path] = verified
+			verifiedHashes[path] = actual
 			seenPosters[poster.Name] = true
 		}
 	}
@@ -175,6 +182,20 @@ func retireEmbySTRMs(ctx context.Context, folder string, manifest embyFolderMani
 	for _, path := range paths {
 		if err := ctx.Err(); err != nil {
 			return removed, err
+		}
+		if verified := verifiedFiles[path]; verified != nil {
+			// long: 校验其他元数据期间媒体也可能被用户替换；删除前再次核对哈希读取时的身份，发生变化立即保留。
+			current, err := os.Lstat(path)
+			if err != nil || !sameEmbyFileSnapshot(verified, current) {
+				return removed, errors.New("Emby 文件在退休校验后发生变化，原内容已保留")
+			}
+			if embyMediaIdentity(current) == "" {
+				expected := verifiedHashes[path]
+				actual, _, err := hashEmbyLocalFile(ctx, path, expected.Name)
+				if err != nil || !sameEmbyLocalFile(actual, expected) {
+					return removed, errors.New("Emby 文件在退休校验后发生变化，原内容已保留")
+				}
+			}
 		}
 		if err := os.Remove(path); err != nil {
 			return removed, err

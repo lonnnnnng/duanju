@@ -12,15 +12,17 @@ import (
 )
 
 type embyFolderManifest struct {
-	Version       int            `json:"version"`
-	DramaID       string         `json:"dramaId"`
-	Mode          string         `json:"mode,omitempty"`
-	RetiredMode   string         `json:"retiredMode,omitempty"`
-	Chapters      []embyChapter  `json:"chapters"`
-	Media         *embyLocalFile `json:"media,omitempty"`
-	PendingMedia  *embyLocalFile `json:"pendingMedia,omitempty"`
-	Poster        *embyLocalFile `json:"localPoster,omitempty"`
-	PendingPoster *embyLocalFile `json:"pendingPoster,omitempty"`
+	Version       int             `json:"version"`
+	DramaID       string          `json:"dramaId"`
+	Mode          string          `json:"mode,omitempty"`
+	RetiredMode   string          `json:"retiredMode,omitempty"`
+	Chapters      []embyChapter   `json:"chapters"`
+	Media         *embyLocalFile  `json:"media,omitempty"`
+	PendingMedia  *embyLocalFile  `json:"pendingMedia,omitempty"`
+	Poster        *embyLocalFile  `json:"localPoster,omitempty"`
+	PendingPoster *embyLocalFile  `json:"pendingPoster,omitempty"`
+	SourceCache   *embyMediaCache `json:"sourceCache,omitempty"`
+	TargetCache   *embyMediaCache `json:"targetCache,omitempty"`
 }
 
 func validEmbyFolder(folder string) bool {
@@ -149,6 +151,7 @@ func syncEmbyManagedFiles(ctx context.Context, settings embySyncSettings, drama 
 		}
 		if merge == nil {
 			manifest.Media, manifest.PendingMedia, manifest.Poster, manifest.PendingPoster = nil, nil, nil, nil
+			manifest.SourceCache, manifest.TargetCache = nil, nil
 		}
 	}
 	// long: 模式切换时退休清理可能移除了空的 Season 目录，写入新的播放入口前重新建立它。

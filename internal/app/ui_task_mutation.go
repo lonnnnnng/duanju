@@ -6,6 +6,7 @@ type taskMutationSnapshot struct {
 	taskOrder       []string
 	merges          map[string]*UIMergeState
 	parsingInFlight map[string]bool
+	autoMerges      map[string]*UIAutoMergeState
 }
 
 func (a *UIApp) snapshotTaskMutationLocked() taskMutationSnapshot {
@@ -14,6 +15,7 @@ func (a *UIApp) snapshotTaskMutationLocked() taskMutationSnapshot {
 		tasks: make(map[string]*UITask, len(a.tasks)), values: make(map[string]UITask, len(a.tasks)),
 		taskOrder: append([]string(nil), a.taskOrder...), merges: make(map[string]*UIMergeState, len(a.merges)),
 		parsingInFlight: make(map[string]bool, len(a.parsingInFlight)),
+		autoMerges:      cloneAutoMergeStates(a.autoMerges),
 	}
 	for id, task := range a.tasks {
 		snapshot.tasks[id] = task
@@ -40,4 +42,5 @@ func (a *UIApp) restoreTaskMutationLocked(snapshot taskMutationSnapshot) {
 	a.taskOrder = snapshot.taskOrder
 	a.merges = snapshot.merges
 	a.parsingInFlight = snapshot.parsingInFlight
+	a.autoMerges = snapshot.autoMerges
 }

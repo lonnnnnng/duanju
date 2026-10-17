@@ -29,6 +29,7 @@ func TestOnlineOnlyAccountPersistsAndBlocksDownloadAPIs(t *testing.T) {
 		{http.MethodPost, "/api/ui/download", map[string]any{"ids": []string{historyFixtureDramaID}}},
 		{http.MethodPost, "/api/ui/update", map[string]any{"ids": []string{historyFixtureDramaID}}},
 		{http.MethodPost, "/api/ui/merge", map[string]any{"dramaIds": []string{historyFixtureDramaID}}},
+		{http.MethodPost, "/api/ui/merge/auto", map[string]any{"dramaIds": []string{historyFixtureDramaID}, "enabled": true}},
 		{http.MethodPost, "/api/ui/merge/cleanup", map[string]any{"dramaIds": []string{historyFixtureDramaID}}},
 		{http.MethodPost, "/api/ui/tasks/retry", map[string]any{"ids": []string{"existing-task"}}},
 		{http.MethodPost, "/api/ui/tasks/resume", map[string]any{"ids": []string{"existing-task"}}},

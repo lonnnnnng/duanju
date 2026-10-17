@@ -11,6 +11,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"time"
 )
 
 const embyLocalMergedMode = "merged-local"
@@ -82,7 +83,8 @@ func hashEmbyLocalFile(ctx context.Context, path, name string) (*embyLocalFile, 
 	after, err := file.Stat()
 	current, pathErr := os.Lstat(path)
 	if err != nil || pathErr != nil || !os.SameFile(info, current) || size != info.Size() ||
-		after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) {
+		after.Size() != info.Size() || !after.ModTime().Equal(info.ModTime()) || current.Size() != info.Size() || !current.ModTime().Equal(info.ModTime()) ||
+		embyMediaIdentity(info) != embyMediaIdentity(after) || embyMediaIdentity(info) != embyMediaIdentity(current) {
 		return nil, nil, errors.New("Emby 本地文件在读取时发生变化，请稍后重试")
 	}
 	return &embyLocalFile{Name: name, Size: size, SHA256: hex.EncodeToString(hash.Sum(nil))}, info, nil
@@ -101,6 +103,11 @@ func checkEmbyLocalMedia(ctx context.Context, folder string, manifest embyFolder
 }
 
 func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *embyFolderManifest, guards ...func(string, uint64) error) (bool, error) {
+	target := filepath.Join(folder, filepath.FromSlash(embyLocalMergedName))
+	if reuseEmbyMediaCache(ctx, source, target, manifest, time.Now()) {
+		return false, nil
+	}
+	// long: 缓存只跳过周期无变化的读盘；缓存失效、恢复发布或更换全集时仍完整校验两端，覆盖和退休删除沿用原保护。
 	wanted, sourceInfo, err := hashEmbyLocalFile(ctx, source, embyLocalMergedName)
 	if err != nil {
 		return false, err
@@ -108,10 +115,10 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 	if wanted == nil {
 		return false, errors.New("本地合并文件不存在或已移动")
 	}
-	target := filepath.Join(folder, filepath.FromSlash(embyLocalMergedName))
 	var actual *embyLocalFile
 	targetInfo, statErr := os.Lstat(target)
-	if statErr == nil && targetInfo.Mode().IsRegular() && os.SameFile(sourceInfo, targetInfo) {
+	if statErr == nil && targetInfo.Mode().IsRegular() && os.SameFile(sourceInfo, targetInfo) && targetInfo.Size() == sourceInfo.Size() &&
+		targetInfo.ModTime().Equal(sourceInfo.ModTime()) && embyMediaIdentity(sourceInfo) == embyMediaIdentity(targetInfo) {
 		// long: 硬链接与源文件共用内容，刚完成的源校验已经覆盖入库文件，避免每轮重复读取整部视频。
 		actual = wanted
 		if !sameEmbyLocalFile(actual, manifest.Media) && !sameEmbyLocalFile(actual, manifest.PendingMedia) {
@@ -126,6 +133,9 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 	if sameEmbyLocalFile(actual, wanted) {
 		recovered := manifest.PendingMedia != nil || !sameEmbyLocalFile(actual, manifest.Media)
 		manifest.Media, manifest.PendingMedia = wanted, nil
+		now := time.Now()
+		manifest.SourceCache = newEmbyMediaCache(source, wanted, sourceInfo, now)
+		manifest.TargetCache = newEmbyMediaCache(target, actual, targetInfo, now)
 		return recovered, nil
 	}
 	stageDir, err := os.MkdirTemp(filepath.Dir(target), ".duanju-media-")
@@ -141,6 +151,14 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 	// long: 硬链接保留源属组，只有源文件允许入库目录的共享组读取时才复用；否则复制继承目标属组且不修改源权限。
 	linked := sourceInfo.Mode().Perm()&0040 != 0 && sameEmbyLocalGroup(sourceInfo, stageInfo) && os.Link(source, stage) == nil
 	staged := wanted
+	sourceCheckInfo := sourceInfo
+	if linked {
+		// long: 建立硬链接本身会改变 ctime；完整校验链接后的内容并冻结新身份，发布前才能区分链接操作与外部改写。
+		staged, sourceCheckInfo, err = hashEmbyLocalFile(ctx, stage, embyLocalMergedName)
+		if err != nil {
+			return false, err
+		}
+	}
 	if !linked {
 		guard := diskspace.Require
 		if len(guards) > 0 && guards[0] != nil {
@@ -180,9 +198,14 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 		staged = &embyLocalFile{Name: embyLocalMergedName, Size: size, SHA256: hex.EncodeToString(hash.Sum(nil))}
 	}
 	currentSource, sourceErr := os.Lstat(source)
-	if sourceErr != nil || !os.SameFile(currentSource, sourceInfo) || currentSource.Size() != sourceInfo.Size() ||
-		!currentSource.ModTime().Equal(sourceInfo.ModTime()) || !sameEmbyLocalFile(staged, wanted) {
+	if sourceErr != nil || !sameEmbyFileSnapshot(currentSource, sourceCheckInfo) || !sameEmbyLocalFile(staged, wanted) {
 		return false, errors.New("全集在同步期间发生变化，旧入库视频已保留")
+	}
+	if embyMediaIdentity(currentSource) == "" {
+		checked, _, checkErr := hashEmbyLocalFile(ctx, source, embyLocalMergedName)
+		if checkErr != nil || !sameEmbyLocalFile(checked, wanted) {
+			return false, errors.New("全集在同步期间发生变化，旧入库视频已保留")
+		}
 	}
 	// long: 先保存待发布身份再替换 MP4；即使发布后进程中断，下一轮也能辨认视频并完成 STRM 迁移。
 	manifest.PendingMedia = wanted
@@ -194,8 +217,14 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 		if !errors.Is(err, os.ErrNotExist) {
 			return false, errors.New("同步期间出现同名 MP4，原文件已保留")
 		}
-	} else if err != nil || !os.SameFile(current, targetInfo) || current.Size() != targetInfo.Size() || !current.ModTime().Equal(targetInfo.ModTime()) {
+	} else if err != nil || !sameEmbyFileSnapshot(current, targetInfo) {
 		return false, errors.New("Emby 视频在同步期间发生变化，原文件已保留")
+	}
+	if targetInfo != nil && embyMediaIdentity(targetInfo) == "" {
+		checked, _, checkErr := checkEmbyLocalMedia(ctx, folder, *manifest)
+		if checkErr != nil || !sameEmbyLocalFile(checked, actual) {
+			return false, errors.New("Emby 视频在同步期间发生变化，原文件已保留")
+		}
 	}
 	if err = ctx.Err(); err != nil {
 		return false, err
@@ -204,6 +233,7 @@ func syncEmbyLocalMedia(ctx context.Context, folder, source string, manifest *em
 		return false, err
 	}
 	manifest.Media, manifest.PendingMedia = wanted, nil
+	manifest.SourceCache, manifest.TargetCache = nil, nil
 	return true, nil
 }
 

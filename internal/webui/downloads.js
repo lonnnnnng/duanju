@@ -2,7 +2,7 @@ import { reconcileChildren, withFocus, readPreference, savePreference } from './
 import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, watchLabel, historySuffix, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
 
 export function createDownloads(app) {
-  let tasks = [], visibleGroups = [], mergeStates = {}, taskRequest = false, ffmpegStatus = '';
+  let tasks = [], visibleGroups = [], mergeStates = {}, autoMergeStates = {}, taskRequest = false, ffmpegStatus = '';
   const selectedTasks = new Set(), selectedMerges = new Set(), exportingMerges = new Set(), verifyingGroups = new Set(), openGroups = new Set(), groupsEl = $('groups');
   let pollTimer, pollPromise, batch = false, taskSignature = '', ffmpegSignature = '';
   let hasActiveTasks = false, polling = false, scheduledDelay = 0;
@@ -180,6 +180,8 @@ function renderGroupHead(group) {
     const mergeStatus = merge.waitingForSpace && merge.status === 'queued' ? '等待磁盘空间' : merge.status === 'success' && merge.error ? '部分完成' : ({queued:'排队中', running:'进行中', success:'完成', failed:'失败'}[merge.status] || merge.status);
     head.appendChild(element('p', merge.error ? 'error notice' : 'small notice', '合并：' + mergeStatus + ' ' + (merge.progress || 0) + '%' + (merge.detail ? ' · ' + merge.detail : '') + (merge.error ? ' · ' + merge.error : '')));
   }
+  const automatic = autoMergeStates[group.id];
+  if (automatic?.enabled) head.appendChild(element('p', automatic.status === 'error' ? 'error notice' : 'small notice', '自动合并：' + ({waiting:'等待下载齐全',queued:'已提交',complete:'完成',error:'需处理'}[automatic.status] || '等待') + (automatic.error ? ' · ' + automatic.error : '') + ' · 保留分集'));
   const actions = element('div', 'group-actions');
   function action(label, key, callback, disabled = false, className = 'secondary') {
     const node = button(label, callback, disabled, className);
@@ -201,11 +203,19 @@ function renderGroupHead(group) {
   if (stats.failed + stats.canceled + group.tasks.filter(task => task.localFileRetryable).length) actions.appendChild(action('重试失败或不可用分集', 'retry', () => taskAction('retry', [], [group.id])));
   if (merge && ['queued', 'running'].includes(merge.status)) actions.appendChild(action('取消合并', 'cancel-merge', async () => {try {await post('/api/ui/merge/cancel', {dramaIds: [group.id]}); await pollTasks();} catch (error) {setMessage(error.message, true);}}));
   if (merge?.cleanupPending?.length) actions.appendChild(action('重试清理 ' + merge.cleanupPending.length + ' 个分集文件', 'retry-merge-cleanup', () => retryMergeCleanup(group.id)));
+  if (automatic?.enabled && automatic.status === 'error') actions.appendChild(action('重试自动合并', 'retry-auto-merge', async () => {try {await post('/api/ui/merge/auto',{dramaIds:[group.id],enabled:true});await pollTasks();} catch(error) {setMessage(error.message,true);}}));
   const menu = element('details', 'action-menu');
   const summary = element('summary', '', '更多操作');
   summary.dataset.focusKey = group.id + '-more';
   const popover = element('div', 'action-popover');
   popover.append(action('更新本剧', 'update', () => updateGroups([group.id])), action('合并已完成分集', 'merge', () => mergeGroups([group.id]), !stats.success || ['queued', 'running'].includes(merge?.status)), action('取消本剧下载', 'cancel', () => taskAction('cancel', [], [group.id]), !stats.running && !stats.queued && !stats.parsing && !stats.paused));
+  popover.appendChild(action(automatic?.enabled ? '关闭自动合并' : '下载齐后自动合并', 'auto-merge', async () => {
+    try {
+      await post('/api/ui/merge/auto', {dramaIds:[group.id],enabled:!automatic?.enabled});
+      setMessage(automatic?.enabled ? '已关闭并取消本剧自动合并，原分集保留' : '本剧下载齐并校验后自动合并，保留分集；旧记录会先解析并补齐缺失集');
+      await pollTasks();
+    } catch (error) {setMessage(error.message,true);}
+  }));
   if (stats.success) popover.appendChild(action(verifyingGroups.has(group.id) ? '校验中…' : '校验本剧文件', 'verify-files', () => verifyGroupFiles(group), verifyingGroups.has(group.id)));
   if (stats.queued) popover.append(action('优先下载', 'priority-front', () => prioritizeTasks([], [group.id], 'front')), action('稍后下载', 'priority-back', () => prioritizeTasks([], [group.id], 'back')));
   if (merge?.playbackTaskId) popover.appendChild(action(exportingMerges.has(group.id) ? '导出中…' : '导出 Emby 全集', 'export-merged', () => exportMergedEmby(group), exportingMerges.has(group.id)));
@@ -294,9 +304,10 @@ async function pollTasks() {
   pollPromise = (async () => {
     try {
       const result = await api('/api/ui/tasks');
-      const signature = JSON.stringify([result.data || [], result.merges || {}]);
+      const signature = JSON.stringify([result.data || [], result.merges || {}, result.autoMerges || {}]);
       if (signature !== taskSignature) {
         mergeStates = result.merges || {};
+        autoMergeStates = result.autoMerges || {};
         renderTasks(result.data || []);
         taskSignature = signature;
       }

@@ -8,18 +8,20 @@ import (
 )
 
 type uiMergeJob struct {
-	dramaID      string
-	tasks        []*UITask
-	remove       bool
-	ctx          context.Context
-	cancel       context.CancelFunc
-	done         chan struct{}
-	result       uiMergeResult
-	running      bool
-	userCanceled bool
+	dramaID        string
+	tasks          []*UITask
+	remove         bool
+	ctx            context.Context
+	cancel         context.CancelFunc
+	done           chan struct{}
+	result         uiMergeResult
+	running        bool
+	userCanceled   bool
+	autoGeneration uint64
+	autoSnapshot   *autoMergeSnapshot
 }
 
-func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMergeJob, error) {
+func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool, automatic ...bool) ([]*uiMergeJob, error) {
 	if a.mergeStopped {
 		return nil, fmt.Errorf("服务正在停止，无法提交合并")
 	}
@@ -52,6 +54,11 @@ func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMer
 		if job == nil {
 			ctx, cancel := context.WithCancel(context.Background())
 			job = &uiMergeJob{dramaID: id, tasks: byDrama[id], remove: deleteEpisodes, ctx: ctx, cancel: cancel, done: make(chan struct{})}
+			if len(automatic) > 0 && automatic[0] {
+				if state := a.autoMerges[id]; state != nil {
+					job.autoGeneration = state.Generation
+				}
+			}
 			a.mergeJobs[id] = job
 			added = append(added, job)
 			title := ""
@@ -59,6 +66,7 @@ func (a *UIApp) enqueueMergesLocked(ids []string, deleteEpisodes bool) ([]*uiMer
 				title = job.tasks[0].DramaTitle
 			}
 			a.merges[id] = &UIMergeState{DramaID: id, DramaTitle: title, Status: "queued", Detail: "已提交后台合并，可关闭或刷新页面", DeleteEpisodes: deleteEpisodes, UpdatedAt: time.Now()}
+			a.merges[id].Automatic = job.autoGeneration != 0
 			if old := previous[id]; old != nil && old.WaitingForSpace {
 				a.merges[id] = old
 			} else {
@@ -99,7 +107,18 @@ func (a *UIApp) runMergeJobs(jobs []*uiMergeJob) {
 		a.mu.Unlock()
 		if job.ctx.Err() == nil {
 			for {
-				job.result = a.mergeDrama(job.ctx, job.dramaID, job.tasks, job.remove)
+				if job.autoGeneration != 0 {
+					if err := a.verifyAutoMergeInputs(job.ctx, job); err != nil {
+						job.result = uiMergeResult{DramaID: job.dramaID, Error: a.redactError(err)}
+						a.recordMergeError(&job.result, err, false)
+						break
+					}
+				}
+				mergeCtx := job.ctx
+				if job.autoSnapshot != nil {
+					mergeCtx = context.WithValue(mergeCtx, autoMergeContextKey{}, job.autoSnapshot)
+				}
+				job.result = a.mergeDrama(mergeCtx, job.dramaID, job.tasks, job.remove)
 				if !job.result.WaitingForSpace {
 					break
 				}
@@ -122,6 +141,15 @@ func (a *UIApp) runMergeJobs(jobs []*uiMergeJob) {
 		}
 		job.cancel()
 		a.mu.Lock()
+		if state := a.autoMerges[job.dramaID]; state != nil && state.Enabled && state.Generation == job.autoGeneration {
+			state.Status, state.Error = "error", job.result.Error
+			if job.result.OK {
+				state.Status = "complete"
+			} else if job.result.ResumeAutomatic {
+				state.SubmittedGeneration, state.Status, state.Error = 0, "waiting", ""
+			}
+			_ = a.saveStateLockedWithDiagnostic("ui.auto_merge_finish_save_failed")
+		}
 		delete(a.mergeJobs, job.dramaID)
 		close(job.done)
 		a.mu.Unlock()
@@ -156,12 +184,15 @@ func (a *UIApp) handleMergeCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	a.mu.Lock()
 	previous := cloneMergeStates(a.merges)
+	previousAutomatic := cloneAutoMergeStates(a.autoMerges)
 	var canceledJobs []*uiMergeJob
 	for _, id := range ids {
+		a.disableAutoMergeLocked(id)
 		if job := a.mergeJobs[id]; job != nil {
 			if state := a.merges[id]; state != nil {
 				state.Status, state.Detail, state.Error = "failed", "", "合并已取消，原分集已保留"
 				state.WaitingForSpace = false
+				state.ResumeAutomatic = false
 			}
 			canceledJobs = append(canceledJobs, job)
 		}
@@ -169,6 +200,7 @@ func (a *UIApp) handleMergeCancel(w http.ResponseWriter, r *http.Request) {
 	saveErr := a.saveStateLockedWithDiagnostic("ui.merge_cancel_save_failed")
 	if saveErr != nil {
 		a.merges = previous
+		a.autoMerges = previousAutomatic
 	} else {
 		// long: 先持久化用户取消意图，再中断后台合并；即使紧接着关机，取消也不能被“恢复空间等待”覆盖。
 		for _, job := range canceledJobs {

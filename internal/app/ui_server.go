@@ -40,6 +40,9 @@ type UIApp struct {
 	tasks                    map[string]*UITask
 	taskOrder                []string
 	merges                   map[string]*UIMergeState
+	autoMerges               map[string]*UIAutoMergeState
+	autoMergeCancel          context.CancelFunc
+	autoMergeWG              sync.WaitGroup
 	lastError                string
 	loadedAt                 time.Time
 	libraryLoading           chan struct{}
@@ -101,15 +104,18 @@ type UIApp struct {
 	coverRepairSlots      chan struct{}
 }
 type uiState struct {
-	Dramas      []Drama                  `json:"dramas,omitempty"`
-	LoadedAt    time.Time                `json:"loadedAt,omitempty"`
-	LastError   string                   `json:"lastError,omitempty"`
-	TaskOrder   []string                 `json:"taskOrder"`
-	Tasks       []*UITask                `json:"tasks"`
-	MergeStates map[string]*UIMergeState `json:"merges,omitempty"`
+	Dramas      []Drama                      `json:"dramas,omitempty"`
+	LoadedAt    time.Time                    `json:"loadedAt,omitempty"`
+	LastError   string                       `json:"lastError,omitempty"`
+	TaskOrder   []string                     `json:"taskOrder"`
+	Tasks       []*UITask                    `json:"tasks"`
+	MergeStates map[string]*UIMergeState     `json:"merges,omitempty"`
+	AutoMerges  map[string]*UIAutoMergeState `json:"autoMerges,omitempty"`
 }
 
 type UIMergeState struct {
+	Automatic       bool      `json:"automatic,omitempty"`
+	ResumeAutomatic bool      `json:"resumeAutomatic,omitempty"`
 	WaitingForSpace bool      `json:"waitingForSpace,omitempty"`
 	PlaybackTaskID  string    `json:"playbackTaskId,omitempty"`
 	DeleteRequested bool      `json:"deleteRequested,omitempty"`
@@ -131,6 +137,7 @@ type UIMergeState struct {
 }
 
 type uiMergeResult struct {
+	ResumeAutomatic bool     `json:"-"`
 	WaitingForSpace bool     `json:"-"`
 	DramaID         string   `json:"dramaId"`
 	DramaTitle      string   `json:"dramaTitle,omitempty"`
@@ -234,15 +241,38 @@ func NewUIApp(d *Downloader) *UIApp {
 	a.loadLibrary()
 	a.startWorkers()
 	a.mu.Lock()
+	a.restoreWaitingMergesLocked()
+	a.mu.Unlock()
+	return a
+}
+
+func (a *UIApp) restoreWaitingMergesLocked() {
 	for id, state := range a.merges {
 		if state != nil && state.WaitingForSpace && state.Status == "queued" {
+			if state.Automatic {
+				automatic := a.autoMerges[id]
+				if automatic == nil || !automatic.Enabled {
+					state.Status, state.WaitingForSpace, state.ResumeAutomatic, state.Error = "failed", false, false, "自动合并已关闭，原分集已保留"
+					_ = a.saveStateLockedWithDiagnostic("ui.auto_merge_restore_disabled_save_failed")
+					continue
+				}
+				// long: 自动合并的恢复也只选取原完整集合；缺集时退回等待，不能使用本剧剩下的成功分集生成局部全集。
+				if tasks, reason := a.autoMergeTasksLocked(id, automatic); reason != "" {
+					automatic.SubmittedGeneration, automatic.Status, automatic.Error = 0, "waiting", reason
+					continue
+				} else if jobs, err := a.enqueueMergesLocked([]string{id}, false, true); err != nil {
+					state.Error = "恢复自动合并失败：" + a.redactError(err)
+				} else {
+					jobs[0].tasks, jobs[0].autoGeneration = tasks, automatic.Generation
+					automatic.SubmittedGeneration = automatic.Generation
+				}
+				continue
+			}
 			if _, err := a.enqueueMergesLocked([]string{id}, state.DeleteEpisodes); err != nil {
 				state.Error = "恢复空间等待任务失败：" + a.redactError(err)
 			}
 		}
 	}
-	a.mu.Unlock()
-	return a
 }
 
 func (a *UIApp) ListenAndServe(addr string) error {
@@ -281,6 +311,7 @@ func (a *UIApp) ListenAndServeContext(ctx context.Context, addr string) error {
 	a.mu.Unlock()
 
 	defer a.stopMergeJobs()
+	a.startAutoMerge()
 	defer a.closePlaybacks()
 
 	server := &http.Server{Addr: addr, Handler: a.routes(), ReadHeaderTimeout: 10 * time.Second, IdleTimeout: 2 * time.Minute}
@@ -358,6 +389,7 @@ func (a *UIApp) routes() http.Handler {
 	mux.HandleFunc("/api/ui/tasks/priority", a.handleTaskPriority)
 	mux.HandleFunc("/api/ui/tasks/verify", a.handleVerifyTasks)
 	mux.HandleFunc("/api/ui/merge", a.handleMerge)
+	mux.HandleFunc("/api/ui/merge/auto", a.handleAutoMerge)
 	mux.HandleFunc("/api/ui/merge/cancel", a.handleMergeCancel)
 	mux.HandleFunc("/api/ui/merge/cleanup", a.handleMergeCleanup)
 	mux.HandleFunc("/api/ui/ffmpeg", a.handleFFmpeg)
@@ -397,6 +429,9 @@ func (a *UIApp) ensureWorkersLocked() {
 func (a *UIApp) stopWorkers() {
 	a.mu.Lock()
 	a.closed = true
+	if a.autoMergeCancel != nil {
+		a.autoMergeCancel()
+	}
 	cancels := make([]context.CancelFunc, 0, len(a.runningCancels)+len(a.parsingCancels)+1)
 	if a.libraryCancel != nil {
 		cancels = append(cancels, a.libraryCancel)
@@ -425,6 +460,7 @@ func (a *UIApp) stopWorkers() {
 	}
 	a.workerWG.Wait()
 	a.parsingWG.Wait()
+	a.autoMergeWG.Wait()
 }
 
 func (a *UIApp) worker() {
@@ -600,6 +636,9 @@ func (a *UIApp) worker() {
 					a.removeTaskLocked(taskID)
 				}
 			}
+			if current != nil && a.tasks[taskID] == current && current.Status == uiStatusSuccess {
+				a.autoMergeDownloadFinishedLocked(current)
+			}
 			saveErr := a.saveStateLockedWithDiagnostic("ui.task_finish_save_failed")
 			a.mu.Unlock()
 			a.cond.Broadcast()
@@ -740,6 +779,12 @@ func (a *UIApp) loadState() {
 	if a.merges == nil {
 		a.merges = make(map[string]*UIMergeState)
 	}
+	a.autoMerges = cloneAutoMergeStates(state.AutoMerges)
+	for id := range a.autoMerges {
+		if sourceFromDramaID(id) != sourceHongguo {
+			delete(a.autoMerges, id)
+		}
+	}
 	for identifier, merge := range state.MergeStates {
 		if sourceFromDramaID(identifier) == sourceHongguo {
 			a.merges[identifier] = merge
@@ -768,6 +813,9 @@ func (a *UIApp) loadState() {
 		}
 		if state != nil && (state.Status == "running" || state.Status == "queued") && !state.WaitingForSpace {
 			state.Status, state.Detail, state.Error = "failed", "", "服务已重启，合并已中断；原分集已保留，可重新合并"
+			if automatic := a.autoMerges[id]; automatic != nil && automatic.Enabled {
+				automatic.SubmittedGeneration, automatic.Status = 0, "waiting"
+			}
 			changed = true
 		}
 	}
@@ -926,6 +974,7 @@ func (a *UIApp) saveStateLocked() error {
 		TaskOrder:   append([]string(nil), a.taskOrder...),
 		Tasks:       make([]*UITask, 0, len(a.tasks)),
 		MergeStates: cloneMergeStates(a.merges),
+		AutoMerges:  cloneAutoMergeStates(a.autoMerges),
 	}
 	if !a.librarySaved {
 		state.Dramas = append([]Drama(nil), a.dramas...)
@@ -1449,6 +1498,7 @@ func (a *UIApp) enqueueDramas(ctx context.Context, dramas []Drama, updateOnly bo
 			changed = true
 		}
 		if changed {
+			a.recordAutoMergeTasksLocked(drama.ID, built)
 			if saveErr := a.saveStateLockedWithDiagnostic("ui.task_enqueue_save_failed"); saveErr != nil {
 				a.restoreTaskMutationLocked(snapshot)
 				views = views[:viewStart]
@@ -1612,6 +1662,14 @@ func (a *UIApp) handleTasks(w http.ResponseWriter, r *http.Request) {
 	a.mu.Lock()
 	views := a.taskViewsForSourceLocked(r.Context())
 	merges := cloneMergeStates(a.merges)
+	automatic := cloneAutoMergeStates(a.autoMerges)
+	for id, state := range automatic {
+		if !dramaAllowed(r.Context(), id, "") {
+			delete(automatic, id)
+		} else {
+			state.RequiredTaskIDs = nil
+		}
+	}
 	for id := range merges {
 		if !dramaAllowed(r.Context(), id, "") {
 			delete(merges, id)
@@ -1623,7 +1681,7 @@ func (a *UIApp) handleTasks(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 	a.mu.Unlock()
-	writeJSON(w, http.StatusOK, map[string]any{"data": views, "merges": merges, "ffmpeg": a.downloader.ffmpegInstallation().snapshot()})
+	writeJSON(w, http.StatusOK, map[string]any{"data": views, "merges": merges, "autoMerges": automatic, "ffmpeg": a.downloader.ffmpegInstallation().snapshot()})
 }
 
 func (a *UIApp) handleRetry(w http.ResponseWriter, r *http.Request) {
@@ -1729,6 +1787,7 @@ func (a *UIApp) handleCancel(w http.ResponseWriter, r *http.Request) {
 		}
 		switch task.Status {
 		case uiStatusParsing:
+			a.disableAutoMergeLocked(task.DramaID)
 			task.PauseRequested = false
 			task.CancelRequested = true
 			if cancel := a.parsingCancels[task.DramaID]; cancel != nil {
@@ -1736,6 +1795,7 @@ func (a *UIApp) handleCancel(w http.ResponseWriter, r *http.Request) {
 			}
 			changed = true
 		case uiStatusQueued, uiStatusPaused:
+			a.disableAutoMergeLocked(task.DramaID)
 			task.PauseRequested = false
 			task.Status = uiStatusCanceled
 			task.Progress = 0
@@ -1747,6 +1807,7 @@ func (a *UIApp) handleCancel(w http.ResponseWriter, r *http.Request) {
 			task.UpdatedAt = now
 			changed = true
 		case uiStatusRunning:
+			a.disableAutoMergeLocked(task.DramaID)
 			task.PauseRequested = false
 			task.CancelRequested = true
 			task.UpdatedAt = now
@@ -1813,6 +1874,7 @@ func (a *UIApp) handleClear(w http.ResponseWriter, r *http.Request) {
 			a.removeTaskLocked(id)
 			removed++
 		}
+		a.disableAutoMergeLocked(task.DramaID)
 	}
 	saveErr := a.saveStateLockedWithDiagnostic("ui.task_clear_save_failed")
 	if saveErr != nil {
@@ -1881,6 +1943,7 @@ func (a *UIApp) handleMerge(w http.ResponseWriter, r *http.Request) {
 }
 
 func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask, deleteEpisodes bool) uiMergeResult {
+	automatic, _ := ctx.Value(autoMergeContextKey{}).(*autoMergeSnapshot)
 	res := uiMergeResult{DramaID: dramaID}
 	if len(tasks) == 0 {
 		res.Error = "没有已完成的分集可合并"
@@ -1948,6 +2011,14 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 	}
 	res.OutputPath = outPath
 	if existing, statErr := os.Lstat(outPath); statErr == nil {
+		if automatic != nil {
+			// long: 自动合并不能把可播放的同名文件当成本轮全集；只有输入集合与输出哈希均匹配的合并收据允许恢复复用。
+			if err := verifyAutoMergedReceipt(ctx, dramaID, outPath, automatic); err != nil {
+				res.Error = a.redactError(err)
+				a.recordMergeError(&res, err, false)
+				return res
+			}
+		}
 		// long: 同名文件可能是用户自行放入的媒体；不能只按大小认定为全集，更不能在校验失败后覆盖它。
 		if !existing.Mode().IsRegular() || existing.Size() < a.cfg.SkipBytes {
 			res.Error = "已有同名全集文件且未通过大小检查，未覆盖；请先移走或删除该文件"
@@ -1965,8 +2036,9 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 		}
 		verifyCancel()
 		if probeErr != nil {
-			res.Error = "已有同名全集文件但无法确认可播放，未覆盖；请先检查或移走该文件：" + a.redactError(probeErr)
-			a.setMergeState(res, "failed", 0, false, deleteEpisodes)
+			// long: 包装可播放性诊断时保留取消原因，既提示同名文件需处理，也让正常停服继续恢复自动意图。
+			err := fmt.Errorf("已有同名全集文件但无法确认可播放，未覆盖；请先检查或移走该文件：%w", probeErr)
+			a.recordMergeError(&res, err, deleteEpisodes)
 			return res
 		}
 		a.finishMergedDrama(&res, valid, true, deleteEpisodes)
@@ -2051,6 +2123,17 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 		return res
 	}
 	// long: 发布全集不能覆盖合并期间出现的同名文件；优先原子链接，不支持硬链接的存储改为独占复制。
+	if automatic != nil {
+		if err := prepareAutoMergedReceipt(ctx, dramaID, outPath, partPath, automatic); err != nil {
+			res.Error = a.redactError(err)
+			a.recordMergeError(&res, err, false)
+			return res
+		}
+	}
+	if err := ctx.Err(); err != nil {
+		a.recordMergeError(&res, err, deleteEpisodes)
+		return res
+	}
 	if err := publishMergedFile(partPath, outPath); err != nil {
 		if diskspace.IsWaiting(err) {
 			a.recordMergeError(&res, err, deleteEpisodes)
@@ -2206,6 +2289,7 @@ func mergeOutputName(title string, start, end int) string {
 
 func (a *UIApp) setMergeState(res uiMergeResult, status string, progress int, skipped, deleteEpisodes bool) error {
 	state := &UIMergeState{
+		ResumeAutomatic: res.ResumeAutomatic,
 		WaitingForSpace: res.WaitingForSpace,
 		DramaID:         res.DramaID, DramaTitle: res.DramaTitle, Status: status, Progress: progress,
 		Merged: res.Merged, StartEpisode: res.StartEpisode, EndEpisode: res.EndEpisode,
@@ -2214,6 +2298,15 @@ func (a *UIApp) setMergeState(res uiMergeResult, status string, progress int, sk
 		CleanupPending: append([]string(nil), res.CleanupPending...), UpdatedAt: time.Now(),
 	}
 	a.mu.Lock()
+	if job := a.mergeJobs[res.DramaID]; job != nil {
+		state.Automatic = job.autoGeneration != 0
+		if job.userCanceled && status != "success" {
+			// long: 关闭与错误回调可能交错，最终写入必须在同一锁内复查取消；已发布成功的全集仍保留成功记录。
+			status, state.Status, state.Progress = "failed", "failed", 0
+			state.WaitingForSpace, state.ResumeAutomatic, state.DeleteEpisodes = false, false, false
+			state.Detail, state.Error = "", "合并已取消，原分集已保留"
+		}
+	}
 	if a.merges == nil {
 		a.merges = map[string]*UIMergeState{}
 	}

@@ -97,6 +97,7 @@ func (a *UIApp) handleDeleteTasks(writer http.ResponseWriter, request *http.Requ
 	var markedMerges []string
 	for _, dramaID := range input.MergedDramaIDs {
 		if merge := a.merges[dramaID]; merge != nil {
+			a.disableAutoMergeLocked(dramaID)
 			marked := *merge
 			marked.DeleteRequested = true
 			a.merges[dramaID] = &marked
@@ -106,6 +107,7 @@ func (a *UIApp) handleDeleteTasks(writer http.ResponseWriter, request *http.Requ
 	for _, id := range ids {
 		if task := a.tasks[id]; task != nil {
 			task.RemoveRequested, task.DeleteFilesRequested = true, true
+			a.disableAutoMergeLocked(task.DramaID)
 			if task.Status == uiStatusRunning || task.Status == uiStatusParsing {
 				task.CancelRequested = true
 			}
@@ -340,9 +342,12 @@ func (a *UIApp) deleteManagedPath(path, dramaID string) (bool, error) {
 	}
 	err := os.Remove(path)
 	if errors.Is(err, os.ErrNotExist) {
-		return false, nil
+		return false, removeAutoMergedReceipt(path, dramaID)
 	}
-	return err == nil, err
+	if err != nil {
+		return false, err
+	}
+	return true, removeAutoMergedReceipt(path, dramaID)
 }
 
 func (a *UIApp) validateDeletePath(path, dramaID string) error {

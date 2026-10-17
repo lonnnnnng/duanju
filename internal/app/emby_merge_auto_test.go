@@ -20,8 +20,9 @@ func TestEmbyLocalNewBackgroundMergeAutomaticallyPublishes(t *testing.T) {
 	if err != nil {
 		t.Skip("FFmpeg unavailable")
 	}
-	for _, remove := range []bool{false, true} {
-		t.Run(map[bool]string{false: "keep-episodes", true: "clean-episodes"}[remove], func(t *testing.T) {
+	for _, mode := range []string{"keep-episodes", "clean-episodes", "auto-merge"} {
+		t.Run(mode, func(t *testing.T) {
+			remove := mode == "clean-episodes"
 			app, admin := administratorFixture(t)
 			app.statePath = filepath.Join(app.cfg.dataDirectory(), "ui-state.json")
 			app.cfg.SkipBytes = 1
@@ -70,11 +71,27 @@ func TestEmbyLocalNewBackgroundMergeAutomaticallyPublishes(t *testing.T) {
 			manager.start()
 			t.Cleanup(manager.stop)
 			t.Cleanup(app.stopMergeJobs)
+			t.Cleanup(app.stopWorkers)
 			// long: 从没有合并记录和入库条目的新剧开始，只提交后台合并；测试不能手动调用同步来掩盖通知链路断开。
 			started := time.Now()
-			response := admin.request(t, http.MethodPost, "/api/ui/merge", map[string]any{"dramaIds": []string{drama.ID}, "async": true, "deleteEpisodes": remove})
-			if response.Code != http.StatusAccepted {
-				t.Fatal("后台合并提交失败", response.Code, response.Body.String())
+			if mode == "auto-merge" {
+				app.autoMerges = map[string]*UIAutoMergeState{drama.ID: {RequiredTaskIDs: append([]string(nil), app.taskOrder...), Generation: 1}}
+				app.tasks["episode-2"].Status = uiStatusQueued
+				response := admin.request(t, http.MethodPost, "/api/ui/merge/auto", map[string]any{"dramaIds": []string{drama.ID}, "enabled": true})
+				if response.Code != http.StatusOK {
+					t.Fatal("开启自动合并失败", response.Code, response.Body.String())
+				}
+				app.mu.Lock()
+				if app.mergeJobs[drama.ID] != nil {
+					t.Fatal("未下载齐就开始自动合并")
+				}
+				app.tasks["episode-2"].Status = uiStatusSuccess
+				app.mu.Unlock()
+			} else {
+				response := admin.request(t, http.MethodPost, "/api/ui/merge", map[string]any{"dramaIds": []string{drama.ID}, "async": true, "deleteEpisodes": remove})
+				if response.Code != http.StatusAccepted {
+					t.Fatal("后台合并提交失败", response.Code, response.Body.String())
+				}
 			}
 			result := waitEmbySync(t, manager, started)
 			entry := result.Entries[drama.ID]
