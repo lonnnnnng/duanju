@@ -4,6 +4,7 @@ import (
 	"context"
 	"duanju/internal/diskspace"
 	"duanju/internal/embycheck"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -43,8 +44,8 @@ type embySyncEntry struct {
 type embySyncDocument struct {
 	Version        int                      `json:"version"`
 	Settings       embySyncSettings         `json:"settings"`
-	OwnerID        string                   `json:"ownerId"`
-	OwnerName      string                   `json:"owner"`
+	ViewerID       string                   `json:"viewerId"`
+	LegacyOwnerID  string                   `json:"ownerId,omitempty"`
 	Entries        map[string]embySyncEntry `json:"entries"`
 	LastStartedAt  time.Time                `json:"lastStartedAt"`
 	LastFinishedAt time.Time                `json:"lastFinishedAt"`
@@ -94,6 +95,13 @@ func (app *UIApp) embySyncer() *embySyncManager {
 			if err == nil {
 				err = stored.Settings.normalize()
 			}
+			if err == nil && stored.ViewerID != "" {
+				// long: 浏览器标识会拼入记录目录，只接受生成器输出的十六进制摘要，防止损坏配置越过记录目录。
+				decoded, decodeErr := hex.DecodeString(stored.ViewerID)
+				if decodeErr != nil || len(decoded) != 32 || strings.ToLower(stored.ViewerID) != stored.ViewerID {
+					err = errors.New("Emby 同步的浏览器标识无效")
+				}
+			}
 			if err == nil {
 				if stored.Entries == nil {
 					stored.Entries = make(map[string]embySyncEntry)
@@ -107,6 +115,11 @@ func (app *UIApp) embySyncer() *embySyncManager {
 				}
 			}
 			if err == nil {
+				// long: 旧同步配置继续读取原账号的记录目录；新保存的配置改用当前浏览器，避免升级丢失同步来源。
+				if stored.ViewerID == "" && stored.LegacyOwnerID != "" {
+					stored.ViewerID = viewerID("account:" + stored.LegacyOwnerID)
+				}
+				stored.LegacyOwnerID = ""
 				manager.document = stored
 			}
 		}
@@ -256,22 +269,7 @@ func (manager *embySyncManager) loop(ctx context.Context) {
 	}
 }
 
-func (manager *embySyncManager) owner(id string) (accountRecord, error) {
-	store := manager.app.browserViewers().accountStore()
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	if store.err != nil {
-		return accountRecord{}, store.err
-	}
-	for _, account := range store.state.Accounts {
-		if account.ID == id && account.Admin && !account.RequirePasswordChange {
-			return account, nil
-		}
-	}
-	return accountRecord{}, errors.New("启用同步的管理员账号不可用，请重新登录管理员并保存同步设置")
-}
-
-func (manager *embySyncManager) targets(ctx context.Context, config embySyncSettings, owner accountRecord) ([]Drama, error) {
+func (manager *embySyncManager) targets(ctx context.Context, config embySyncSettings, viewerID string) ([]Drama, error) {
 	selected := map[string]Drama{}
 	if config.MergedOnly {
 		app := manager.app
@@ -281,7 +279,7 @@ func (manager *embySyncManager) targets(ctx context.Context, config embySyncSett
 			if state == nil || state.Status != "success" {
 				continue
 			}
-			if task, _, err := app.mergedPlaybackTaskLocked(mergedPlaybackPrefix + id); err == nil && taskSourceAllowed(ctx, task) {
+			if task, _, err := app.mergedPlaybackTaskLocked(mergedPlaybackPrefix + id); err == nil {
 				selected[id] = Drama{ID: id, Title: state.DramaTitle, Source: task.Chapter.Source}
 			}
 		}
@@ -293,8 +291,8 @@ func (manager *embySyncManager) targets(ctx context.Context, config embySyncSett
 		app.mu.Unlock()
 		return embyValidTargets(ctx, selected)
 	}
-	if config.Following {
-		viewer := manager.app.browserViewers().acquire(owner.viewerID())
+	if config.Following && viewerID != "" {
+		viewer := manager.app.browserViewers().acquire(viewerID)
 		defer viewer.release()
 		entries, err := viewer.followingStore().list()
 		if err != nil {
@@ -329,7 +327,7 @@ func (manager *embySyncManager) targets(ctx context.Context, config embySyncSett
 	app.mu.Lock()
 	if config.Downloads {
 		for _, task := range app.tasks {
-			if task != nil && task.Status == uiStatusSuccess && !isChapterPlaceholderTask(task) && taskSourceAllowed(ctx, task.Source) {
+			if task != nil && task.Status == uiStatusSuccess && !isChapterPlaceholderTask(task) {
 				selected[task.DramaID] = Drama{ID: task.DramaID, Title: task.DramaTitle, Source: task.Source.Chapter.Source}
 			}
 		}
@@ -350,7 +348,7 @@ func embyValidTargets(ctx context.Context, selected map[string]Drama) ([]Drama, 
 	result := make([]Drama, 0, len(selected))
 	for _, drama := range selected {
 		id, _, valid := playbackHistoryIdentity(drama.ID)
-		if valid && id == drama.ID && dramaAllowed(ctx, drama.ID, drama.Source) {
+		if valid && id == drama.ID {
 			result = append(result, drama)
 		}
 	}
@@ -421,12 +419,9 @@ func (manager *embySyncManager) safeError(err error, key string) string {
 }
 
 func (manager *embySyncManager) synchronize(ctx context.Context, document *embySyncDocument) error {
-	owner, err := manager.owner(document.OwnerID)
-	if err != nil {
-		return err
-	}
-	ctx = context.WithValue(withSourceScope(ctx, owner), backgroundCatalogKey{}, true)
-	targets, err := manager.targets(ctx, document.Settings, owner)
+	ctx = context.WithValue(ctx, backgroundCatalogKey{}, true)
+	// long: 追剧来源绑定最后保存配置的浏览器，后台同步不再依赖登录会话或管理员状态。
+	targets, err := manager.targets(ctx, document.Settings, document.ViewerID)
 	if err != nil {
 		return err
 	}
@@ -526,7 +521,7 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 				merge.OutputPath, fetchErr = path, pathErr
 				manager.app.mu.Unlock()
 				if fetchErr == nil {
-					entry.Folder, written, episodes, fetchErr = syncEmbyMergedFiles(dramaCtx, document.Settings, drama, merge, entry.Folder, key, owner.ID)
+					entry.Folder, written, episodes, fetchErr = syncEmbyMergedFiles(dramaCtx, document.Settings, drama, merge, entry.Folder, key, "")
 				}
 			} else {
 				var title string
@@ -534,7 +529,7 @@ func (manager *embySyncManager) synchronize(ctx context.Context, document *embyS
 				title, chapters, fetchErr = manager.app.downloader.GetDramaChapters(dramaCtx, drama.ID)
 				if fetchErr == nil {
 					drama.Title = firstNonEmpty(title, drama.DisplayTitle())
-					entry.Folder, written, episodes, fetchErr = syncEmbyDramaFiles(dramaCtx, document.Settings, drama, chapters, entry.Folder, key, owner.ID)
+					entry.Folder, written, episodes, fetchErr = syncEmbyDramaFiles(dramaCtx, document.Settings, drama, chapters, entry.Folder, key, "")
 				}
 			}
 			if fetchErr == nil {

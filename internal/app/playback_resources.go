@@ -49,7 +49,7 @@ func (settings playbackSettings) validate() error {
 	seen := make(map[string]bool)
 	for _, source := range settings.DirectSources {
 		valid := false
-		for _, choice := range accountSourceChoices {
+		for _, choice := range sourceChoices {
 			valid = valid || source == choice.ID
 		}
 		if !valid || seen[source] {
@@ -125,7 +125,7 @@ func (resources *playbackResources) acquire(ctx context.Context, kind string, op
 		}
 		if limit == 0 {
 			resources.mu.Unlock()
-			return nil, fmt.Errorf("管理员已禁用此类播放处理（%s）", kind)
+			return nil, fmt.Errorf("设置中已禁用此类播放处理（%s）", kind)
 		}
 		if resources.active[kind] < limit && (!optional || resources.waiting[kind] == 1) {
 			resources.active[kind]++
@@ -158,7 +158,7 @@ func (resources *playbackResources) acquire(ctx context.Context, kind string, op
 func (app *UIApp) handlePlaybackSettings(writer http.ResponseWriter, request *http.Request) {
 	resources := app.mediaResources()
 	if request.Method == http.MethodGet {
-		writeJSON(writer, http.StatusOK, map[string]any{"settings": resources.snapshot(), "sources": accountSourceChoices})
+		writeJSON(writer, http.StatusOK, map[string]any{"settings": resources.snapshot(), "sources": sourceChoices})
 		return
 	}
 	var settings playbackSettings
@@ -198,5 +198,5 @@ func (app *UIApp) handlePlaybackSettings(writer http.ResponseWriter, request *ht
 	resources.settings = settings
 	resources.notifyLocked()
 	resources.mu.Unlock()
-	writeJSON(writer, http.StatusOK, map[string]any{"settings": settings, "sources": accountSourceChoices})
+	writeJSON(writer, http.StatusOK, map[string]any{"settings": settings, "sources": sourceChoices})
 }

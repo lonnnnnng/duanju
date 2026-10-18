@@ -122,8 +122,7 @@ export function createDetails(app) {
       emby.id = 'detailEmbyBtn';
       emby.dataset.focusKey = 'detail-emby';
       emby.title = '导出 STRM 分集文件，用于现有 Emby 电视剧媒体库';
-      if (app.viewer?.onlineOnly) secondary.appendChild(watched);
-      else secondary.append(app.downloads.qualityControl(), download, watched, emby);
+      secondary.append(app.downloads.qualityControl(), download, watched, emby);
       actions.after(secondary);
       content.appendChild(element('p', 'small notice', '手动标记用于整理清单，实际播放进度仍自动保存。'));
     });

@@ -97,13 +97,9 @@ func TestEmbyArchiveIncludesSignedPosterMetadataOnly(t *testing.T) {
 	}
 }
 
-func TestEmbyCoverWithoutCookiesChecksSignatureAndCurrentPermissions(t *testing.T) {
-	app, admin := administratorFixture(t)
-	member := newAccountTestBrowser(t, app)
-	member.register(t, "poster-viewer")
-	store := app.browserViewers().accountStore()
-	owner := store.state.Accounts["poster-viewer"].ID
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/settings", map[string]bool{"requireLogin": true, "allowRegistration": true}))
+func TestEmbyCoverWithoutCookiesChecksLegacySignature(t *testing.T) {
+	app, _ := lanFixture(t)
+	owner := "legacy-poster-owner"
 	app.dramas[0].CoverURL = embyFixtureCover
 	data := embySyntheticPoster(t)
 	var calls atomic.Int32
@@ -155,11 +151,7 @@ func TestEmbyCoverWithoutCookiesChecksSignatureAndCurrentPermissions(t *testing.
 	if result := request(restarted.routes(), http.MethodGet, address); result.Code != 200 {
 		t.Fatal("poster link did not survive restart", result.Code)
 	}
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/accounts/permissions", map[string]any{"username": "poster-viewer", "onlineOnly": true}))
-	before := calls.Load()
-	if result := request(app.routes(), http.MethodGet, address); result.Code != 403 || calls.Load() != before {
-		t.Fatal("online-only account retained poster export access")
-	}
+
 }
 
 func TestEmbyPosterMatchesIdentityAndPortableFolderPaths(t *testing.T) {
@@ -188,10 +180,9 @@ func TestEmbyPosterMatchesIdentityAndPortableFolderPaths(t *testing.T) {
 }
 
 func TestEmbyPostersScanDelayRetryRestartAndCustomArtwork(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": historyFixtureDramaID, "saved": true}))
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/settings", map[string]bool{"requireLogin": true, "allowRegistration": true}))
 	app.dramas[0].CoverURL = embyFixtureCover
 	data := embySyntheticPoster(t)
 	var imageRequests atomic.Int32
@@ -268,7 +259,7 @@ func TestEmbyPostersScanDelayRetryRestartAndCustomArtwork(t *testing.T) {
 		}
 	}))
 	defer emby.Close()
-	manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+	manager.document.ViewerID = admin.id
 	manager.document.Settings = embySyncSettings{Enabled: true, Following: true, IntervalMinutes: 60, OutputDir: t.TempDir(), BaseURL: library.URL, ServerURL: emby.URL + "/emby", APIKey: "private-api-key"}
 	forcePoster := func() {
 		entry := manager.document.Entries[historyFixtureDramaID]

@@ -175,11 +175,8 @@ func (a *UIApp) handleMergeCancel(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-	if !requireDownload(w, r) {
-		return
-	}
 	ids, ok := readDramaIDsRequest(w, r)
-	if !ok || !a.requireDramaSources(w, r, ids) {
+	if !ok {
 		return
 	}
 	a.mu.Lock()

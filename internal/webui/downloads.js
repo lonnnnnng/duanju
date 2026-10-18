@@ -70,7 +70,6 @@ function updateTaskSelection(){
 }
 
 function renderTasks(next) {
-  if (app.viewer?.onlineOnly) return;
   if (tasks !== next) taskSignature = '';
   tasks = next;
   if (selectedTasks.size) {
@@ -295,10 +294,9 @@ async function exportMergedEmby(group) {
   finally {exportingMerges.delete(group.id); renderTasks(tasks);}
 }
 
-function renderFFmpeg(state){if(!state)return;const retryCovers=ffmpegStatus&&ffmpegStatus!=='ready'&&state.status==='ready';ffmpegStatus=state.status;let text=state.detail||'首次使用时自动准备 FFmpeg';if(state.status==='downloading'&&number(state.totalBytes)>0)text+=' · '+formatBytes(state.downloadedBytes)+' / '+formatBytes(state.totalBytes);if(state.error)text+='：'+state.error;for(const id of ['ffmpegNotice','ffmpegSettingsStatus']){const target=$(id);empty(target);target.appendChild(element('span',state.status==='failed'?'error':'',text));if(state.status==='failed'&&app.viewer?.account?.admin)target.appendChild(button('重新检查 FFmpeg',retryFFmpeg));if(id==='ffmpegNotice')target.hidden=!['downloading','verifying','failed'].includes(state.status);}if(retryCovers)app.library.retryCovers();window.dramaPlayer?.updateDependency(state,text);}
+function renderFFmpeg(state){if(!state)return;const retryCovers=ffmpegStatus&&ffmpegStatus!=='ready'&&state.status==='ready';ffmpegStatus=state.status;let text=state.detail||'首次使用时自动准备 FFmpeg';if(state.status==='downloading'&&number(state.totalBytes)>0)text+=' · '+formatBytes(state.downloadedBytes)+' / '+formatBytes(state.totalBytes);if(state.error)text+='：'+state.error;for(const id of ['ffmpegNotice','ffmpegSettingsStatus']){const target=$(id);empty(target);target.appendChild(element('span',state.status==='failed'?'error':'',text));if(state.status==='failed')target.appendChild(button('重新检查 FFmpeg',retryFFmpeg));if(id==='ffmpegNotice')target.hidden=!['downloading','verifying','failed'].includes(state.status);}if(retryCovers)app.library.retryCovers();window.dramaPlayer?.updateDependency(state,text);}
 
 async function pollTasks() {
-  if (app.viewer?.onlineOnly) return;
   if (taskRequest) return pollPromise;
   taskRequest = true;
   pollPromise = (async () => {
@@ -412,7 +410,6 @@ function renderActivity(all) {
 }
 
 async function enqueue(ids) {
-  if (app.viewer?.onlineOnly) {setMessage('当前账号仅可在线观看', true); return false;}
   if (!ids.length) return false;
   try {
     const quality = downloadQuality;
@@ -438,7 +435,6 @@ function toggleBatch() {
 }
 
 function schedule(restart = true) {
-  if (app.viewer?.onlineOnly) return;
   const active = hasActiveTasks || ['idle', 'downloading', 'verifying'].includes(ffmpegStatus) || Object.values(mergeStates).some(state => ['queued', 'running'].includes(state.status));
   // long: 闲置下载页主要是成功任务；降低轮询频率可减少共享存储目录检查，操作和窗口恢复仍会立即刷新。
   const delay = document.hidden ? 30000 : active ? 2000 : 15000;
@@ -451,7 +447,6 @@ function schedule(restart = true) {
 }
 
 function init() {
-  if (app.viewer?.onlineOnly) return;
   document.querySelectorAll('[data-download-quality]').forEach(setupQualitySelect);
   const stored = readPreference('downloadFilters', {}), saved = stored && typeof stored === 'object' ? stored : {};
   $('taskSearch').value = typeof saved.search === 'string' ? saved.search.slice(0, 80) : '';

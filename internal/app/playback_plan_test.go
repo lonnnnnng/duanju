@@ -317,11 +317,11 @@ func TestPlaybackOriginalHLSURIHeadersAndByteRanges(t *testing.T) {
 }
 
 func TestPlaybackResourceBudgetsCancellationAndPersistence(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	settings := defaultPlaybackSettings()
 	settings.Enabled = true
 	settings.MaxVideoTranscodes, settings.MaxMediaRequests = 0, 1
-	response := admin.request(t, http.MethodPost, "/api/ui/admin/playback", settings)
+	response := admin.request(t, http.MethodPost, "/api/ui/settings/playback", settings)
 	if response.Code != 200 {
 		t.Fatal(response.Code, response.Body.String())
 	}
@@ -355,9 +355,9 @@ func TestPlaybackResourceBudgetsCancellationAndPersistence(t *testing.T) {
 		t.Fatal("resource lease leaked")
 	}
 	resources.mu.Unlock()
-	guest := newAccountTestBrowser(t, app)
-	if result := guest.request(t, http.MethodPost, "/api/ui/admin/playback", defaultPlaybackSettings()); result.Code != 403 {
-		t.Fatal("guest changed playback budgets", result.Code)
+	guest := newLANTestBrowser(t, app)
+	if result := guest.request(t, http.MethodPost, "/api/ui/settings/playback", defaultPlaybackSettings()); result.Code != 200 {
+		t.Fatal("LAN browser could not change playback budgets", result.Code)
 	}
 }
 

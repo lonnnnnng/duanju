@@ -23,9 +23,9 @@ async function checkNetwork(){ $('checkNetworkBtn').disabled=true;$('settingsSta
 let updateInfo = null;
 function renderUpdateInfo(info){updateInfo=info;$('appVersionText').textContent='当前 '+(info.currentVersion||'未知')+' · commit '+(info.currentCommit||'未知')+' · 构建 '+(info.buildTime||'未知');$('applyAppUpdateBtn').hidden=!info.updateReady||!info.updateAvailable||info.updateApplied;$('appUpdateStatus').textContent=info.message||(info.latestVersion?'最新正式版 '+info.latestVersion+' · '+(info.assetName||'当前平台暂无安装包'):'尚未检查更新');}
 async function loadAppVersion(){try{const info=await api('/healthz');$('appVersionText').textContent='当前 '+(info.version||'未知')+' · commit '+(info.commit||'未知');}catch(error){$('appVersionText').textContent='版本信息读取失败：'+error.message;}}
-async function checkAppUpdate(){const button=$('checkAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在查询 GitHub Release…';try{renderUpdateInfo(await api('/api/ui/admin/update'));}catch(error){$('appUpdateStatus').textContent='检查失败：'+error.message;}finally{button.disabled=false;}}
+async function checkAppUpdate(){const button=$('checkAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在查询 GitHub Release…';try{renderUpdateInfo(await api('/api/ui/settings/update'));}catch(error){$('appUpdateStatus').textContent='检查失败：'+error.message;}finally{button.disabled=false;}}
 async function waitForUpdatedHealth(version){for(let attempt=0;attempt<60;attempt+=1){try{const health=await api('/healthz');if(health.version===version){$('appVersionText').textContent='当前 '+(health.version||'未知')+' · commit '+(health.commit||'未知');$('appUpdateStatus').textContent='服务已重启并运行新版本';return true;}}catch(error){/* long: systemd 重启期间连接会短暂失败，下一轮继续确认服务是否已恢复。 */}await new Promise(resolve=>setTimeout(resolve,1000));}return false;}
-async function applyAppUpdate(){if(!updateInfo?.updateReady)return;const button=$('applyAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在下载并校验程序…';try{const result=await post('/api/ui/admin/update',{});renderUpdateInfo(result);if(result.autoRestart&&result.latestVersion){$('appUpdateStatus').textContent='服务正在重启…';if(!await waitForUpdatedHealth(result.latestVersion))$('appUpdateStatus').textContent='程序已替换，但尚未确认新服务健康，请查看 systemd 状态';}else $('appUpdateStatus').textContent=result.message||'更新完成';}catch(error){$('appUpdateStatus').textContent='更新失败：'+error.message;}finally{button.disabled=false;}}
+async function applyAppUpdate(){if(!updateInfo?.updateReady)return;const button=$('applyAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在下载并校验程序…';try{const result=await post('/api/ui/settings/update',{});renderUpdateInfo(result);if(result.autoRestart&&result.latestVersion){$('appUpdateStatus').textContent='服务正在重启…';if(!await waitForUpdatedHealth(result.latestVersion))$('appUpdateStatus').textContent='程序已替换，但尚未确认新服务健康，请查看 systemd 状态';}else $('appUpdateStatus').textContent=result.message||'更新完成';}catch(error){$('appUpdateStatus').textContent='更新失败：'+error.message;}finally{button.disabled=false;}}
 
 async function chooseDownloadDirectory(){const button=$('browseDirectoryBtn');if(button.disabled)return;button.disabled=true;$('settingsStatus').textContent='请在系统窗口中选择下载文件夹…';try{const result=await post('/api/ui/directory/pick',{initialPath:$('downloadDirectory').value});if(result.canceled){$('settingsStatus').textContent='已取消选择，原目录未修改';return;}$('downloadDirectory').value=result.selectionPath||result.path;$('settingsStatus').textContent='已选择文件夹，请点击“保存并应用”';}catch(error){$('settingsStatus').textContent='选择文件夹失败：'+error.message;}finally{button.disabled=false;}}
 
@@ -39,7 +39,7 @@ async function importLegacyRecords() {
     $('legacyImportSection').hidden = true;
     app.viewer.legacyAvailable = false;
     await Promise.all([window.DuanjuHistory.refresh(), app.following.refresh()]);
-    $('viewerImportStatus').textContent = app.viewer?.account ? '旧版记录已接入当前账号，原始文件仍保留。' : '旧版记录已接回当前浏览器，原始文件仍保留。';
+    $('viewerImportStatus').textContent = '旧版记录已接回当前浏览器，原始文件仍保留。';
   } catch (error) {
     $('viewerImportStatus').textContent = error.message;
   } finally {
@@ -48,11 +48,6 @@ async function importLegacyRecords() {
 }
 
 function init() {
-  const admin = Boolean(app.viewer?.account?.admin && !app.viewer.account.requirePasswordChange);
-  $('serverSettings').hidden = !admin;
-  $('serverSettingsNotice').hidden = admin;
-  $('downloadLocationBtn').hidden = !admin;
-  if (!admin) $('downloadLocation').textContent = '服务端下载目录';
   $('legacyImportSection').hidden = !app.viewer?.legacyAvailable;
   $('viewerImportStatus').textContent = app.viewer?.legacyError || '';
   $('legacyImportBtn').addEventListener('click', importLegacyRecords);
@@ -67,7 +62,7 @@ function init() {
   $('themeSelect').value = window.DuanjuTheme.get();
   $('themeSelect').addEventListener('change', () => window.DuanjuTheme.set($('themeSelect').value));
   document.addEventListener('themechange', event => {$('themeSelect').value = event.detail;});
-  return admin ? Promise.all([loadConfig(), createPlaybackSettings().init(), loadAppVersion(), checkAppUpdate()]) : Promise.resolve();
+  return Promise.all([loadConfig(), createPlaybackSettings().init(), loadAppVersion(), checkAppUpdate()]);
 }
 return {init, config: () => config};
 

@@ -201,9 +201,6 @@ func (a *UIApp) handleAutoMerge(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-	if !requireDownload(w, r) {
-		return
-	}
 	var input struct {
 		DramaIDs []string `json:"dramaIds"`
 		Enabled  bool     `json:"enabled"`
@@ -215,7 +212,7 @@ func (a *UIApp) handleAutoMerge(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ids, ok := cleanIDList(w, input.DramaIDs)
-	if !ok || !a.requireDramaSources(w, r, ids) {
+	if !ok {
 		return
 	}
 	a.mu.Lock()

@@ -13,8 +13,6 @@ services:
     environment:
       TZ: ${TZ:-Asia/Shanghai}
       DUANJU_PROXY_URL: ${DUANJU_PROXY_URL:-}
-      DUANJU_ADMIN_USER: ${DUANJU_ADMIN_USER:-}
-      DUANJU_ADMIN_PASSWORD: ${DUANJU_ADMIN_PASSWORD:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:

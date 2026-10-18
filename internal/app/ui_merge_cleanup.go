@@ -23,11 +23,8 @@ func (a *UIApp) handleMergeCleanup(writer http.ResponseWriter, request *http.Req
 		writeJSON(writer, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
-	if !requireDownload(writer, request) {
-		return
-	}
 	ids, ok := readDramaIDsRequest(writer, request)
-	if !ok || !a.requireDramaSources(writer, request, ids) {
+	if !ok {
 		return
 	}
 	a.mu.Lock()

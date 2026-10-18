@@ -117,7 +117,9 @@ func TestRecommendationAPIValidationAndCancellation(t *testing.T) {
 	app := &UIApp{downloader: d, cfg: d.cfg}
 	for _, body := range []string{`{"genre":"unknown"}`, `{"genre":"short_play","offset":-1}`, `{"genre":"short_play","seen":["huangdou:1"]}`, `{"genre":"short_play"} {}`, `null`, fmt.Sprintf(`{"genre":"short_play","sessionId":%q}`, strings.Repeat("x", 4097))} {
 		writer := httptest.NewRecorder()
-		app.routes().ServeHTTP(writer, httptest.NewRequest(http.MethodPost, "/api/ui/recommendations", strings.NewReader(body)))
+		request := httptest.NewRequest(http.MethodPost, "/api/ui/recommendations", strings.NewReader(body))
+		request.Header.Set("Content-Type", "application/json")
+		app.routes().ServeHTTP(writer, request)
 		if writer.Code != http.StatusBadRequest {
 			t.Fatalf("invalid body accepted: %d", writer.Code)
 		}
@@ -142,7 +144,9 @@ func TestRecommendationAPIPersistsNewDramasAndKeepsKnownMetadata(t *testing.T) {
 	})
 	app := &UIApp{downloader: d, cfg: d.cfg, metadataClosed: true, dramas: []Drama{{ID: "hongguo:1", Source: sourceHongguo, Title: "旧标题", Views: "0", OnlineDate: "2026-09-01"}}}
 	writer := httptest.NewRecorder()
-	app.routes().ServeHTTP(writer, httptest.NewRequest(http.MethodPost, "/api/ui/recommendations", strings.NewReader(`{"genre":"short_play"}`)))
+	request := httptest.NewRequest(http.MethodPost, "/api/ui/recommendations", strings.NewReader(`{"genre":"short_play"}`))
+	request.Header.Set("Content-Type", "application/json")
+	app.routes().ServeHTTP(writer, request)
 	if writer.Code != http.StatusOK {
 		t.Fatal(writer.Body.String())
 	}

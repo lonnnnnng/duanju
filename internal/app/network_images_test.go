@@ -283,7 +283,7 @@ func TestImageTransportPinsDNSPreservesSNIAndProxy(t *testing.T) {
 func TestImageSourceRequiresRegisteredCoverForEveryViewer(t *testing.T) {
 	address := "https://new-covers.example.org/cover?token=fixture"
 	app := &UIApp{dramas: []Drama{{ID: "hongguo:7000000000000000001", Source: sourceHongguo, CoverURL: address}}}
-	for _, ctx := range []context.Context{context.Background(), withSourceScope(context.Background(), accountRecord{Admin: true}), withSourceScope(context.Background(), accountRecord{Sources: []string{sourceHongguo}})} {
+	for _, ctx := range []context.Context{context.Background()} {
 		if source, allowed := app.imageSource(ctx, address); !allowed || source != sourceHongguo {
 			t.Fatal("registered cover was rejected")
 		}

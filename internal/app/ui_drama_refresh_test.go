@@ -137,14 +137,6 @@ func TestDramaRefreshFailureValidationPermissionsAndRetry(t *testing.T) {
 			t.Fatal("invalid or missing drama accepted", response.Code)
 		}
 	}
-	request := httptest.NewRequest(http.MethodPost, "/api/ui/dramas/refresh", strings.NewReader(fmt.Sprintf(`{"dramaId":%q}`, old.ID)))
-	request.Header.Set("Content-Type", "application/json")
-	request = request.WithContext(withSourceScope(request.Context(), accountRecord{Sources: []string{}}))
-	writer := httptest.NewRecorder()
-	app.handleDramaRefresh(writer, request)
-	if writer.Code != http.StatusForbidden || calls.Load() != 0 {
-		t.Fatal("source permission check happened after an upstream request", writer.Code, calls.Load())
-	}
 	for i := 0; i < 2; i++ {
 		response := dramaRefreshRequest(app, old.ID)
 		var result dramaRefreshResult
@@ -169,7 +161,7 @@ func TestDramaRefreshFailureValidationPermissionsAndRetry(t *testing.T) {
 	}
 }
 
-func TestOnlineOnlyAccountMayRefreshAllowedDramaMetadata(t *testing.T) {
+func TestLANBrowserMayRefreshDramaMetadata(t *testing.T) {
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		return rankingHTTPResponse(request, 200, refreshMetadataFixture("7000000000000000001")), nil
 	})
@@ -177,7 +169,6 @@ func TestOnlineOnlyAccountMayRefreshAllowedDramaMetadata(t *testing.T) {
 	app := &UIApp{downloader: d, cfg: d.cfg, dramas: []Drama{old}}
 	request := httptest.NewRequest(http.MethodPost, "/api/ui/dramas/refresh", strings.NewReader(fmt.Sprintf(`{"dramaId":%q}`, old.ID)))
 	request.Header.Set("Content-Type", "application/json")
-	request = request.WithContext(withSourceScope(request.Context(), accountRecord{Sources: []string{sourceHongguo}, OnlineOnly: true}))
 	writer := httptest.NewRecorder()
 	app.handleDramaRefresh(writer, request)
 	if writer.Code != http.StatusOK || app.dramas[0].Desc == "" {

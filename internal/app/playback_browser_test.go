@@ -85,7 +85,6 @@ func TestPlaybackBrowserFixture(t *testing.T) {
 		}
 		return transport.RoundTrip(request)
 	})}
-	app.cfg.adminUsername, app.cfg.adminPassword, app.cfg.adminPasswordExplicit = "admin", accountFixturePassword, true
 	if err := app.prepareBrowserViewers(); err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +150,7 @@ func TestPlaybackBrowserFixture(t *testing.T) {
 		routes.ServeHTTP(w, r)
 	}))
 	defer server.Close()
-	ready, _ := json.Marshal(map[string]string{"url": server.URL, "mediaOrigin": mediaOrigin, "adminPassword": accountFixturePassword})
+	ready, _ := json.Marshal(map[string]string{"url": server.URL, "mediaOrigin": mediaOrigin})
 	if err := os.WriteFile(filepath.Join(root, "ready.json"), ready, 0600); err != nil {
 		t.Fatal(err)
 	}

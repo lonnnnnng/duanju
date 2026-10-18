@@ -99,10 +99,6 @@ func (app *UIApp) authorizeEmby(writer http.ResponseWriter, request *http.Reques
 		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "Emby 播放链接无效，请重新导出"})
 		return "", "", false
 	}
-	if owner != "" && !app.embyAccountSourceAllowed(owner, id) {
-		writeViewerError(writer, http.StatusForbidden, "export_forbidden", "当前账号无权使用此 Emby 链接，请联系管理员")
-		return "", "", false
-	}
 	return id, chapter, true
 }
 
@@ -121,9 +117,6 @@ func (app *UIApp) handleEmbyExport(writer http.ResponseWriter, request *http.Req
 		Merged  bool   `json:"merged"`
 	}
 	if !readPlaybackRequest(writer, request, &input) {
-		return
-	}
-	if !app.requireDramaSources(writer, request, []string{input.DramaID}) {
 		return
 	}
 	base, err := embyBaseURL(input.BaseURL)
@@ -186,9 +179,6 @@ func (app *UIApp) handleEmbyExport(writer http.ResponseWriter, request *http.Req
 		return
 	}
 	owner := ""
-	if scope := sourceScope(request.Context()); scope != nil {
-		owner = scope.AccountID
-	}
 	var body []byte
 	if input.Merged {
 		body, err = buildEmbyMergedArchive(drama, merge, base, key, owner)

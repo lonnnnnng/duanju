@@ -24,8 +24,7 @@
   </nav>
   <div class="header-actions">
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
-    <button id="openAccountBtn" class="quiet" aria-label="登录或注册账号" aria-haspopup="dialog" aria-controls="accountPanel"><span data-icon="user"></span><span id="accountLabel" class="account-label">登录</span></button>
-    <details id="headerMenu" class="action-menu header-menu"><summary id="moreButton" aria-label="更多" aria-expanded="false" aria-controls="morePanel"><span data-icon="more"></span></summary><div id="morePanel" class="action-popover menu-list"><button id="menuUsersBtn" data-page="users" data-admin-only hidden><span data-icon="user"></span>用户管理<span data-icon="right"></span></button><button id="openSettingsBtn"><span data-icon="settings"></span>代理 / 设置<span data-icon="right"></span></button><button id="openEmbyBtn" data-admin-only hidden aria-haspopup="dialog" aria-controls="embyPanel"><span data-icon="library"></span>Emby 同步<span data-icon="right"></span></button><button id="menuHistoryBtn"><span data-icon="clock"></span>历史记录<span data-icon="right"></span></button><button id="sourceStatusBtn"><span data-icon="activity"></span>站源状态<span data-icon="right"></span></button><button id="aboutBtn"><span data-icon="help"></span>使用提示<span data-icon="right"></span></button><span id="libraryMenuUpdatedAt" class="small"></span></div></details>
+    <details id="headerMenu" class="action-menu header-menu"><summary id="moreButton" aria-label="更多" aria-expanded="false" aria-controls="morePanel"><span data-icon="more"></span></summary><div id="morePanel" class="action-popover menu-list"><button id="openSettingsBtn"><span data-icon="settings"></span>代理 / 设置<span data-icon="right"></span></button><button id="openEmbyBtn" aria-haspopup="dialog" aria-controls="embyPanel"><span data-icon="library"></span>Emby 同步<span data-icon="right"></span></button><button id="menuHistoryBtn"><span data-icon="clock"></span>历史记录<span data-icon="right"></span></button><button id="sourceStatusBtn"><span data-icon="activity"></span>站源状态<span data-icon="right"></span></button><button id="aboutBtn"><span data-icon="help"></span>使用提示<span data-icon="right"></span></button><span id="libraryMenuUpdatedAt" class="small"></span></div></details>
   </div>
 </header>
 <div id="viewerNotice" class="viewer-notice" role="status" hidden></div>
@@ -76,32 +75,6 @@
     <div id="taskScroll"><div id="groups" class="groups"></div></div>
     <p class="page-footnote">“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p>
   </section>
-  <section class="page-view users-page" id="usersPage" data-view="users" aria-label="用户管理" hidden>
-    <div class="page-heading"><div><h1>用户管理</h1><p>管理访问方式、账号和各账号的使用权限。</p></div><button id="adminRefreshBtn" class="secondary button-content"><span data-icon="refresh"></span>刷新</button></div>
-    <div id="adminPanel">
-      <div class="users-settings-grid">
-        <section class="admin-card" aria-labelledby="adminPolicyTitle"><h2 id="adminPolicyTitle">访问设置</h2>
-          <form id="adminPolicyForm" class="account-form">
-            <label class="account-check"><input id="adminRequireLogin" type="checkbox"><span>必须登录才能使用剧库<small>关闭时允许匿名观看，记录仍各自独立。</small></span></label>
-            <label class="account-check"><input id="adminAllowRegistration" type="checkbox" checked><span>允许用户自行注册<small>关闭时，仅管理员可以创建账号。</small></span></label>
-            <button id="adminSavePolicyBtn" class="secondary" type="submit" disabled>保存访问设置</button>
-          </form>
-          <p class="small admin-access-hint">匿名访客和自行注册的账号默认可用全部站源及下载功能。需要按账号控制权限时，开启必须登录并关闭自行注册。</p>
-        </section>
-        <section class="admin-card" aria-labelledby="adminCreateTitle"><h2 id="adminCreateTitle">创建用户</h2>
-          <form id="adminCreateUserForm" class="account-form">
-            <label>用户名<input id="adminNewUsername" type="text" minlength="2" maxlength="32" autocomplete="off" autocapitalize="none" required></label>
-            <label>初始密码<input id="adminNewUserPassword" type="password" minlength="10" maxlength="128" autocomplete="new-password" required placeholder="10–128 个字符"></label>
-            <fieldset class="account-source-fieldset"><legend>可用站源</legend><div id="adminNewUserSources" class="account-source-choices"></div></fieldset>
-            <label class="account-check"><input id="adminNewOnlineOnly" type="checkbox"><span>仅在线观看<small>隐藏下载入口，禁止下载、任务管理和 Emby 导出。</small></span></label>
-            <button id="adminCreateUserBtn" class="secondary" type="submit">创建用户</button>
-          </form>
-        </section>
-      </div>
-      <p id="adminStatus" class="small account-status" role="status" aria-live="polite"></p>
-      <section class="admin-card admin-users-card" aria-labelledby="adminAccountsTitle"><div class="admin-list-heading"><h2 id="adminAccountsTitle">已有用户 <span id="adminAccountCount" class="small"></span></h2><input id="adminAccountSearch" type="search" maxlength="32" placeholder="搜索用户名" aria-label="搜索用户"></div><ul id="adminAccountList" class="admin-account-list" aria-label="已注册账号"></ul><p id="adminAccountEmpty" class="small" hidden>没有匹配的账号。</p></section>
-    </div>
-  </section>
 </main>
 <nav class="mobile-nav" aria-label="手机主导航">
   <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
@@ -135,7 +108,7 @@
   <dialog id="settingsPanel" class="settings-dialog" aria-labelledby="settingsTitle">
     <div class="heading"><h2 id="settingsTitle">剧库设置</h2><button id="closeSettingsBtn" class="secondary" aria-label="关闭设置">关闭</button></div>
     <div class="settings-body"><div class="appearance-row"><div><h3>外观</h3><p class="small">选择适合当前环境的明暗模式</p></div><select id="themeSelect" aria-label="外观"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
-      <p id="serverSettingsNotice" class="small">登录管理员账号后可调整代理、保存目录与服务并发。</p><div id="serverSettings" hidden><div class="directory-input"><label class="small">下载目录<input id="downloadDirectory" type="text" placeholder="./downloads" autocomplete="off"></label><button id="browseDirectoryBtn" class="secondary">选择文件夹</button></div>
+      <div id="serverSettings"><div class="directory-input"><label class="small">下载目录<input id="downloadDirectory" type="text" placeholder="./downloads" autocomplete="off"></label><button id="browseDirectoryBtn" class="secondary">选择文件夹</button></div>
       <p class="small" id="downloadDirectoryHint">点击按钮打开本机系统文件夹选择框，也可输入相对/绝对路径。重启后新合集使用新目录，原任务和文件保留。</p>
       <div class="settings-grid">
         <label>下载并发<input id="downloadConcurrency" type="number" min="1" max="32" value="2"></label>
@@ -169,10 +142,10 @@
     </div>
     </div><section class="viewer-settings" aria-labelledby="viewerSettingsTitle">
       <h3 id="viewerSettingsTitle">个人记录 <span class="small" id="viewerIdentityLabel">当前浏览器</span></h3>
-      <p class="small" id="viewerRecordsHint">登录后可跨设备接着看，观看记录和追剧清单各自独立。</p><button class="quiet" data-account-open>打开我的账号</button>
+      <p class="small" id="viewerRecordsHint">观看记录和追剧清单按浏览器独立保存。</p>
       <div id="legacyImportSection" hidden>
         <div class="viewer-import-row"><label class="small">旧版记录恢复码<input id="legacyImportCode" type="password" maxlength="64" autocomplete="off" placeholder="粘贴一次性恢复码"></label><button id="legacyImportBtn" class="secondary">接回旧记录</button></div>
-        <p class="small">恢复码在服务所在电脑的 data/viewer-legacy-code 文件中。旧版记录接入当前登录账号；未登录时接回当前浏览器。</p>
+        <p class="small">恢复码在服务所在电脑的 data/viewer-legacy-code 文件中。旧版记录接回当前浏览器。</p>
       </div>
       <p id="viewerImportStatus" class="small" role="status" aria-live="polite"></p>
     </section>
@@ -184,15 +157,15 @@
   <div class="dialog-body">
     <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。</p>
     <form id="embyForm" class="emby-form">
-      <label class="account-check"><input id="embyEnabled" type="checkbox"><span>启用自动同步</span></label>
+      <label class="settings-check"><input id="embyEnabled" type="checkbox"><span>启用自动同步</span></label>
       <div class="settings-grid">
         <label class="wide">媒体库输出目录<input id="embyOutputDir" type="text" maxlength="2048" required placeholder="程序所在服务器的文件夹"></label>
         <label class="wide">Emby 能访问的剧库地址<input id="embyBaseURL" type="url" maxlength="2048" placeholder="http://剧库服务器:3333"></label>
         <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required></label>
       </div>
-      <fieldset class="account-source-fieldset"><legend>同步内容</legend><label class="account-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
-      <fieldset id="embySourceScope" class="account-source-fieldset"><legend>分集模式自动加入的范围</legend><label class="account-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>当前管理员的“在看”和“想看”，其他用户的记录独立保留。</small></span></label><label class="account-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
-      <p id="embyOwner" class="small"></p>
+      <fieldset class="settings-fieldset"><legend>同步内容</legend><label class="settings-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
+      <fieldset id="embySourceScope" class="settings-fieldset"><legend>分集模式自动加入的范围</legend><label class="settings-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>最后保存设置的浏览器中的“在看”和“想看”。</small></span></label><label class="settings-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
+      <p id="embyFollowingScope" class="small"></p>
       <details class="emby-refresh-settings"><summary>Emby 扫描与连接（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知 Emby 扫描。本地全集模式会把海报保存到输出目录，无需 API Key；在线分集模式由 Emby 获取和缓存海报。已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换 Emby 服务器后需重新填写 API Key。</p></details>
       <div class="toolbar"><button id="embySaveBtn" type="submit">保存并应用</button><button id="embyRunBtn" class="secondary" type="button" disabled>立即同步</button></div>
     </form>
@@ -202,39 +175,7 @@
     <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
   </div>
 </dialog>
-<dialog id="accountPanel" class="account-dialog" aria-labelledby="accountTitle">
-  <div class="dialog-heading"><h2 id="accountTitle">我的账号</h2><button class="quiet icon-button" data-close aria-label="关闭账号"><span data-icon="close"></span></button></div>
-  <div class="dialog-body">
-    <div id="accountGuest">
-      <p class="account-intro">登录后，换设备也能接着看。</p>
-      <div class="account-tabs segments" role="group" aria-label="账号操作"><button data-account-mode="login" aria-pressed="true">登录</button><button data-account-mode="register" aria-pressed="false">注册</button></div>
-      <p id="accountRegistrationDisabled" class="small" hidden>注册已关闭，请联系管理员创建账号。</p>
-      <form id="accountForm" class="account-form">
-        <label>用户名<input id="accountUsername" name="username" type="text" minlength="2" maxlength="32" autocomplete="username" autocapitalize="none" spellcheck="false" required placeholder="中文、字母、数字均可"></label>
-        <label>密码<input id="accountPassword" name="password" type="password" minlength="10" maxlength="128" autocomplete="current-password" required placeholder="10–128 个字符"></label>
-        <label id="accountConfirmRow" hidden>确认密码<input id="accountPasswordConfirm" type="password" minlength="10" maxlength="128" autocomplete="new-password"></label>
-        <label id="accountImportOnRegisterRow" class="account-check" hidden><input id="accountImportOnRegister" type="checkbox" checked><span>把此浏览器原有记录接入新账号</span></label>
-        <button id="accountSubmitBtn" type="submit">登录</button>
-      </form>
-      <p class="small account-note">这是当前剧库服务的账号，观看进度和追剧清单各自独立。</p>
-    </div>
-    <div id="accountMember" hidden>
-      <div class="account-member-heading"><div><span class="small">已登录</span><strong id="accountName"></strong></div><button id="accountLogoutBtn" class="secondary">退出登录</button></div>
-      <p class="small">在其他设备打开同一剧库，登录此账号即可继续观看。</p>
-      <div id="accountGuestImportSection" class="account-import" hidden><p class="small">此浏览器还有未接入账号的旧记录。接回时保留账号已有记录。</p><button id="accountImportGuestBtn" class="secondary">接回此浏览器原有记录</button></div>
-      <p id="accountForcedPasswordHint" class="account-initial-note" hidden>请先修改服务启动时生成的随机初始密码，再使用剧库。</p>
-      <details id="accountPasswordDetails" class="account-password"><summary>修改密码</summary><form id="accountPasswordForm" class="account-form">
-        <label>当前密码<input id="accountCurrentPassword" type="password" minlength="10" maxlength="128" autocomplete="current-password" required></label>
-        <label>新密码<input id="accountNewPassword" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
-        <label>确认新密码<input id="accountNewPasswordConfirm" type="password" minlength="10" maxlength="128" autocomplete="new-password" required></label>
-        <button type="submit">保存新密码</button><p class="small">修改后，其他设备需重新登录。</p>
-      </form></details>
-      <button id="accountManageUsersBtn" class="secondary account-manage-users button-content" data-go="users" data-admin-only hidden><span data-icon="user"></span>用户管理</button>
-    </div>
-    <a id="accountAnonymousLink" class="account-anonymous-link" href="/" hidden>继续匿名浏览</a>
-    <p id="accountStatus" class="account-status small" role="status" aria-live="polite"></p>
-  </div>
-</dialog>
+
 <dialog id="playerPanel" class="player-dialog" aria-labelledby="playerTitle">
   <div id="playerViewport" class="player-viewport">
     <div class="player-heading"><div><span class="small">正在观看</span><h2 id="playerTitle">在线观看</h2></div><button id="closePlayerBtn" class="quiet icon-button" aria-label="关闭播放器"><span data-icon="close"></span></button></div>

@@ -36,19 +36,10 @@ func (a *UIApp) startLibraryRefreshLocked(source string) {
 	a.startLibraryLoadLocked(source, libraryLoadRefresh, nil)
 }
 
-func (a *UIApp) startLibraryLoadLocked(source string, mode libraryLoadMode, priority []string, scopes ...context.Context) {
+func (a *UIApp) startLibraryLoadLocked(source string, mode libraryLoadMode, priority []string) {
 	base := context.Background()
-	if len(scopes) > 0 && sourceScope(scopes[0]) != nil {
-		base = context.WithValue(base, accountSourceContextKey{}, sourceScope(scopes[0]))
-	}
 	if mode == libraryLoadUpdate || mode == libraryLoadMore {
-		if source == "" && sourceScopeRestricted(base) {
-			for _, allowed := range sourceScope(base).Sources {
-				a.enqueueHistoricalMetadataLocked(allowed, priority)
-			}
-		} else {
-			a.enqueueHistoricalMetadataLocked(source, priority)
-		}
+		a.enqueueHistoricalMetadataLocked(source, priority)
 	}
 	more := mode == libraryLoadMore
 	if more {

@@ -57,23 +57,11 @@ func (manager *viewerManager) hasLegacyRecords() (bool, error) {
 	return found, nil
 }
 
-func (manager *viewerManager) legacyOwner(id string) string {
-	store := manager.accountStore()
-	store.mu.Lock()
-	defer store.mu.Unlock()
-	if imported, exists := store.state.GuestImports[id]; exists {
-		if account := store.state.Accounts[imported.Account]; account.ID != "" {
-			return account.viewerID()
-		}
-	}
-	return id
-}
-
 func (manager *viewerManager) legacyAvailable(id string) (bool, error) {
 	manager.legacyMu.Lock()
 	defer manager.legacyMu.Unlock()
 	state, err := manager.legacyImport()
-	if err != nil || state.Completed || state.Viewer != "" && manager.legacyOwner(state.Viewer) != id {
+	if err != nil || state.Completed || state.Viewer != "" && state.Viewer != id {
 		return false, err
 	}
 	return manager.hasLegacyRecords()
@@ -147,8 +135,8 @@ func (app *UIApp) handleViewerLegacy(writer http.ResponseWriter, request *http.R
 	manager.legacyMu.Lock()
 	defer manager.legacyMu.Unlock()
 	state, err := manager.legacyImport()
-	if err == nil && state.Viewer != "" && manager.legacyOwner(state.Viewer) != viewer.id {
-		writeJSON(writer, http.StatusConflict, map[string]string{"error": "旧版记录已经归属其他账号或浏览器，不能重复领取"})
+	if err == nil && state.Viewer != "" && state.Viewer != viewer.id {
+		writeJSON(writer, http.StatusConflict, map[string]string{"error": "旧版记录已经归属其他浏览器，不能重复领取"})
 		return
 	}
 	if err == nil && state.Completed {
@@ -193,7 +181,7 @@ func (app *UIApp) handleViewerLegacy(writer http.ResponseWriter, request *http.R
 		err = manager.saveLegacyImport(state, false)
 	}
 	if err != nil {
-		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "旧版记录尚未全部恢复，可在当前账号或浏览器重试：" + publicError(err).Error()})
+		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "旧版记录尚未全部恢复，可在当前浏览器重试：" + publicError(err).Error()})
 		return
 	}
 	writeJSON(writer, http.StatusOK, map[string]bool{"ok": true})

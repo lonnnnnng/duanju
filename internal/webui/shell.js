@@ -2,17 +2,12 @@ import { $, element, button, sourceLabel, normalizeSource, readPreference, saveP
 
 export function createShell(app) {
   const main = $('workspaceMain');
-  const positions = {library: 0, following: 0, downloads: 0, users: 0};
+  const positions = {library: 0, following: 0, downloads: 0};
   let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
   let sourceNotice;
   const sourceRows = new Map(), sourceErrors = new Map();
 
   function setPage(page) {
-    if (!app.viewer && page === 'users') return;
-    if (app.viewer && (page === 'users' && !app.viewer.account?.admin || page === 'downloads' && app.viewer.onlineOnly)) {
-      window.DuanjuDialogs.navigate('library');
-      page = 'library';
-    }
     if (page === current) return;
     if (current) positions[current] = main.scrollTop;
     current = page;
@@ -22,7 +17,6 @@ export function createShell(app) {
       if (control.dataset.page === page) control.setAttribute('aria-current', 'page');
       else control.removeAttribute('aria-current');
     });
-    if (page === 'users') app.users?.load();
     if (page === 'following') app.following?.render();
     if (page === 'downloads') app.downloads?.render();
     if (page === 'library') app.library?.layout();
@@ -30,12 +24,11 @@ export function createShell(app) {
   }
 
   function activity(visible) {
-    visible = visible && !app.viewer?.onlineOnly;
     $('activityPanel').hidden = !visible;
     $('catalogLayout').classList.toggle('with-activity', visible);
     $('activityToggle').setAttribute('aria-pressed', String(visible));
     $('activityToggleLabel').textContent = visible ? '收起任务' : '任务侧栏';
-    if (!app.viewer?.onlineOnly) savePreference('activitySidebar', visible);
+    savePreference('activitySidebar', visible);
     if (visible) app.downloads?.render();
   }
 
@@ -53,14 +46,12 @@ export function createShell(app) {
     const statuses = {loading: '正在获取', ready: '已就绪', success: '已更新', done: '已更新', failed: '暂不可用', error: '暂不可用', partial: '部分更新', cached: '使用缓存', pending: '等待更新'};
     for (const [id, controls] of sourceRows) {
       const state = sourceStates[id];
-      const allowed = !app.viewer?.sources || app.viewer.sources.includes(normalizeSource(id));
       const busy = sourceRequest === id || sourceLoading && state?.status === 'loading';
-      controls.row.hidden = !allowed;
       controls.status.textContent = sourceRequest === id ? '正在提交' : state ? statuses[state.status] || (state.error ? '暂不可用' : '已有缓存') : '未检查';
       const date = state?.updatedAt && !state.updatedAt.startsWith('0001') ? new Date(state.updatedAt).toLocaleString() : '';
       controls.detail.textContent = [Number.isFinite(state?.count) ? state.count + ' 部' : '', date].filter(Boolean).join(' · ');
       controls.error.textContent = sourceErrors.get(id) || state?.error || '';
-      controls.action.disabled = !allowed || sourceLoading || Boolean(sourceRequest);
+      controls.action.disabled = sourceLoading || Boolean(sourceRequest);
       controls.action.textContent = busy ? '更新中…' : '更新';
       controls.action.setAttribute('aria-busy', String(busy));
       controls.action.title = sourceLoading || sourceRequest ? '正在更新剧库，完成后可再次更新' : '只更新' + controls.label + '的目录和资料';
@@ -69,7 +60,7 @@ export function createShell(app) {
   }
 
   async function updateSource(id) {
-    if (sourceLoading || sourceRequest || app.viewer?.sources && !app.viewer.sources.includes(normalizeSource(id))) return;
+    if (sourceLoading || sourceRequest) return;
     sourceRequest = id;
     sourceErrors.delete(id);
     updateSourceRows();
@@ -91,7 +82,6 @@ export function createShell(app) {
     const names = {hongguo: '主站'};
     info('站源状态', content => {
       for (const [id, label] of Object.entries(names)) {
-        if (app.viewer?.sources && !app.viewer.sources.includes(normalizeSource(id))) continue;
         const row = element('section', 'source-status-row');
         row.dataset.source = id;
         const heading = element('div', 'heading source-status-heading');
@@ -136,9 +126,6 @@ export function createShell(app) {
 
   function access() {
     updateSourceRows();
-    document.body.classList.toggle('online-only', Boolean(app.viewer?.onlineOnly));
-    document.querySelectorAll('[data-admin-only]').forEach(control => {control.hidden = !app.viewer?.account?.admin;});
-    document.querySelectorAll('button[data-page=downloads], [data-go=downloads]').forEach(control => {control.hidden = Boolean(app.viewer?.onlineOnly);});
     activity(readPreference('activitySidebar', false) === true);
     setPage(window.DuanjuDialogs.page());
   }
@@ -162,7 +149,7 @@ export function createShell(app) {
     $('menuHistoryBtn').addEventListener('click', () => $('openHistoryBtn').click());
     $('sourceStatusBtn').addEventListener('click', showSources);
     $('aboutBtn').addEventListener('click', () => info('使用提示', content => {
-      for (const text of ['输入关键词先筛选本地剧库，点击“联网搜索”补充结果。', '更新剧库会查新、继续加载目录，并在后台补齐历史资料。', '登录账号后，观看进度和追剧清单可跨设备接续；允许匿名访问时，匿名记录仍按浏览器独立保存。', '下载保存到运行短剧的电脑；手机浏览器不会把下载任务保存到手机相册。']) content.appendChild(element('p', 'notice', text));
+      for (const text of ['输入关键词先筛选本地剧库，点击“联网搜索”补充结果。', '更新剧库会查新、继续加载目录，并在后台补齐历史资料。', '观看记录和追剧清单按浏览器独立保存。', '下载保存到运行短剧的电脑；手机浏览器不会把下载任务保存到手机相册。']) content.appendChild(element('p', 'notice', text));
     }));
     $('activityToggle').addEventListener('click', () => activity($('activityPanel').hidden));
     $('closeActivityBtn').addEventListener('click', () => activity(false));

@@ -55,10 +55,10 @@ func TestPlaybackDirectHLSChecksCORSKeysAndScheme(t *testing.T) {
 		t.Fatal("server-only key was treated as public")
 	}
 	media.key = nil
-	for source, group := range accountSourceAliases {
+	for source, group := range map[string]string{sourceHongguo: sourceHongguo} {
 		app.mediaResources().settings.DirectSources = []string{group}
 		if !app.allowPlaybackDirect(context.Background(), media, source, "http://library.test") {
-			t.Fatal("source alias ignored the administrator setting", source)
+			t.Fatal("source alias ignored the playback setting", source)
 		}
 	}
 }

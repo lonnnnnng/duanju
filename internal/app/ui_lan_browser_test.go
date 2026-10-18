@@ -2,6 +2,7 @@ package app
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -16,12 +17,12 @@ import (
 	"time"
 )
 
-func TestAccountBrowserFixture(t *testing.T) {
-	root := os.Getenv("DUANJU_ACCOUNT_BROWSER_ROOT")
+func TestLANBrowserFixture(t *testing.T) {
+	root := os.Getenv("DUANJU_LAN_BROWSER_ROOT")
 	if root == "" {
 		t.Skip("browser fixture is opt-in")
 	}
-	media, err := os.ReadFile(os.Getenv("DUANJU_ACCOUNT_BROWSER_MEDIA"))
+	media, err := os.ReadFile(os.Getenv("DUANJU_LAN_BROWSER_MEDIA"))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,6 +43,9 @@ func TestAccountBrowserFixture(t *testing.T) {
 	t.Cleanup(app.embySyncer().stop)
 	app.loadedAt = time.Now()
 	app.tasks = map[string]*UITask{}
+	// long: 浏览器验收包含实际入队下载，必须像正式服务一样初始化取消表并等待 worker 停止。
+	app.runningCancels = map[string]context.CancelFunc{}
+	t.Cleanup(app.stopWorkers)
 	app.cond = sync.NewCond(&app.mu)
 	app.statePath = filepath.Join(app.cfg.dataDirectory(), "ui-state.json")
 	app.downloader.cfg.FFmpeg = ffmpeg
@@ -55,22 +59,12 @@ func TestAccountBrowserFixture(t *testing.T) {
 		}
 		return transport.RoundTrip(request)
 	})}
-	app.cfg.adminUsername, app.cfg.adminPassword, app.cfg.adminPasswordExplicit = "admin", accountFixturePassword, true
-	adminPassword := accountFixturePassword
-	if os.Getenv("DUANJU_ACCOUNT_BROWSER_RANDOM_ADMIN") == "1" {
-		app.cfg.adminPassword, app.cfg.adminPasswordExplicit = "", false
-		bootstrap, err := app.browserViewers().ensureAdministrator(app.cfg)
-		if err != nil {
-			t.Fatal(err)
-		}
-		adminPassword = bootstrap.InitialPassword
-	}
 	if err := app.prepareBrowserViewers(); err != nil {
 		t.Fatal(err)
 	}
 	client := app.downloader.hongguoClient()
 	entry := client.details["7000000000000000001"]
-	if os.Getenv("DUANJU_ACCOUNT_BROWSER_MOBILE") == "1" {
+	if os.Getenv("DUANJU_LAN_BROWSER_MOBILE") == "1" {
 		entry.Chapters = nil
 		for index := 1; index <= 65; index++ {
 			entry.Chapters = append(entry.Chapters, Chapter{ID: providerChapterID(sourceHongguo, "7000000000000000001", strconv.Itoa(index)), Source: sourceHongguo, CurrentEpisode: rawEpisode(index)})
@@ -82,11 +76,16 @@ func TestAccountBrowserFixture(t *testing.T) {
 		entry.Chapters[index].VideoURL = mediaServer.URL + "/synthetic.mp4"
 	}
 	client.details["7000000000000000001"] = entry
+	app.startWorkers()
 	routes := app.routes()
 	var requestsMu sync.Mutex
 	var nativeRequests []map[string]string
 	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		switch request.URL.Path {
+		case "/api/ui/dramas/refresh":
+			// long: 播放会主动补齐剧集资料，离线验收返回固定资料，确保不会误访问真实站源。
+			writeJSON(writer, http.StatusOK, dramaRefreshResult{DramaID: historyFixtureDramaID, Drama: entry.Drama, RetryAfter: 300})
+			return
 		case "/api/ui/cover/repair":
 			writeJSON(writer, http.StatusOK, map[string]any{"dramaId": historyFixtureDramaID, "retryAfter": 300})
 			return
@@ -96,9 +95,8 @@ func TestAccountBrowserFixture(t *testing.T) {
 			return
 		}
 		if strings.HasPrefix(request.URL.Path, "/api/ui/playback/hls/") {
-			account, _, _, _ := app.browserViewers().requestAccount(request)
 			requestsMu.Lock()
-			nativeRequests = append(nativeRequests, map[string]string{"path": request.URL.Path, "account": account.Username})
+			nativeRequests = append(nativeRequests, map[string]string{"path": request.URL.Path})
 			requestsMu.Unlock()
 		}
 		routes.ServeHTTP(writer, request)
@@ -115,7 +113,7 @@ func TestAccountBrowserFixture(t *testing.T) {
 			t.Error(err)
 		}
 	}()
-	ready, _ := json.Marshal(map[string]string{"url": server.URL, "adminPassword": adminPassword})
+	ready, _ := json.Marshal(map[string]string{"url": server.URL})
 	if err = os.WriteFile(filepath.Join(root, "ready.json"), ready, 0600); err != nil {
 		t.Fatal(err)
 	}

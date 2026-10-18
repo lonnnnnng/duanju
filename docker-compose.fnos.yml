@@ -6,8 +6,6 @@ services:
       - "${DUANJU_BIND_ADDRESS:-0.0.0.0}:${DUANJU_PORT:-3333}:3333"
     environment:
       - TZ=Asia/Shanghai
-      - DUANJU_ADMIN_USER=
-      - DUANJU_ADMIN_PASSWORD=
     volumes:
       - /vol1/1000/docker/duanju/data:/data
       - /vol1/1000/docker/duanju/downloads:/downloads

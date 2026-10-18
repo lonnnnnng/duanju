@@ -32,7 +32,6 @@ esac
 
 # long: 调用正在运行的服务能共用网页更新锁、校验与回滚，避免另起进程替换程序时互相覆盖备份。
 exec python3 - "$ACTION" <<'PY'
-import getpass
 import http.cookiejar
 import json
 import os
@@ -49,7 +48,7 @@ class APIError(Exception):
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
-    # long: 管理员密码只发送到显式选择的本机服务，拒绝接口重定向带来的凭据转发。
+    # long: 管理请求只发送到显式选择的本机服务，拒绝重定向把本地管理操作转发到其他地址。
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
@@ -63,7 +62,7 @@ def main():
             or address.path or address.query or address.fragment):
         raise APIError("DUANJU_SERVICE_URL 必须是本机 HTTP/HTTPS 地址，例如 http://127.0.0.1:3333")
     cookies = http.cookiejar.CookieJar()
-    # long: 本机管理接口绕过系统代理，Cookie 只保存在内存中，退出时注销临时会话。
+    # long: 本机管理接口绕过系统代理，匿名浏览器 Cookie 只保存在内存中，退出时自动丢弃。
     client = urllib.request.build_opener(
         urllib.request.ProxyHandler({}), urllib.request.HTTPCookieProcessor(cookies), NoRedirect())
     viewer_id = ""
@@ -88,7 +87,7 @@ def main():
 
     def initialize_viewer():
         nonlocal viewer_id
-        # long: 账号接口需要已确认的 Cookie 与身份头；登录后身份会切换，必须重新读取才能继续管理服务。
+        # long: 设置接口需要已确认的浏览器 Cookie 与身份头，以保留来源和身份变更校验。
         viewer = request("/api/ui/viewer")
         if not viewer.get("ready"):
             viewer = request("/api/ui/viewer?confirm=1")
@@ -99,59 +98,43 @@ def main():
 
     request("/healthz")
     initialize_viewer()
-    username = os.environ.get("DUANJU_ADMIN_USER") or "admin"
-    password = getpass.getpass("管理员 %s 密码：" % username)
-    logged_in = False
-    try:
-        login = request("/api/ui/account/login", {"username": username, "password": password})
-        password = None
-        logged_in = True
-        initialize_viewer()
-        if not login.get("account", {}).get("admin"):
-            raise APIError("该账号没有管理员权限")
-        info = request("/api/ui/admin/update")
-        print("当前版本：%s；最新版本：%s" % (info["currentVersion"], info.get("latestVersion", "未知")), flush=True)
-        if not info.get("updateAvailable"):
-            print("当前程序已是最新版本，无需更新。")
-            return
-        if not info.get("updateReady"):
-            raise APIError("最新 Release 缺少当前系统的程序包")
-        print("可更新程序包：%s" % info["assetName"], flush=True)
-        if sys.argv[1] == "check-update":
-            return
-        print("正在下载、校验并替换程序……", flush=True)
-        result = request("/api/ui/admin/update", {}, timeout=150)
-        if not result.get("updateApplied"):
-            raise APIError(result.get("message", "服务未确认更新完成"))
-        print(result.get("message", "程序已更新"), flush=True)
-        if not result.get("autoRestart"):
-            print("请运行 duanju-service restart 完成重启。")
-            return
-        # long: 磁盘替换成功不代表新程序已启动，必须等健康接口报告目标版本再宣布更新完成。
-        deadline = time.monotonic() + 60
-        while time.monotonic() < deadline:
-            try:
-                health = request("/healthz", timeout=3)
-                if health.get("status") == "ok" and health.get("version") == result["latestVersion"]:
-                    print("更新完成，服务已运行 %s。" % health["version"])
-                    return
-            except APIError:
-                pass
-            time.sleep(1)
-        raise APIError("等待新版本启动超时；请用 status、logs 查看启动或回滚结果")
-    finally:
-        password = None
-        if logged_in:
-            try:
-                request("/api/ui/account/logout", {}, timeout=3)
-            except APIError:
-                pass
+    info = request("/api/ui/settings/update")
+    print("当前版本：%s；最新版本：%s" % (info["currentVersion"], info.get("latestVersion", "未知")), flush=True)
+    if not info.get("updateAvailable"):
+        print("当前程序已是最新版本，无需更新。")
+        return
+    if not info.get("updateReady"):
+        raise APIError("最新 Release 缺少当前系统的程序包")
+    print("可更新程序包：%s" % info["assetName"], flush=True)
+    if sys.argv[1] == "check-update":
+        return
+    print("正在下载、校验并替换程序……", flush=True)
+    result = request("/api/ui/settings/update", {}, timeout=150)
+    if not result.get("updateApplied"):
+        raise APIError(result.get("message", "服务未确认更新完成"))
+    print(result.get("message", "程序已更新"), flush=True)
+    if not result.get("autoRestart"):
+        print("请运行 duanju-service restart 完成重启。")
+        return
+    # long: 磁盘替换成功不代表新程序已启动，必须等健康接口报告目标版本再宣布更新完成。
+    deadline = time.monotonic() + 60
+    while time.monotonic() < deadline:
+        try:
+            health = request("/healthz", timeout=3)
+            if health.get("status") == "ok" and health.get("version") == result["latestVersion"]:
+                print("更新完成，服务已运行 %s。" % health["version"])
+                return
+        except APIError:
+            pass
+        time.sleep(1)
+    raise APIError("等待新版本启动超时；请用 status、logs 查看启动或回滚结果")
+
 
 
 try:
     main()
 except (APIError, EOFError) as error:
-    print("操作失败：%s" % (error or "未输入管理员密码"), file=sys.stderr)
+    print("操作失败：%s" % (error or "无法完成服务操作"), file=sys.stderr)
     sys.exit(1)
 except KeyboardInterrupt:
     print("\n操作已中断；若已提交更新，请查看服务状态。", file=sys.stderr)

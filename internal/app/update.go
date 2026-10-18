@@ -171,7 +171,7 @@ func releaseIsNewer(current, latest string) bool {
 	return false
 }
 
-func (a *UIApp) handleAdminUpdate(writer http.ResponseWriter, request *http.Request) {
+func (a *UIApp) handleAppUpdate(writer http.ResponseWriter, request *http.Request) {
 	if request.Method != http.MethodGet && request.Method != http.MethodPost {
 		writeJSON(writer, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
@@ -226,7 +226,7 @@ func (a *UIApp) handleAdminUpdate(writer http.ResponseWriter, request *http.Requ
 	a.recordUpdateDiagnostic("app.updated", "已下载并替换应用程序："+info.AssetName)
 	writeJSON(writer, http.StatusOK, info)
 	if info.AutoRestart {
-		// long: systemd 通过非零退出触发 Restart=on-failure；延迟退出让 HTTP 响应先回到管理员浏览器。
+		// long: systemd 通过非零退出触发 Restart=on-failure；延迟退出让 HTTP 响应先回到发起更新的浏览器。
 		time.AfterFunc(250*time.Millisecond, func() { os.Exit(75) })
 	}
 }

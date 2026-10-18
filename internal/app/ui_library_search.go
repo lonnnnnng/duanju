@@ -17,9 +17,6 @@ func (app *UIApp) handleLibrarySearch(writer http.ResponseWriter, request *http.
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": err.Error()})
 		return
 	}
-	if !requireSource(writer, request.Context(), sourceHongguo) {
-		return
-	}
 	ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
 	defer cancel()
 	result, err := app.downloader.searchHongguoDramas(ctx, keyword)

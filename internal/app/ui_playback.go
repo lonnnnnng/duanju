@@ -18,7 +18,7 @@ const playbackIdleTimeout = 10 * time.Minute
 const playbackMIME = `video/mp4; codecs="avc1.42C01F, mp4a.40.2"`
 
 type playbackSession struct {
-	accountID       string
+	embyOwner       string
 	dramaID         string
 	id              string
 	viewer          *viewerRecords
@@ -75,7 +75,7 @@ type playbackView struct {
 }
 
 func (app *UIApp) registerPlaybackRoutes(mux *http.ServeMux) {
-	mux.HandleFunc("/api/ui/admin/playback", app.handlePlaybackSettings)
+	mux.HandleFunc("/api/ui/settings/playback", app.handlePlaybackSettings)
 	mux.HandleFunc("/api/ui/playback/plan", app.handlePlaybackPlan)
 	mux.HandleFunc("/api/ui/playback/media/", app.handlePlaybackMediaAsset)
 	mux.HandleFunc("/api/emby/media/", app.handleEmbyMediaAsset)
@@ -109,13 +109,13 @@ func playbackRequestAllowed(writer http.ResponseWriter, request *http.Request, m
 		return true
 	case "":
 	default:
-		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "请从剧库页面发起播放"})
+		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "请从剧库页面发起操作"})
 		return false
 	}
 	if origin := request.Header.Get("Origin"); origin != "" {
 		parsed, err := url.Parse(origin)
 		if err != nil || parsed.User != nil || parsed.Scheme != "http" && parsed.Scheme != "https" || !originHostMatches(parsed, request.Host) {
-			writeJSON(writer, http.StatusForbidden, map[string]string{"error": "不允许跨站播放请求"})
+			writeJSON(writer, http.StatusForbidden, map[string]string{"error": "不允许跨站请求"})
 			return false
 		}
 	}
@@ -162,18 +162,12 @@ func (app *UIApp) handlePlaybackOpen(writer http.ResponseWriter, request *http.R
 	if !readPlaybackRequest(writer, request, &input) {
 		return
 	}
-	if input.TaskID != "" && !requireDownload(writer, request) {
-		return
-	}
 	if input.TaskID != "" && input.DramaID != "" {
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "请选择剧库播放或合集播放"})
 		return
 	}
 	viewer := requestViewer(writer, request)
 	if viewer == nil {
-		return
-	}
-	if input.DramaID != "" && !app.requireDramaSources(writer, request, []string{input.DramaID}) {
 		return
 	}
 	openedAt := time.Now()
@@ -190,7 +184,7 @@ func (app *UIApp) handlePlaybackOpen(writer http.ResponseWriter, request *http.R
 	initialIndex := 1
 	var collectionErr error
 	app.mu.Lock()
-	if input.FromHistory && previous.Mode == "collection" && downloadAllowed(request.Context()) {
+	if input.FromHistory && previous.Mode == "collection" {
 		if strings.HasPrefix(previous.TaskID, mergedPlaybackPrefix) && previous.TaskID == mergedPlaybackPrefix+previous.DramaID {
 			if _, _, err := app.mergedPlaybackTaskLocked(previous.TaskID); err == nil {
 				input.TaskID = previous.TaskID
@@ -212,10 +206,6 @@ func (app *UIApp) handlePlaybackOpen(writer http.ResponseWriter, request *http.R
 		}
 	}
 	if input.TaskID != "" {
-		if !app.requireTaskSourcesLocked(writer, request, taskSelection{IDs: []string{input.TaskID}}) {
-			app.mu.Unlock()
-			return
-		}
 		title, tasks, downloadIDs, initialIndex, collectionErr = app.collectionPlaybackTasksLocked(input.TaskID)
 	} else {
 		for _, candidate := range app.dramas {
@@ -239,16 +229,6 @@ func (app *UIApp) handlePlaybackOpen(writer http.ResponseWriter, request *http.R
 	if input.TaskID == "" && drama.ID == "" {
 		writeJSON(writer, http.StatusNotFound, map[string]string{"error": "此短剧不在当前剧库中，请刷新剧库后重试"})
 		return
-	}
-	if drama.ID != "" && !dramaAllowed(request.Context(), drama.ID, drama.Source) {
-		writeSourceDenied(writer)
-		return
-	}
-	for _, task := range tasks {
-		if !taskSourceAllowed(request.Context(), task) {
-			writeSourceDenied(writer)
-			return
-		}
 	}
 	sessionDramaID := drama.ID
 	if len(tasks) > 0 {
@@ -293,12 +273,6 @@ func (app *UIApp) handlePlaybackOpen(writer http.ResponseWriter, request *http.R
 		title = firstNonEmpty(fetchedTitle, drama.DisplayTitle())
 		for index, chapter := range chapters {
 			tasks = append(tasks, Task{DramaID: drama.ID, DramaTitle: title, Chapter: chapter, Index: index + 1, Total: len(chapters)})
-		}
-	}
-	for _, task := range tasks {
-		if !taskSourceAllowed(request.Context(), task) {
-			writeSourceDenied(writer)
-			return
 		}
 	}
 	episodes := make([]playbackEpisode, 0, len(tasks))

@@ -38,29 +38,18 @@ go run .
 | --- | --- |
 | `-listen 地址` | 修改监听地址，默认 `0.0.0.0:3333` |
 | `-open=false` | 不自动打开浏览器 |
-| `-data-dir 目录` | 配置、缓存、账号和任务目录，默认 `./data` |
+| `-data-dir 目录` | 配置、缓存和任务目录，默认 `./data` |
 | `-out 目录` | 下载目录，默认 `./downloads` |
 | `-ffmpeg 路径` | 指定 FFmpeg，默认从 PATH 查找 |
-| `-admin-user` / `-admin-password` | 设置管理员凭据 |
 | `-ui=false -mode list` | 使用命令行模式查看剧库 |
 
-## 账号与权限
+## 局域网使用
 
-首次启动创建 `admin` 管理员。未指定密码时，随机密码只在启动输出一次，并要求首次登录改密；也可以通过启动参数或环境变量指定：
+打开页面即可使用剧库、下载、设置和 Emby 同步，无需登录或创建用户。
+观看记录、追剧和续播通过浏览器 Cookie 独立保存；更换浏览器或清除 Cookie 后不会自动接续，备份时请保留 `viewer-key` 和 `viewers/`。
 
-```bash
-DUANJU_ADMIN_USER=admin DUANJU_ADMIN_PASSWORD='替换为强密码' ./duanju-vX.Y.Z-linux-amd64 -open=false
-```
-
-`DUANJU_ADMIN_PASSWORD` 或 `-admin-password` 会在每次启动时重新应用。网页修改密码后，应移除旧环境变量或同步更新服务环境文件。
-
-管理员在“更多 → 用户管理”中控制：
-
-- 是否必须登录、是否允许注册；
-- 普通账号可用的站源；
-- 是否仅允许在线观看；仅在线观看会同时隐藏并拒绝下载、合并和 Emby 导出接口。
-
-观看记录、收藏、追剧和续播按账号保存；匿名记录按浏览器 Cookie 隔离。账号、会话、密钥和记录都在 `data/` 中，备份时不要遗漏。
+升级后不再读取旧账号、会话和权限策略，也不再创建管理员或接受管理员凭据参数。已有 `accounts.json` 和记录目录保留在磁盘上。
+Emby 新导出链接使用服务密钥签名，旧签名链接继续有效；自动同步的追剧范围使用最后保存同步设置的浏览器，旧同步配置在重新保存前沿用原记录目录。
 
 ## Linux 后台运行、日志与更新
 
@@ -79,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/lonnnnnng/duanju/main/scripts/insta
 bash install-duanju.sh
 ```
 
-可选环境变量：`DUANJU_VERSION=v0.1.10` 固定版本，`DUANJU_INSTALL_DIR` 修改安装目录，`DUANJU_OUTPUT_DIR` 修改下载目录，`DUANJU_LISTEN` 修改监听地址。安装完成后首次登录密码可从 `sudo journalctl -u duanju -n 30 --no-pager` 查看；登录后建议立即修改密码。
+可选环境变量：`DUANJU_VERSION=v0.1.10` 固定版本，`DUANJU_INSTALL_DIR` 修改安装目录，`DUANJU_OUTPUT_DIR` 修改下载目录，`DUANJU_LISTEN` 修改监听地址。安装完成后直接打开页面使用。
 
 ### systemd
 
@@ -109,7 +98,7 @@ install -m 0755 scripts/duanju-service.sh "$HOME/duanju/duanju-service"
 ~/duanju/duanju-service update        # 在线更新并验证重启结果
 ```
 
-启停和重启会调用 `sudo systemctl`；检查和更新需 Python 3，会交互输入管理员密码。默认访问 `http://127.0.0.1:3333`，自定义端口设置 `DUANJU_SERVICE_URL`；更新时服务须处于运行状态。脚本也支持 `DUANJU_SERVICE_NAME`、`DUANJU_INSTALL_DIR`、`DUANJU_DATA_DIR` 和 `DUANJU_ADMIN_USER`。
+启停和重启使用系统服务管理命令；检查和更新需 Python 3，无需登录。默认访问 `http://127.0.0.1:3333`，自定义端口设置 `DUANJU_SERVICE_URL`；脚本支持 `DUANJU_SERVICE_NAME`、`DUANJU_INSTALL_DIR` 和 `DUANJU_DATA_DIR`。
 
 ### 日志与健康检查
 
@@ -127,7 +116,7 @@ journalctl -u duanju --since '10 minutes ago'
 
 ### 在线更新
 
-管理员在“更多 → 代理 / 设置 → 应用版本”检查 GitHub 正式 Release。更新器：
+在“更多 → 代理 / 设置 → 应用版本”检查 GitHub 正式 Release。更新器：
 
 1. 按当前 `GOOS/GOARCH` 查找 `duanju-版本号-系统-架构` 资产；Windows 资产带 `.exe`。
 2. 下载程序和 `SHA256SUMS`，校验 SHA-256。
@@ -152,7 +141,7 @@ journalctl -u duanju --since '10 minutes ago'
 - 解密、换封装、音频转码和视频转码的独立并发限制；
 - Emby、本地已下载文件和在线缓冲的统一播放入口。
 
-“优先原始 MP4 / HLS 播放”及客户端直连都在管理员设置中控制。直连只是条件允许时的尝试，失败会回退到服务端中转；开启直连不会绕过账号权限。
+“优先原始 MP4 / HLS 播放”及客户端直连都在设置中控制。直连只是条件允许时的尝试，失败会回退到服务端中转。
 
 ### 下载与合并
 
@@ -176,7 +165,6 @@ journalctl -u duanju --since '10 minutes ago'
 
 | 变量 | 作用 |
 | --- | --- |
-| `DUANJU_ADMIN_USER` / `DUANJU_ADMIN_PASSWORD` | 管理员凭据 |
 | `DUANJU_OUTPUT_DIR` | 下载目录 |
 | `DUANJU_FFMPEG` | FFmpeg 路径 |
 | `DUANJU_PROXY_URL` | HTTP、HTTPS 或 SOCKS5 代理 |
@@ -189,7 +177,6 @@ journalctl -u duanju --since '10 minutes ago'
 ```text
 data/
 ├── duanju.json                 # 代理、并发和下载目录
-├── accounts.json             # 账号、权限和会话
 ├── library.json              # 剧库缓存
 ├── ui-state.json             # 下载与合并状态
 ├── viewers/                  # 观看记录和追剧清单
@@ -199,7 +186,7 @@ data/
 downloads/                    # 视频文件
 ```
 
-备份时同时保存 `data/` 和视频目录，尤其是 `accounts.json`、`viewer-key`、`viewers/` 与 `emby-key`。不要把真实数据、密码、令牌或视频提交到 Git。
+备份时同时保存 `data/` 和视频目录，尤其是 `viewer-key`、`viewers/` 与 `emby-key`。不要把真实数据、密码、令牌或视频提交到 Git。
 
 ## Docker
 
@@ -215,8 +202,6 @@ docker compose logs --tail=100 app
 ```dotenv
 DUANJU_PORT=3333
 DUANJU_BIND_ADDRESS=0.0.0.0
-DUANJU_ADMIN_USER=admin
-DUANJU_ADMIN_PASSWORD=替换为强密码
 DUANJU_PROXY_URL=
 ```
 
@@ -258,7 +243,6 @@ Linux/macOS 的全集周期同步缓存源文件和入库文件的磁盘身份�
 | 现象 | 排查 |
 | --- | --- |
 | 局域网无法访问 | 确认监听不是 `127.0.0.1`，放行 TCP 3333，并确认客户端未启用无线隔离 |
-| 登录后反复跳回 | 保持访问地址不变，反向代理透传 Cookie / Set-Cookie，并使用 HTTPS |
 | 播放卡顿或 CPU 高 | 先查看日志中的 `playback.plan`、`playback.mode`，限制播放处理并发；免转码中转仍消耗服务器带宽 |
 | 下载目录不可写 | 检查服务用户、容器 UID/GID 以及父目录权限；不要用无条件 `chmod -R 777` |
 | FFmpeg 不可用 | 在设置中重新检查，或设置 `-ffmpeg` / `DUANJU_FFMPEG` 指向支持 H.264/AAC 的版本 |

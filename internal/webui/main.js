@@ -6,8 +6,6 @@ import { createSettings } from './settings.js';
 import { createFollowing } from './following.js';
 import { createDetails } from './details.js';
 import { initializeViewer } from './viewer.js';
-import { createAccount } from './account.js';
-import { createUsers } from './users.js';
 import { createEmby } from './emby.js';
 
 const app = {api, post};
@@ -23,13 +21,11 @@ app.downloads = createDownloads(app);
 app.settings = createSettings(app);
 app.following = createFollowing(app);
 app.details = createDetails(app);
-app.account = createAccount(app);
-app.users = createUsers(app);
 app.emby = createEmby(app);
 
 app.shell.init();
 window.addEventListener('duanjuviewerchange', () => {
-  document.getElementById('viewerNotice').textContent = '账号权限已变化，正在重新加载…';
+  document.getElementById('viewerNotice').textContent = '浏览器身份已变化，正在重新加载…';
   document.getElementById('viewerNotice').hidden = false;
   window.location.reload();
 });
@@ -48,8 +44,6 @@ async function initialize() {
     notice.hidden = false;
     return;
   }
-if (app.account.init()) return;
-app.users.init();
 app.emby.init();
 app.shell.access();
 window.DuanjuHistory.init({
@@ -65,7 +59,6 @@ window.DuanjuRankings.init({
   getDrama: id => app.library.get(id),
   sourceLabel,
   onLibraryChanged: () => app.library.refresh(),
-  canDownload: () => !app.viewer?.onlineOnly,
   onDownloadsChanged: app.downloads.refresh,
   getDownloadQuality: app.downloads.quality,
   play: app.play

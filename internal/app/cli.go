@@ -84,8 +84,6 @@ func usage() {
   -ui=true|false               启动/关闭本地浏览器管理界面，默认 true
   -listen 地址                UI 监听地址，默认 0.0.0.0:3333，支持局域网访问
   -open=true|false            UI 模式是否自动打开浏览器，默认 true
-  -admin-user 用户名           管理员账号，首次默认 admin
-  -admin-password 密码         指定管理员密码；首次未指定时随机生成并输出，首次登录须修改
   -mode all|search|id|list    CLI 模式，需配合 -ui=false，默认 all
   -keyword 关键词             search 模式关键词
   -id 剧ID                    id 模式下载单部剧
@@ -119,8 +117,6 @@ func Run() {
 	configFile := flag.String("config", "", "import a legacy config on first startup")
 	dataDir := flag.String("data-dir", "data", "configuration, cache and task directory")
 	ffmpeg := flag.String("ffmpeg", "", "ffmpeg path")
-	adminUser := flag.String("admin-user", "", "administrator username, default admin on first startup")
-	adminPassword := flag.String("admin-password", "", "administrator password; default random on first startup")
 	uiMode := flag.Bool("ui", true, "start local web UI")
 	listen := flag.String("listen", defaultUIListenAddress, "UI listen address; use 127.0.0.1:3333 for local-only access")
 	open := flag.Bool("open", true, "open browser automatically in UI mode")
@@ -158,13 +154,6 @@ func Run() {
 		fmt.Fprintln(os.Stderr, "恢复更新前版本失败:", publicError(err))
 		os.Exit(1)
 	}
-	cfg.adminUsername = firstNonEmpty(*adminUser, os.Getenv("DUANJU_ADMIN_USER"), "admin")
-	cfg.adminUserExplicit = flagWasSet("admin-user") || os.Getenv("DUANJU_ADMIN_USER") != ""
-	cfg.adminPassword = os.Getenv("DUANJU_ADMIN_PASSWORD")
-	if flagWasSet("admin-password") {
-		cfg.adminPassword = *adminPassword
-	}
-	cfg.adminPasswordExplicit = flagWasSet("admin-password") || os.Getenv("DUANJU_ADMIN_PASSWORD") != ""
 	if *concurrency > 0 {
 		cfg.Concurrency = *concurrency
 	}

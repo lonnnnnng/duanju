@@ -170,15 +170,8 @@ func (a *UIApp) handleTaskPriority(writer http.ResponseWriter, request *http.Req
 	if _, valid := cleanIDList(writer, append(append([]string{}, input.IDs...), input.DramaIDs...)); !valid {
 		return
 	}
-	if !requireDownload(writer, request) {
-		return
-	}
 	a.mu.Lock()
 	selection := taskSelection{IDs: input.IDs, DramaIDs: input.DramaIDs}
-	if !a.requireTaskSourcesLocked(writer, request, selection) {
-		a.mu.Unlock()
-		return
-	}
 	selected := make(map[string]bool)
 	for _, id := range selection.idsLocked(a) {
 		selected[id] = true
@@ -224,7 +217,7 @@ func (a *UIApp) handleTaskPriority(writer http.ResponseWriter, request *http.Req
 			a.cond.Broadcast()
 		}
 	}
-	views := a.taskViewsForSourceLocked(request.Context())
+	views := a.taskViewsLocked()
 	a.mu.Unlock()
 	writeJSON(writer, http.StatusOK, map[string]any{"data": views, "changed": changed})
 }
@@ -239,10 +232,6 @@ func (a *UIApp) handlePause(writer http.ResponseWriter, request *http.Request) {
 		return
 	}
 	a.mu.Lock()
-	if !a.requireTaskSourcesLocked(writer, request, selection) {
-		a.mu.Unlock()
-		return
-	}
 	snapshot := a.snapshotTaskMutationLocked()
 	var cancels []context.CancelFunc
 	for _, id := range selection.idsLocked(a) {
@@ -271,7 +260,7 @@ func (a *UIApp) handlePause(writer http.ResponseWriter, request *http.Request) {
 	if saveErr != nil {
 		a.restoreTaskMutationLocked(snapshot)
 	}
-	views := a.taskViewsForSourceLocked(request.Context())
+	views := a.taskViewsLocked()
 	a.mu.Unlock()
 	if saveErr != nil {
 		a.writeStatePersistenceError(writer, saveErr)
@@ -294,10 +283,6 @@ func (a *UIApp) handleResume(writer http.ResponseWriter, request *http.Request) 
 		return
 	}
 	a.mu.Lock()
-	if !a.requireTaskSourcesLocked(writer, request, selection) {
-		a.mu.Unlock()
-		return
-	}
 	snapshot := a.snapshotTaskMutationLocked()
 	if a.parsingInFlight == nil {
 		a.parsingInFlight = map[string]bool{}
@@ -343,7 +328,7 @@ func (a *UIApp) handleResume(writer http.ResponseWriter, request *http.Request) 
 			a.cond.Broadcast()
 		}
 	}
-	views := a.taskViewsForSourceLocked(request.Context())
+	views := a.taskViewsLocked()
 	a.mu.Unlock()
 	if saveErr != nil {
 		a.writeStatePersistenceError(writer, saveErr)

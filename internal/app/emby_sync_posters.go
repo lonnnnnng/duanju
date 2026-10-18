@@ -173,7 +173,7 @@ func (manager *embySyncManager) synchronizePoster(ctx context.Context, client *e
 		poster.CheckedAt, poster.RetryAt, poster.Failures = time.Now(), time.Time{}, 0
 		return
 	}
-	address := embyCoverURL(Drama{ID: id, CoverURL: poster.SourceURL}, document.Settings.BaseURL, key, document.OwnerID)
+	address := embyCoverURL(Drama{ID: id, CoverURL: poster.SourceURL}, document.Settings.BaseURL, key, "")
 	if address == "" {
 		manager.postponePoster(poster, false, errors.New("海报地址无效，请更新剧集资料后重试"), document.Settings.APIKey)
 		return

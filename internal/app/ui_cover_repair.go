@@ -31,9 +31,6 @@ func (a *UIApp) handleCoverRepair(w http.ResponseWriter, r *http.Request) {
 	if !readPlaybackRequest(w, r, &input) {
 		return
 	}
-	if !a.requireDramaSources(w, r, []string{input.DramaID}) {
-		return
-	}
 	source, id, valid := splitProviderDramaID(input.DramaID)
 	if !valid || len(input.DramaID) > 512 || len(input.Cover) > 8192 || !supportsSortMetadata(Drama{Source: source}) {
 		writeJSON(w, http.StatusBadRequest, map[string]string{"error": "封面补齐参数无效"})

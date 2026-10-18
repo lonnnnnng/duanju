@@ -208,6 +208,3 @@ echo "访问地址：http://127.0.0.1:3333"
 echo "安装目录：${INSTALL_DIR}"
 echo "下载目录：${OUTPUT_DIR}"
 echo "管理命令：${INSTALL_DIR}/duanju-service status|logs|start|stop|restart|update"
-if ! sudo grep -q 'DUANJU_ADMIN_PASSWORD=' "${INSTALL_DIR}/.env" 2>/dev/null; then
-  echo "首次登录密码请执行：sudo journalctl -u ${SERVICE_NAME} -n 30 --no-pager"
-fi

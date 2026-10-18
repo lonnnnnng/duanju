@@ -1,24 +1,12 @@
-let identity = '', sources = '', onlineOnly = 'false';
+let identity = "";
 let changed = false;
-const changeKey = 'duanju.account.change';
-
-export function announceViewerChange() {
-  try { localStorage.setItem(changeKey, Date.now() + '-' + Math.random()); } catch (_) {}
-}
-
-window.addEventListener('storage', event => {
-  if (event.key === changeKey && identity && !changed) {
-    changed = true;
-    window.dispatchEvent(new Event('duanjuviewerchange'));
-  }
-});
 
 export function viewerHeaders() {
-  return identity ? {'X-Duanju-Viewer': identity, 'X-Duanju-Sources': sources, 'X-Duanju-Online-Only': onlineOnly} : {};
+  return identity ? {'X-Duanju-Viewer': identity} : {};
 }
 
 export function checkViewerResponse(result) {
-  if (!identity || changed || !['viewer_required', 'viewer_changed', 'login_required', 'password_change_required', 'sources_changed', 'permissions_changed'].includes(result?.code)) return;
+  if (!identity || changed || !['viewer_required', 'viewer_changed'].includes(result?.code)) return;
   changed = true;
   window.dispatchEvent(new Event('duanjuviewerchange'));
 }
@@ -35,8 +23,6 @@ export async function initializeViewer() {
   if (!result.ready) result = await read('/api/ui/viewer?confirm=1');
   if (!result.ready || !/^[a-f0-9]{64}$/.test(result.id)) throw new Error('无法确认浏览器身份，请刷新页面重试');
   identity = result.id;
-  sources = (result.sources || []).join(',');
-  onlineOnly = String(result.onlineOnly === true);
   changed = false;
   return result;
 }

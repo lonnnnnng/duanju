@@ -95,8 +95,8 @@ func (app *UIApp) handleEmbyCover(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	expected, _ := hex.DecodeString(embyCoverToken(key, id, owner, version))
-	if !hmac.Equal(expected, supplied) || owner != "" && !app.embyAccountSourceAllowed(owner, id) {
-		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "Emby 海报链接无效或账号权限已变更"})
+	if !hmac.Equal(expected, supplied) {
+		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "Emby 海报链接无效，请重新同步或导出"})
 		return
 	}
 	remote := app.embyCoverSource(id)

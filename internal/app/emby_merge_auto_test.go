@@ -23,7 +23,7 @@ func TestEmbyLocalNewBackgroundMergeAutomaticallyPublishes(t *testing.T) {
 	for _, mode := range []string{"keep-episodes", "clean-episodes", "auto-merge"} {
 		t.Run(mode, func(t *testing.T) {
 			remove := mode == "clean-episodes"
-			app, admin := administratorFixture(t)
+			app, admin := lanFixture(t)
 			app.statePath = filepath.Join(app.cfg.dataDirectory(), "ui-state.json")
 			app.cfg.SkipBytes = 1
 			app.downloader.cfg.FFmpeg = ffmpeg
@@ -67,7 +67,7 @@ func TestEmbyLocalNewBackgroundMergeAutomaticallyPublishes(t *testing.T) {
 			defer emby.Close()
 			manager := app.embySyncer()
 			manager.document.Settings = embySyncSettings{Enabled: true, MergedOnly: true, OutputDir: output, IntervalMinutes: 60, ServerURL: emby.URL, APIKey: "synthetic-api-key"}
-			manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+			manager.document.ViewerID = newLANTestBrowser(t, app).id
 			manager.start()
 			t.Cleanup(manager.stop)
 			t.Cleanup(app.stopMergeJobs)
@@ -129,7 +129,7 @@ func TestEmbyLocalNewBackgroundMergeAutomaticallyPublishes(t *testing.T) {
 }
 
 func TestEmbyLocalMergeNotificationRetriesInterruptedScan(t *testing.T) {
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	settings, drama, merge, _ := localEmbyFixture(t, 0600)
 	app.cfg.OutputDir = filepath.Dir(merge.OutputPath)
 	app.statePath = filepath.Join(app.cfg.dataDirectory(), "ui-state.json")
@@ -152,7 +152,7 @@ func TestEmbyLocalMergeNotificationRetriesInterruptedScan(t *testing.T) {
 	manager := app.embySyncer()
 	settings.Enabled, settings.ServerURL, settings.APIKey = true, emby.URL, "synthetic-api-key"
 	manager.document.Settings = settings
-	manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+	manager.document.ViewerID = newLANTestBrowser(t, app).id
 	manager.start()
 	t.Cleanup(manager.stop)
 	select {
@@ -172,7 +172,7 @@ func TestEmbyLocalMergeNotificationRetriesInterruptedScan(t *testing.T) {
 }
 
 func TestEmbyLocalUncommittedPublicationScansAfterRestart(t *testing.T) {
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	settings, drama, merge, _ := localEmbyFixture(t, 0600)
 	app.dramas = []Drama{drama}
 	app.cfg.OutputDir = filepath.Dir(merge.OutputPath)
@@ -189,7 +189,7 @@ func TestEmbyLocalUncommittedPublicationScansAfterRestart(t *testing.T) {
 	manager := app.embySyncer()
 	settings.Enabled, settings.ServerURL, settings.APIKey = true, emby.URL, "synthetic-api-key"
 	manager.document.Settings = settings
-	manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+	manager.document.ViewerID = newLANTestBrowser(t, app).id
 	if err := writeEmbyJSON(manager.path, manager.document, 0600); err != nil {
 		t.Fatal(err)
 	}
@@ -198,7 +198,7 @@ func TestEmbyLocalUncommittedPublicationScansAfterRestart(t *testing.T) {
 		t.Fatal(err)
 	}
 	// long: 模拟 MP4 和 NFO 已发布、条目收据尚未落盘就退出；重启必须补扫已有文件，不能只等待下一次文件变化。
-	if _, _, _, err := syncEmbyMergedFiles(context.Background(), settings, drama, merge, "", key, manager.document.OwnerID); err != nil {
+	if _, _, _, err := syncEmbyMergedFiles(context.Background(), settings, drama, merge, "", key, manager.document.ViewerID); err != nil {
 		t.Fatal(err)
 	}
 	restarted := &UIApp{cfg: app.cfg, downloader: app.downloader, dramas: app.dramas, statePath: app.statePath, tasks: map[string]*UITask{}}

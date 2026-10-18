@@ -12,7 +12,7 @@ import (
 func (app *UIApp) allowPlaybackDirect(ctx context.Context, media *playbackMediaSession, source, origin string) bool {
 	allowed := false
 	for _, selected := range app.mediaResources().snapshot().DirectSources {
-		allowed = allowed || selected == accountSourceGroup(source)
+		allowed = allowed || selected == canonicalProviderSource(source)
 	}
 	if !allowed || media.local != "" || media.media.AudioURL != "" || len(media.key) != 0 || len(media.media.HLSKey) != 0 || len(media.media.CENCKey) != 0 {
 		return false

@@ -28,7 +28,7 @@ func (a *UIApp) handleDramaRefresh(w http.ResponseWriter, r *http.Request) {
 	var input struct {
 		DramaID string `json:"dramaId"`
 	}
-	if !readPlaybackRequest(w, r, &input) || !a.requireDramaSources(w, r, []string{input.DramaID}) {
+	if !readPlaybackRequest(w, r, &input) {
 		return
 	}
 	source, id, valid := splitProviderDramaID(input.DramaID)

@@ -21,9 +21,6 @@ func (app *UIApp) handleRecommendations(writer http.ResponseWriter, request *htt
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "推荐分类或分页参数无效，请重新获取"})
 		return
 	}
-	if !requireSource(writer, request.Context(), sourceHongguo) {
-		return
-	}
 	ctx, cancel := context.WithTimeout(request.Context(), 45*time.Second)
 	defer cancel()
 	result, err := app.downloader.fetchHongguoRecommendations(ctx, query)

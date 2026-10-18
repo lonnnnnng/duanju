@@ -124,14 +124,10 @@ func TestEmbyMergedManualExportWorksWithoutBrowserCookie(t *testing.T) {
 			link = strings.TrimSpace(string(content))
 		}
 	}
-	if !strings.Contains(link, "/api/emby/merged.mp4?") || !strings.Contains(link, "account=") {
-		t.Fatal("merged STRM is missing account-bound local playback", link)
+	if !strings.Contains(link, "/api/emby/merged.mp4?") || strings.Contains(link, "account=") {
+		t.Fatal("merged STRM is missing service-signed local playback", link)
 	}
-	store := app.browserViewers().accountStore()
-	store.mu.Lock()
-	store.state.RequireLogin = true
-	store.mu.Unlock()
-	// long: Emby 请求不会携带网页 Cookie；签名链接必须走真实路由并在强制登录模式下仍可读取。
+	// long: Emby 不携带网页 Cookie，服务签名必须足以读取已导出的媒体。
 	request := httptest.NewRequest(http.MethodHead, link, nil)
 	response := httptest.NewRecorder()
 	app.routes().ServeHTTP(response, request)

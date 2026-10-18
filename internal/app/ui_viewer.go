@@ -35,15 +35,13 @@ type viewerRecords struct {
 }
 
 type viewerManager struct {
-	directory    string
-	key          []byte
-	cookie       string
-	err          error
-	mu           sync.Mutex
-	viewers      map[string]*viewerRecords
-	legacyMu     sync.Mutex
-	accountsOnce sync.Once
-	accounts     *accountStore
+	directory string
+	key       []byte
+	cookie    string
+	err       error
+	mu        sync.Mutex
+	viewers   map[string]*viewerRecords
+	legacyMu  sync.Mutex
 }
 
 func (app *UIApp) browserViewers() *viewerManager {
@@ -204,7 +202,7 @@ func requestViewer(writer http.ResponseWriter, request *http.Request) *viewerRec
 
 func viewerOwnsPlayback(ctx context.Context, session *playbackSession) bool {
 	viewer := contextViewer(ctx)
-	return viewer != nil && session != nil && session.viewer == viewer && playbackSourceAllowed(ctx, session)
+	return viewer != nil && session != nil && session.viewer == viewer
 }
 
 func writeViewerError(writer http.ResponseWriter, status int, code, message string) {
@@ -220,7 +218,7 @@ func (app *UIApp) withBrowserViewer(next http.Handler) http.Handler {
 			next.ServeHTTP(writer, request)
 			return
 		}
-		if path != "/api/ui/following" && !strings.HasPrefix(path, "/api/ui/playback/") && !strings.HasPrefix(path, "/api/ui/account/") && path != "/api/ui/viewer/legacy" && !accountAdminPath(path) {
+		if path != "/api/ui/following" && !strings.HasPrefix(path, "/api/ui/playback/") && path != "/api/ui/viewer/legacy" && !serviceSettingsPath(path) {
 			next.ServeHTTP(writer, request)
 			return
 		}
@@ -231,20 +229,12 @@ func (app *UIApp) withBrowserViewer(next http.Handler) http.Handler {
 			writeViewerError(writer, http.StatusServiceUnavailable, "viewer_unavailable", "无法读取浏览器身份："+publicError(manager.err).Error())
 			return
 		}
-		account, _, accountCookie, accountErr := manager.requestAccount(request)
-		if accountErr != nil {
-			writeViewerError(writer, http.StatusServiceUnavailable, "viewer_unavailable", accountErr.Error())
-			return
-		}
 		identity := manager.identity(request)
-		if account.ID == "" && (identity == "" || accountCookie) {
+		if identity == "" {
 			writeViewerError(writer, http.StatusUnauthorized, "viewer_required", "请刷新页面，恢复此浏览器的独立观看记录")
 			return
 		}
 		id := viewerID(identity)
-		if account.ID != "" {
-			id = account.viewerID()
-		}
 		if expected := request.Header.Get("X-Duanju-Viewer"); expected != "" && expected != id {
 			writeViewerError(writer, http.StatusConflict, "viewer_changed", "浏览器身份已变化，请刷新页面后继续")
 			return
@@ -266,21 +256,8 @@ func (app *UIApp) handleViewer(writer http.ResponseWriter, request *http.Request
 		writeViewerError(writer, http.StatusServiceUnavailable, "viewer_unavailable", "无法保存浏览器身份："+publicError(manager.err).Error())
 		return
 	}
-	if err := manager.accountStore().err; err != nil {
-		writeViewerError(writer, http.StatusServiceUnavailable, "viewer_unavailable", err.Error())
-		return
-	}
-	account, accountName, accountCookie, err := manager.requestAccount(request)
-	if err != nil {
-		accountOperationError(writer, err)
-		return
-	}
-	accountExpired := accountCookie && account.ID == ""
-	if accountExpired {
-		manager.setAccountCookie(writer, request, "")
-	}
 	identity := manager.identity(request)
-	confirmed := identity != "" || account.ID != ""
+	confirmed := identity != ""
 	if identity == "" {
 		if !confirmed && request.URL.Query().Get("confirm") == "1" {
 			writeViewerError(writer, http.StatusUnauthorized, "viewer_cookies_disabled", "请允许此网站保存 Cookie，再重试；观看记录需要用它识别当前浏览器")
@@ -298,16 +275,8 @@ func (app *UIApp) handleViewer(writer http.ResponseWriter, request *http.Request
 		return
 	}
 	id := viewerID(identity)
-	if account.ID != "" {
-		id = account.viewerID()
-	}
 	available, err := manager.legacyAvailable(id)
-	requireLogin, allowRegistration := manager.accountStore().policy()
-	result := map[string]any{"onlineOnly": account.onlineOnly(), "sources": account.effectiveSources(), "sourceChoices": accountSourceChoices, "ready": true, "id": id, "legacyAvailable": available, "accountExpired": accountExpired, "requireLogin": requireLogin, "allowRegistration": allowRegistration}
-	if account.ID != "" {
-		result["account"] = account.public()
-		result["guestImportAvailable"] = manager.guestImportAvailable(identity, accountName)
-	}
+	result := map[string]any{"ready": true, "id": id, "legacyAvailable": available}
 	if err != nil {
 		result["legacyError"] = "旧版记录恢复暂不可用：" + publicError(err).Error()
 	}
@@ -318,19 +287,6 @@ func (app *UIApp) prepareBrowserViewers() error {
 	manager := app.browserViewers()
 	if manager.err != nil {
 		return fmt.Errorf("初始化独立观看记录失败：%w", manager.err)
-	}
-	if err := manager.accountStore().err; err != nil {
-		return err
-	}
-	admin, err := manager.ensureAdministrator(app.cfg)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("管理员账号: %s\n", admin.Username)
-	if admin.InitialPassword != "" {
-		fmt.Printf("管理员随机初始密码: %s\n首次登录必须修改密码。此密码仅在首次创建时输出，请妥善保存。\n", admin.InitialPassword)
-	} else if admin.RequirePasswordChange {
-		fmt.Println("管理员尚未修改初始密码；若已遗失，可用 -admin-password 指定新密码后启动。")
 	}
 	if available, err := manager.prepareLegacyCode(); err != nil {
 		fmt.Printf("旧版观看记录已保留，恢复码准备失败：%v\n", publicError(err))

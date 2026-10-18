@@ -241,41 +241,23 @@ func TestHealthzDoesNotRequireAdministratorSession(t *testing.T) {
 	}
 }
 
-func TestAdminUpdateRequiresAdministratorSession(t *testing.T) {
-	app, admin := administratorFixture(t)
-	guest := newAccountTestBrowser(t, app)
-	created := admin.request(t, http.MethodPost, "/api/ui/admin/accounts", map[string]string{
-		"username": "update-member",
-		"password": accountFixturePassword,
-	})
-	if created.Code != http.StatusCreated {
-		t.Fatalf("failed to create ordinary account: %d %s", created.Code, created.Body.String())
-	}
-	member := newAccountTestBrowser(t, app)
-	member.login(t, "update-member", accountFixturePassword)
-
-	for _, browser := range []*accountTestBrowser{guest, member} {
-		result := browser.request(t, http.MethodGet, "/api/ui/admin/update", nil)
-		if result.Code != http.StatusForbidden || !strings.Contains(result.Body.String(), "admin_required") {
-			t.Fatalf("non-administrator reached update endpoint: status=%d body=%s", result.Code, result.Body.String())
-		}
-	}
-
-	// long: 使用无效仓库让管理员请求停在更新源校验，证明认证已通过且不会访问真实 Release。
+func TestLANUpdateRequiresNoLogin(t *testing.T) {
+	_, browser := lanFixture(t)
+	// long: 无效仓库让请求停在更新源校验，证明匿名浏览器可进入设置且不会访问真实 Release。
 	t.Setenv("DUANJU_GITHUB_REPO", "invalid repo")
-	result := admin.request(t, http.MethodGet, "/api/ui/admin/update", nil)
-	if result.Code != http.StatusBadGateway || strings.Contains(result.Body.String(), "admin_required") {
-		t.Fatalf("administrator did not reach update check: status=%d body=%s", result.Code, result.Body.String())
+	result := browser.request(t, http.MethodGet, "/api/ui/settings/update", nil)
+	if result.Code != http.StatusBadGateway {
+		t.Fatalf("LAN browser did not reach update check: %d %s", result.Code, result.Body.String())
 	}
 }
 
 func TestAdminUpdateRejectsSecondApplyBeforeRestart(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	if err := stagePendingUpdate(app.cfg.dataDirectory(), "/tmp/duanju-test-target", "/tmp/duanju-test-backup"); err != nil {
 		t.Fatal(err)
 	}
 	// long: 待启动标记存在时应直接拒绝第二次 POST，避免再次下载后覆盖首次更新的回滚备份。
-	result := admin.request(t, http.MethodPost, "/api/ui/admin/update", map[string]any{})
+	result := admin.request(t, http.MethodPost, "/api/ui/settings/update", map[string]any{})
 	if result.Code != http.StatusConflict || !strings.Contains(result.Body.String(), "已有更新等待服务重启") {
 		t.Fatalf("second update was not rejected: status=%d body=%s", result.Code, result.Body.String())
 	}

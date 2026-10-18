@@ -86,14 +86,14 @@ func (app *UIApp) acquireEmbyPlayback(writer http.ResponseWriter, request *http.
 	var session *playbackSession
 	if sessionID != "" {
 		session = app.playbacks[sessionID]
-		if session == nil || !session.emby || session.viewer != nil || session.accountID != owner || session.dramaID != id || len(session.tasks) != 1 || session.tasks[0].Chapter.ID != chapter {
+		if session == nil || !session.emby || session.viewer != nil || session.embyOwner != owner || session.dramaID != id || len(session.tasks) != 1 || session.tasks[0].Chapter.ID != chapter {
 			app.playbackMu.Unlock()
 			app.writeEmbyPlaybackError(writer, request, http.StatusGone, "播放已过期，请重新播放")
 			return nil
 		}
 	} else {
 		for _, candidate := range app.playbacks {
-			if candidate.emby && candidate.embyLegacy == legacy && candidate.accountID == owner && candidate.dramaID == id && len(candidate.tasks) == 1 && candidate.tasks[0].Chapter.ID == chapter && candidate.mediaError == nil {
+			if candidate.emby && candidate.embyLegacy == legacy && candidate.embyOwner == owner && candidate.dramaID == id && len(candidate.tasks) == 1 && candidate.tasks[0].Chapter.ID == chapter && candidate.mediaError == nil {
 				session = candidate
 				break
 			}
@@ -111,7 +111,7 @@ func (app *UIApp) acquireEmbyPlayback(writer http.ResponseWriter, request *http.
 			app.writeEmbyPlaybackError(writer, request, http.StatusInternalServerError, "无法创建播放会话")
 			return nil
 		}
-		session = &playbackSession{id: sessionID, accountID: owner, dramaID: id, emby: true, embyLegacy: legacy, run: 1,
+		session = &playbackSession{id: sessionID, embyOwner: owner, dramaID: id, emby: true, embyLegacy: legacy, run: 1,
 			tasks: []Task{{DramaID: id, Chapter: Chapter{ID: chapter}}}}
 		if app.playbacks == nil {
 			app.playbacks = make(map[string]*playbackSession)

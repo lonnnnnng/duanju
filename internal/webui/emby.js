@@ -36,7 +36,7 @@ export function createEmby(app) {
     const imported = entries.filter(entry => entry.episodes > 0).length;
     $('embyRunBtn').disabled = saving || !state.settings.enabled || state.running;
     $('embyRunBtn').textContent = state.running ? '正在同步…' : '立即同步';
-    $('embyOwner').textContent = state.owner ? (state.settings.mergedOnly ? '同步账号：' : '追剧账号：') + state.owner : '保存后使用当前管理员账号。';
+    $('embyFollowingScope').textContent = '追剧范围以最后保存设置的浏览器为准。';
     const confirmed=entries.filter(entry=>entry.mediaStatus==='confirmed').length;
     $('embySummary').textContent = '文件已发布 ' + imported + ' 部 · ' + (state.episodes || 0) + (state.settings.mergedOnly ? ' 个全集' : ' 集') + (state.settings.mergedOnly&&state.settings.serverUrl?' · Emby 已识别 '+confirmed+' 部':'') + (state.pending ? ' · 待处理 ' + state.pending + ' 部' : '');
     $('embyPosterSummary').textContent = state.settings.mergedOnly || state.settings.serverUrl ? (state.settings.mergedOnly ? '本地海报已同步 ' : '海报已同步 ') + (state.postersSynced || 0) + ' 部' + (state.postersPending ? ' · 等待 ' + state.postersPending + ' 部' : '') + (state.postersFailed ? ' · 失败待重试 ' + state.postersFailed + ' 部' : '') : '填写 Emby 服务器地址和 API Key 后可自动同步海报。';
@@ -71,7 +71,7 @@ export function createEmby(app) {
     if (loading) return;
     loading = true;
     try {
-      state = await app.api('/api/ui/admin/emby');
+      state = await app.api('/api/ui/settings/emby');
       if (fill) fields();
       render();
     } catch (error) {
@@ -90,7 +90,7 @@ export function createEmby(app) {
     const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyMergedOnly').checked ? '' : $('embyBaseURL').value.trim(), intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
     if ($('embyAPIKey').value) input.apiKey = $('embyAPIKey').value;
     try {
-      state = await app.post('/api/ui/admin/emby', input);
+      state = await app.post('/api/ui/settings/emby', input);
       fields();
       $('embyFeedback').textContent = input.enabled ? '设置已保存，正在安排同步。Emby 媒体库请使用上方的输出目录。' : '设置已保存，自动同步已关闭。';
     } catch (error) {
@@ -106,7 +106,7 @@ export function createEmby(app) {
   async function run() {
     $('embyRunBtn').disabled = true;
     try {
-      state = await app.post('/api/ui/admin/emby/sync', {});
+      state = await app.post('/api/ui/settings/emby/sync', {});
       $('embyFeedback').textContent = '同步已安排，关闭此窗口也会继续。';
       render();
     } catch (error) {
@@ -122,7 +122,6 @@ export function createEmby(app) {
     $('embyMergedOnly').addEventListener('change', sourceFields);
     $('embyRunBtn').addEventListener('click', run);
     $('openEmbyBtn').addEventListener('click', () => {
-      if (!app.viewer?.account?.admin) return;
       $('embyFeedback').textContent = '';
       window.DuanjuDialogs.open('embyPanel');
       load();

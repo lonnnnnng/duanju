@@ -13,7 +13,7 @@ func (a *UIApp) handleVerifyTasks(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	selection, ok := readTaskSelection(writer, request)
-	if !ok || !requireDownload(writer, request) {
+	if !ok {
 		return
 	}
 	if len(selection.IDs) > 10 || len(selection.DramaIDs) != 0 {
@@ -21,10 +21,6 @@ func (a *UIApp) handleVerifyTasks(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	a.mu.Lock()
-	if !a.requireTaskSourcesLocked(writer, request, selection) {
-		a.mu.Unlock()
-		return
-	}
 	type candidate struct {
 		original *UITask
 		id, path string

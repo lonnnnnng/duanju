@@ -62,7 +62,7 @@ export function createLibrary(app) {
 function searchableText(drama) {if (!searchText.has(drama)) searchText.set(drama, dramaSearchText(drama)); return searchText.get(drama);}
 function filteredDramas(){ const keyword=$('searchInput').value.trim().toLowerCase();const source=$('sourceSelect').value;const channel=$('channelSelect').value;return dramas.filter(dr=>{if(source&&sourceKey(dr)!==source)return false;const cat=categoryName(dr);if(channel&&cat!==channel)return false;return !keyword||searchableText(dr).includes(keyword)||onlineSearchQuery===keyword&&onlineSearchIDs.has(dr.id);}); }
 
-function rebuildSources(){ rebuildOptions($('sourceSelect'),app.viewer?.sources || ['hongguo'],'全部站源',sourceLabel,false); }
+function rebuildSources(){ rebuildOptions($('sourceSelect'),['hongguo'],'全部站源',sourceLabel,false); }
 
 function rebuildChannels(reset){ const source=$('sourceSelect').value;const values=Array.from(new Set(dramas.filter(dr=>!source||sourceKey(dr)===source).map(categoryName))).sort((left,right)=>left.localeCompare(right,'zh-Hans-CN'));rebuildOptions($('channelSelect'),values,'全部分类',value=>value,reset);updateRefreshLabel(); }
 
@@ -160,7 +160,7 @@ function renderCard(drama) {
   download.setAttribute('aria-label', '下载 ' + title);
   download.dataset.focusKey = 'download-' + drama.id;
   actions.appendChild(app.following.saveButton(drama.id, title));
-  if (!app.viewer?.onlineOnly) actions.appendChild(download);
+  actions.appendChild(download);
   footer.append(meta, actions);
   body.append(name, footer);
   card.append(label, poster, body);

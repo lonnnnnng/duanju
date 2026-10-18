@@ -99,9 +99,6 @@ func (app *UIApp) handleFollowing(writer http.ResponseWriter, request *http.Requ
 	known := app.followingMetadata(ids)
 	result := make([]followingView, 0, len(entries))
 	for _, entry := range entries {
-		if !dramaAllowed(request.Context(), entry.DramaID, entry.Source) {
-			continue
-		}
 		view := followingView{followingEntry: entry, TotalEpisode: entry.KnownEpisodes}
 		if current, exists := known[entry.DramaID]; exists {
 			view.Title = current.Title
@@ -135,9 +132,6 @@ func (app *UIApp) handleFollowingUpdate(writer http.ResponseWriter, request *htt
 	}
 	viewer := requestViewer(writer, request)
 	if viewer == nil {
-		return
-	}
-	if !app.requireDramaSources(writer, request, []string{id}) {
 		return
 	}
 	metadata := app.followingMetadata([]string{id})[id]

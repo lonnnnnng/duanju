@@ -92,17 +92,6 @@ func TestMergedPlaybackLocalRangeResumeWithoutEpisodes(t *testing.T) {
 	if string(resumed["initialPosition"]) != "2.5" || !bytes.Contains(resumed["episodes"], []byte(`"merged":true`)) {
 		t.Fatal("merged history returned to online episodes or lost the full-file timestamp", string(resumed["initialPosition"]), string(resumed["episodes"]))
 	}
-	for _, scope := range []accountRecord{{OnlineOnly: true}, {Sources: []string{"no-access"}}} {
-		body, _ := json.Marshal(map[string]string{"taskId": id})
-		request := viewerFixtureRequest(app, httptest.NewRequest(http.MethodPost, "/api/ui/playback/open", bytes.NewReader(body)))
-		request.Header.Set("Content-Type", "application/json")
-		request = request.WithContext(withSourceScope(request.Context(), scope))
-		writer := httptest.NewRecorder()
-		app.handlePlaybackOpen(writer, request)
-		if writer.Code != http.StatusForbidden {
-			t.Fatal("merged playback bypassed source/download permissions", scope, writer.Code, writer.Body.String())
-		}
-	}
 	other := app.browserViewers().acquire(viewerID("different-merged-viewer"))
 	defer other.release()
 	request := httptest.NewRequest(http.MethodGet, "http://localhost"+plan.URL, nil)

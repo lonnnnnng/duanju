@@ -11,9 +11,9 @@ import (
 	"time"
 )
 
-func deleteFixture(t *testing.T) (*UIApp, *accountTestBrowser, string, string, string) {
+func deleteFixture(t *testing.T) (*UIApp, *lanTestBrowser, string, string, string) {
 	t.Helper()
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	app.tasks = map[string]*UITask{}
 	app.taskOrder = nil
 	app.merges = map[string]*UIMergeState{}

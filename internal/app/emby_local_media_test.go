@@ -208,7 +208,7 @@ func TestEmbyLocalMergedRecoversPendingPublication(t *testing.T) {
 }
 
 func TestEmbyLocalPostersRetryWithoutServerAndPreserveCustomArtwork(t *testing.T) {
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	settings, drama, merge, _ := localEmbyFixture(t, 0600)
 	app.cfg.OutputDir = filepath.Dir(merge.OutputPath)
 	app.merges = map[string]*UIMergeState{drama.ID: &merge}
@@ -217,7 +217,7 @@ func TestEmbyLocalPostersRetryWithoutServerAndPreserveCustomArtwork(t *testing.T
 	t.Cleanup(manager.stop)
 	manager.document.Settings = settings
 	manager.document.Settings.Enabled = true
-	manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+	manager.document.ViewerID = newLANTestBrowser(t, app).id
 	data, failing, requests := embySyntheticPoster(t), true, 0
 	app.downloader.client.Transport = embyPosterTestTransport(func(request *http.Request) (*http.Response, error) {
 		requests++
@@ -283,7 +283,7 @@ func TestEmbyLocalMergedVideoSurvivesServiceStop(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	server := httptest.NewServer(app.routes())
 	server.Close()
 	// long: 服务关闭且原下载路径消失后仍实际解析入库 MP4，验证播放源确实是独立文件而不是 HTTP 地址或软链接。
@@ -308,7 +308,7 @@ func TestEmbyLocalSettingsDoNotRequirePlaybackAddress(t *testing.T) {
 }
 
 func TestEmbyLocalScanFailureRetainsFilesAndRetries(t *testing.T) {
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	settings, drama, merge, _ := localEmbyFixture(t, 0600)
 	app.cfg.OutputDir = filepath.Dir(merge.OutputPath)
 	app.merges = map[string]*UIMergeState{drama.ID: &merge}
@@ -344,7 +344,7 @@ func TestEmbyLocalScanFailureRetainsFilesAndRetries(t *testing.T) {
 	t.Cleanup(manager.stop)
 	settings.Enabled, settings.ServerURL, settings.APIKey = true, emby.URL, "synthetic-api-key"
 	manager.document.Settings = settings
-	manager.document.OwnerID = app.browserViewers().accountStore().state.Accounts["admin"].ID
+	manager.document.ViewerID = newLANTestBrowser(t, app).id
 	manager.runOnce(context.Background())
 	if !manager.document.RefreshPending || manager.document.Entries[drama.ID].Episodes != 1 || scans.Load() != 1 || images.Load() != 1 {
 		t.Fatal("扫描失败丢失完整媒体或重试待办", manager.document.Error)
@@ -443,7 +443,7 @@ func TestEmbyLocalPostersRecoverPublishedImageWithoutNetwork(t *testing.T) {
 	if err = writeEmbyJSON(marker, manifest, 0600); err != nil {
 		t.Fatal(err)
 	}
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	app.downloader.client.Transport = embyPosterTestTransport(func(request *http.Request) (*http.Response, error) {
 		t.Error("恢复已发布海报不应访问网络")
 		return nil, errors.New("network forbidden")
@@ -463,7 +463,7 @@ func TestEmbyLocalPosterConvertsGIFToPortableJPEG(t *testing.T) {
 	if err != nil {
 		t.Skip("FFmpeg unavailable")
 	}
-	app, _ := administratorFixture(t)
+	app, _ := lanFixture(t)
 	// long: 通用账号夹具使用测试程序模拟 FFmpeg，这项转换验收必须调用实际二进制。
 	app.downloader.ffmpegInstaller = &ffmpegInstaller{state: ffmpegInstallState{Status: "ready", Path: ffmpeg}}
 	var buffer bytes.Buffer

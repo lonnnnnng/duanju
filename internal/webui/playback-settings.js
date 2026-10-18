@@ -28,7 +28,7 @@ export function createPlaybackSettings() {
     updateDirect();
   }
   async function load() {
-    try {render(await api('/api/ui/admin/playback'));}
+    try {render(await api('/api/ui/settings/playback'));}
     catch (error) {$('playbackSettingsStatus').textContent = error.message;}
   }
   async function save() {
@@ -39,7 +39,7 @@ export function createPlaybackSettings() {
       const value = {...settings, enabled: $('originalPlaybackEnabled').checked,
         directSources: [...$('playbackDirectSources').querySelectorAll('input:checked')].map(input => input.value)};
       for (const name of fields) value[name] = Number($('playback-' + name).value);
-      render(await post('/api/ui/admin/playback', value));
+      render(await post('/api/ui/settings/playback', value));
       $('playbackSettingsStatus').textContent = '播放设置已保存，新任务按当前限制执行。' + (!value.enabled && value.directSources.length ? '原始播放已关闭，直连暂不生效。' : '');
     } catch (error) {$('playbackSettingsStatus').textContent = '保存失败：' + error.message;}
     finally {button.disabled = false;}

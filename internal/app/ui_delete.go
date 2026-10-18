@@ -43,15 +43,10 @@ func (a *UIApp) handleDeleteTasks(writer http.ResponseWriter, request *http.Requ
 		return
 	}
 	input, ok := readDeleteTasksRequest(writer, request)
-	if !ok || !requireDownload(writer, request) {
+	if !ok {
 		return
 	}
 	a.mu.Lock()
-	selection := taskSelection{IDs: input.IDs, DramaIDs: input.MergedDramaIDs}
-	if !a.requireTaskSourcesLocked(writer, request, selection) {
-		a.mu.Unlock()
-		return
-	}
 	ids := (taskSelection{IDs: input.IDs}).idsLocked(a)
 	// long: 合并进程持有分集路径快照；先拒绝同剧删除，避免 FFmpeg 读写途中移走文件。
 	for _, id := range ids {
@@ -179,7 +174,7 @@ func (a *UIApp) handleDeleteTasks(writer http.ResponseWriter, request *http.Requ
 		removed++
 	}
 	saveErr := a.saveStateLockedWithDiagnostic("ui.task_delete_save_failed")
-	views := a.taskViewsForSourceLocked(request.Context())
+	views := a.taskViewsLocked()
 	a.mu.Unlock()
 	for _, cancel := range cancels {
 		cancel()

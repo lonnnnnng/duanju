@@ -34,7 +34,7 @@ func (manager *embySyncManager) view() map[string]any {
 	if manager.loadErr != nil {
 		message = "同步配置读取失败，原文件已保留：" + manager.safeError(manager.loadErr, manager.document.Settings.APIKey)
 	}
-	return map[string]any{"settings": settings, "hasAPIKey": hasKey, "owner": manager.document.OwnerName,
+	return map[string]any{"settings": settings, "hasAPIKey": hasKey,
 		"running": manager.running, "lastStartedAt": manager.document.LastStartedAt, "lastFinishedAt": manager.document.LastFinishedAt,
 		"nextRunAt": manager.document.NextRunAt, "writtenFiles": manager.document.WrittenFiles, "succeeded": manager.document.Succeeded,
 		"failed": manager.document.Failed, "pending": manager.document.Pending, "error": message, "entries": entries, "episodes": totalEpisodes,
@@ -61,14 +61,11 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 		ServerURL       string  `json:"serverUrl"`
 		APIKey          *string `json:"apiKey"`
 	}
-	if !readAccountRequest(writer, request, &input) {
+	if !readServiceRequest(writer, request, &input) {
 		return
 	}
-	account, _, _, err := app.browserViewers().requestAccount(request)
-	if err != nil || !account.Admin || account.RequirePasswordChange {
-		writeJSON(writer, http.StatusForbidden, map[string]string{"error": "请使用管理员账号保存同步设置"})
-		return
-	}
+	viewer := contextViewer(request.Context())
+	var err error
 	manager.mu.Lock()
 	if manager.loadErr != nil {
 		manager.mu.Unlock()
@@ -105,7 +102,7 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 		}
 	}
 	document := manager.document
-	document.Settings, document.OwnerID, document.OwnerName = settings, account.ID, account.Username
+	document.Settings, document.ViewerID = settings, viewer.id
 	document.Entries = make(map[string]embySyncEntry, len(manager.document.Entries))
 	for id, entry := range manager.document.Entries {
 		entry.CheckedAt = time.Time{}
@@ -143,7 +140,7 @@ func (app *UIApp) handleEmbySyncSettings(writer http.ResponseWriter, request *ht
 
 func (app *UIApp) handleEmbySyncNow(writer http.ResponseWriter, request *http.Request) {
 	var input struct{}
-	if !readAccountRequest(writer, request, &input) {
+	if !readServiceRequest(writer, request, &input) {
 		return
 	}
 	manager := app.embySyncer()

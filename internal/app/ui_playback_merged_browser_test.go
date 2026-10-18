@@ -39,7 +39,6 @@ func TestMergedPlaybackBrowserFixture(t *testing.T) {
 		app.tasks[id] = &UITask{ID: id, DramaID: task.DramaID, DramaTitle: task.DramaTitle, Path: video, Status: uiStatusSuccess, Source: task}
 		app.taskOrder = append(app.taskOrder, id)
 	}
-	app.cfg.adminUsername, app.cfg.adminPassword, app.cfg.adminPasswordExplicit = "admin", accountFixturePassword, true
 	if err := app.prepareBrowserViewers(); err != nil {
 		t.Fatal(err)
 	}

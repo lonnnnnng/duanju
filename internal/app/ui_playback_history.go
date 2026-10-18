@@ -34,13 +34,7 @@ func (app *UIApp) handlePlaybackHistory(writer http.ResponseWriter, request *htt
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "无法读取观看记录：" + publicError(err).Error()})
 		return
 	}
-	visible := make([]playbackHistoryEntry, 0, len(entries))
-	for _, entry := range entries {
-		if dramaAllowed(request.Context(), entry.DramaID, entry.Source) {
-			visible = append(visible, entry)
-		}
-	}
-	writeJSON(writer, http.StatusOK, map[string]any{"data": visible, "limit": playbackHistoryLimit})
+	writeJSON(writer, http.StatusOK, map[string]any{"data": entries, "limit": playbackHistoryLimit})
 }
 
 func (app *UIApp) handlePlaybackHistoryRemove(writer http.ResponseWriter, request *http.Request) {
@@ -60,10 +54,7 @@ func (app *UIApp) handlePlaybackHistoryRemove(writer http.ResponseWriter, reques
 	if viewer == nil {
 		return
 	}
-	if !input.All && !app.requireDramaSources(writer, request, []string{id}) {
-		return
-	}
-	if err := viewer.playbackHistory().removeForSources(request.Context(), id, input.All); err != nil {
+	if err := viewer.playbackHistory().remove(id, input.All); err != nil {
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "删除观看记录未能保存：" + publicError(err).Error()})
 		return
 	}

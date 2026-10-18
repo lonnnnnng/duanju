@@ -293,16 +293,10 @@ func TestEmbyEvictedRemuxRestoresExistingSegmentURLs(t *testing.T) {
 	}
 }
 
-func TestEmbyPlaybackCacheRemainsAccountScoped(t *testing.T) {
+func TestEmbyPlaybackCacheKeepsLegacySignatureNamespaces(t *testing.T) {
 	for _, optimized := range []bool{false, true} {
 		t.Run(fmt.Sprintf("original=%t", optimized), func(t *testing.T) {
 			app, address := embyScanFixture(t, optimized)
-			store := app.browserViewers().accountStore()
-			store.mu.Lock()
-			for _, owner := range []string{"owner-a", "owner-b"} {
-				store.state.Accounts[owner] = accountRecord{ID: owner, Sources: []string{sourceHongguo}}
-			}
-			store.mu.Unlock()
 			key, err := app.embySigningKey(false)
 			if err != nil {
 				t.Fatal(err)

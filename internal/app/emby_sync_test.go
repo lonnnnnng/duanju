@@ -14,6 +14,52 @@ import (
 	"time"
 )
 
+func TestEmbySyncMigratesLegacyOwnerAndRebindsToBrowser(t *testing.T) {
+	app, browser := lanFixture(t)
+	legacyID := viewerID("account:retired-owner")
+	legacy := app.browserViewers().acquire(legacyID)
+	_, err := legacy.followingStore().update(historyFixtureDramaID, func(followingEntry, bool) (followingEntry, error) {
+		return followingEntry{DramaID: historyFixtureDramaID, Source: sourceHongguo, Title: "旧追剧", Saved: true, AddedAt: time.Now(), UpdatedAt: time.Now()}, nil
+	})
+	legacy.release()
+	if err != nil {
+		t.Fatal(err)
+	}
+	path := filepath.Join(app.cfg.dataDirectory(), "emby-sync.json")
+	settings := embySyncSettings{OutputDir: t.TempDir(), BaseURL: "http://library.test", IntervalMinutes: 60, Following: true}
+	stored := embySyncDocument{Version: 1, Settings: settings, LegacyOwnerID: "retired-owner", Entries: map[string]embySyncEntry{}}
+	if err := writeEmbyJSON(path, stored, 0600); err != nil {
+		t.Fatal(err)
+	}
+	manager := app.embySyncer()
+	t.Cleanup(manager.stop)
+	if manager.loadErr != nil || manager.document.ViewerID != legacyID || manager.document.LegacyOwnerID != "" {
+		t.Fatal("legacy sync source was lost", manager.loadErr, manager.document.ViewerID)
+	}
+	targets, err := manager.targets(context.Background(), settings, manager.document.ViewerID)
+	if err != nil || len(targets) != 1 || targets[0].ID != historyFixtureDramaID {
+		t.Fatal("legacy following did not remain available", targets, err)
+	}
+	// long: 保存配置是明确切换追剧来源的操作，不能把旧记录搬走或合并进另一个浏览器。
+	viewerResultOK(t, browser.request(t, http.MethodPost, "/api/ui/settings/emby", settings))
+	manager.mu.Lock()
+	bound := manager.document.ViewerID
+	manager.mu.Unlock()
+	if bound != browser.id || len(browser.following(t)) != 0 {
+		t.Fatal("settings did not bind to the current browser or merged records")
+	}
+	legacy = app.browserViewers().acquire(legacyID)
+	entries, err := legacy.followingStore().list()
+	legacy.release()
+	if err != nil || len(entries) != 1 {
+		t.Fatal("rebinding changed legacy records", err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil || strings.Contains(string(data), "ownerId") || !strings.Contains(string(data), browser.id) {
+		t.Fatal("saved settings still contain the retired owner", err)
+	}
+}
+
 func embySyncTestChapters() []Chapter {
 	return []Chapter{{ID: "fixture-1", Title: "第一集"}, {ID: "fixture-2", Title: "第二集"}}
 }
@@ -85,14 +131,14 @@ func TestEmbySyncFilesIdempotentStableAndNonDestructive(t *testing.T) {
 }
 
 func TestEmbySyncMergedOnlySwitchAndDirectFiles(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
 	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": historyFixtureDramaID, "saved": true}))
-	owner := app.browserViewers().accountStore().state.Accounts["admin"]
+	owner := admin.id
 	output := t.TempDir()
 	manager.document.Settings = embySyncSettings{Enabled: true, OutputDir: output, BaseURL: "http://library.test", IntervalMinutes: 60, Following: true}
-	manager.document.OwnerID = owner.ID
+	manager.document.ViewerID = owner
 	manager.runOnce(context.Background())
 	entry := manager.document.Entries[historyFixtureDramaID]
 	season := filepath.Join(output, entry.Folder, "Season 01")
@@ -403,13 +449,12 @@ func waitEmbySync(t *testing.T, manager *embySyncManager, after time.Time) embyS
 }
 
 func TestEmbySyncAutomaticFollowedImportRefreshAndRestart(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
-	ordinary := newAccountTestBrowser(t, app)
-	ordinary.register(t, "other-viewer")
+	ordinary := newLANTestBrowser(t, app)
 	otherID := "hongguo:7000000000000000002"
-	app.dramas = append(app.dramas, Drama{ID: otherID, Source: sourceHongguo, Title: "另一个用户的剧"})
+	app.dramas = append(app.dramas, Drama{ID: otherID, Source: sourceHongguo, Title: "另一个浏览器的剧"})
 	viewerResultOK(t, ordinary.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": otherID, "saved": true}))
 	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": historyFixtureDramaID, "saved": true}))
 	var scans atomic.Int32
@@ -423,14 +468,14 @@ func TestEmbySyncAutomaticFollowedImportRefreshAndRestart(t *testing.T) {
 	defer emby.Close()
 	settings := map[string]any{"enabled": true, "outputDir": t.TempDir(), "baseUrl": "http://library.test:8998", "intervalMinutes": 60, "following": true, "downloads": false, "serverUrl": emby.URL + "/emby", "apiKey": "private-test-key"}
 	started := time.Now()
-	response := admin.request(t, http.MethodPost, "/api/ui/admin/emby", settings)
+	response := admin.request(t, http.MethodPost, "/api/ui/settings/emby", settings)
 	viewerResultOK(t, response)
 	if strings.Contains(response.Body.String(), "private-test-key") {
 		t.Fatal("API response leaked the Emby key")
 	}
 	result := waitEmbySync(t, manager, started)
 	if result.Error != "" || result.Succeeded != 1 || len(result.Entries) != 1 || result.Entries[historyFixtureDramaID].Episodes != 3 || scans.Load() != 1 {
-		t.Fatal("automatic import failed or crossed accounts", result.Error, result.Succeeded, len(result.Entries), scans.Load())
+		t.Fatal("automatic import failed or crossed browsers", result.Error, result.Succeeded, len(result.Entries), scans.Load())
 	}
 	output := settings["outputDir"].(string)
 	entry := result.Entries[historyFixtureDramaID]
@@ -440,8 +485,8 @@ func TestEmbySyncAutomaticFollowedImportRefreshAndRestart(t *testing.T) {
 	}
 	link := strings.TrimSpace(string(strm))
 	parsed, _ := url.Parse(link)
-	if parsed.Query().Get("account") == "" {
-		t.Fatal("automatic export created a guest link")
+	if parsed.Query().Get("account") != "" {
+		t.Fatal("automatic export still depends on an account")
 	}
 	writer := httptest.NewRecorder()
 	app.handleEmbyStream(writer, httptest.NewRequest(http.MethodHead, link, nil))
@@ -471,27 +516,11 @@ func TestEmbySyncAutomaticFollowedImportRefreshAndRestart(t *testing.T) {
 	}
 }
 
-func TestEmbySyncAdminGateDisabledDefaultsAndValidation(t *testing.T) {
-	app, admin := administratorFixture(t)
+func TestEmbySyncLANDefaultsAndValidation(t *testing.T) {
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
-	guest := newAccountTestBrowser(t, app)
-	member := newAccountTestBrowser(t, app)
-	member.register(t, "online-only-fixture")
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/accounts/permissions", map[string]any{"username": "online-only-fixture", "onlineOnly": true}))
-	for _, browser := range []*accountTestBrowser{guest, member} {
-		for _, method := range []string{http.MethodGet, http.MethodPost} {
-			response := browser.request(t, method, "/api/ui/admin/emby", map[string]any{})
-			if response.Code != http.StatusForbidden {
-				t.Fatal("non-admin accessed server export settings", response.Code)
-			}
-		}
-		// long: 即使同步配置稍后启用，普通账号也不能强制唤醒管理员的全库同步。
-		if response := browser.request(t, http.MethodPost, "/api/ui/admin/emby/sync", map[string]any{}); response.Code != http.StatusForbidden {
-			t.Fatal("non-admin started server export sync", response.Code)
-		}
-	}
-	response := admin.request(t, http.MethodGet, "/api/ui/admin/emby", nil)
+	response := admin.request(t, http.MethodGet, "/api/ui/settings/emby", nil)
 	viewerResultOK(t, response)
 	if manager.document.Settings.Enabled {
 		t.Fatal("automatic export enabled by default")
@@ -500,24 +529,24 @@ func TestEmbySyncAdminGateDisabledDefaultsAndValidation(t *testing.T) {
 		t.Fatal("reading settings created an export job")
 	}
 	input := map[string]any{"enabled": true, "outputDir": t.TempDir(), "baseUrl": "file:///private/fixture", "intervalMinutes": 60, "following": true, "downloads": false}
-	if result := admin.request(t, http.MethodPost, "/api/ui/admin/emby", input); result.Code != http.StatusBadRequest {
+	if result := admin.request(t, http.MethodPost, "/api/ui/settings/emby", input); result.Code != http.StatusBadRequest {
 		t.Fatal("invalid playback address accepted", result.Code)
 	}
 	input["baseUrl"] = "http://library.test"
 	input["intervalMinutes"] = 1
-	if result := admin.request(t, http.MethodPost, "/api/ui/admin/emby", input); result.Code != http.StatusBadRequest {
+	if result := admin.request(t, http.MethodPost, "/api/ui/settings/emby", input); result.Code != http.StatusBadRequest {
 		t.Fatal("unbounded refresh frequency accepted", result.Code)
 	}
 	input["intervalMinutes"] = 60
 	input["enabled"] = false
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/emby", input))
-	if result := admin.request(t, http.MethodPost, "/api/ui/admin/emby/sync", map[string]any{}); result.Code != http.StatusConflict {
+	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/settings/emby", input))
+	if result := admin.request(t, http.MethodPost, "/api/ui/settings/emby/sync", map[string]any{}); result.Code != http.StatusConflict {
 		t.Fatal("disabled sync executed", result.Code)
 	}
 	input["enabled"] = true
 	input["following"] = false
 	input["mergedOnly"] = true
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/emby", input))
+	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/settings/emby", input))
 	var saved embySyncDocument
 	if err := readEmbyJSON(manager.path, &saved, 8<<20); err != nil || !saved.Settings.MergedOnly || saved.Settings.Following {
 		t.Fatal("全集模式没有经设置接口持久化", err)
@@ -525,11 +554,11 @@ func TestEmbySyncAdminGateDisabledDefaultsAndValidation(t *testing.T) {
 }
 
 func TestEmbySyncPartialFailurePreservesFilesAndRetriesScan(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
 	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": historyFixtureDramaID, "saved": true}))
-	owner := app.browserViewers().accountStore().state.Accounts["admin"]
+	owner := admin.id
 	var scans atomic.Int32
 	emby := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		count := scans.Add(1)
@@ -541,7 +570,7 @@ func TestEmbySyncPartialFailurePreservesFilesAndRetriesScan(t *testing.T) {
 	}))
 	defer emby.Close()
 	manager.document.Settings = embySyncSettings{Enabled: true, OutputDir: t.TempDir(), BaseURL: "http://library.test", IntervalMinutes: 60, Following: true, ServerURL: emby.URL, APIKey: "scan-secret"}
-	manager.document.OwnerID = owner.ID
+	manager.document.ViewerID = owner
 	manager.runOnce(context.Background())
 	if !manager.document.RefreshPending || !strings.Contains(manager.document.Error, "HTTP 503") {
 		t.Fatal("failed scan was not retained for retry", manager.document.Error)
@@ -573,8 +602,8 @@ func TestEmbySyncPartialFailurePreservesFilesAndRetriesScan(t *testing.T) {
 }
 
 func TestEmbySyncDownloadedCollectionAndLocalPlaybackPriority(t *testing.T) {
-	app, _ := administratorFixture(t)
-	owner := app.browserViewers().accountStore().state.Accounts["admin"]
+	app, _ := lanFixture(t)
+	owner := newLANTestBrowser(t, app).id
 	cached := app.downloader.hongguoClient().details["7000000000000000001"]
 	path := filepath.Join(t.TempDir(), "local-fixture.mp4")
 	if err := os.WriteFile(path, []byte("synthetic file identity only"), 0600); err != nil {
@@ -583,7 +612,7 @@ func TestEmbySyncDownloadedCollectionAndLocalPlaybackPriority(t *testing.T) {
 	task := Task{DramaID: historyFixtureDramaID, DramaTitle: "下载完成的合成剧", Chapter: cached.Chapters[0], OutPath: path, Index: 1, Total: 3}
 	app.tasks = map[string]*UITask{"download-fixture": {ID: "download-fixture", DramaID: historyFixtureDramaID, DramaTitle: task.DramaTitle, Path: path, Status: uiStatusSuccess, Source: task}}
 	manager := app.embySyncer()
-	manager.document.OwnerID = owner.ID
+	manager.document.ViewerID = owner
 	manager.document.Settings = embySyncSettings{Enabled: true, OutputDir: t.TempDir(), BaseURL: "http://library.test", IntervalMinutes: 60, Downloads: true}
 	manager.runOnce(context.Background())
 	if manager.document.Error != "" || manager.document.Entries[historyFixtureDramaID].Episodes != 3 {
@@ -602,7 +631,7 @@ func TestEmbySyncDownloadedCollectionAndLocalPlaybackPriority(t *testing.T) {
 }
 
 func TestEmbySyncStartupDoesNotImmediatelyRepeatFailedScan(t *testing.T) {
-	app, admin := administratorFixture(t)
+	app, admin := lanFixture(t)
 	manager := app.embySyncer()
 	t.Cleanup(manager.stop)
 	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/following", map[string]any{"dramaId": historyFixtureDramaID, "saved": true}))
@@ -611,7 +640,7 @@ func TestEmbySyncStartupDoesNotImmediatelyRepeatFailedScan(t *testing.T) {
 	defer server.Close()
 	started := time.Now()
 	input := map[string]any{"enabled": true, "outputDir": t.TempDir(), "baseUrl": "http://library.test", "intervalMinutes": 60, "following": true, "downloads": false, "serverUrl": server.URL, "apiKey": "fixture-scan-key"}
-	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/admin/emby", input))
+	viewerResultOK(t, admin.request(t, http.MethodPost, "/api/ui/settings/emby", input))
 	result := waitEmbySync(t, manager, started)
 	if result.Succeeded != 1 || !result.RefreshPending || !strings.Contains(result.Error, "HTTP 503") {
 		t.Fatal("failed scan status not preserved", result.Error)
