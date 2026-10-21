@@ -258,7 +258,7 @@ func TestPlaybackRemuxSplitCENCKeepsAudio(t *testing.T) {
 		// long: 全流程只访问本地合成音视频，验证 App 空响应回退网页后仍能下载到完整双轨 MP4。
 		app.downloader.client = &http.Client{Transport: rankingTransport(func(request *http.Request) (*http.Response, error) {
 			switch request.URL.Path {
-			case "/novel/player/multi_video_model/preload/v1/":
+			case "/novel/player/multi_video_model/v1/":
 				return rankingHTTPResponse(request, http.StatusOK, ""), nil
 			case "/player/700001/800001":
 				return rankingHTTPResponse(request, http.StatusOK, `<script>window._ROUTER_DATA={"loaderData":{"player_page":{"series_id":"700001","vid":"800001","protectedPlayback":true}}}</script>`), nil

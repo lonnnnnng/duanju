@@ -17,16 +17,18 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	if !hongguoNumericID.MatchString(videoID) {
 		return providerMedia{}, errors.New("视频 ID 无效")
 	}
+	// long: 播放模型接口使用新版 X-Gorgon 签名；固定设备 ID 会被判为 110001，必须使用随机设备 ID。
+	ctx = context.WithValue(ctx, hongguoModelSignKey{}, true)
 	payload := map[string]any{
-		// long: 新版预加载接口按内容类型接收分集列表；单集接口的 video_id 参数会被判为参数错误。
-		"mixed_video_id_map": map[string][]string{"1004": {videoID}}, "dr_scene": "preload",
+		// long: 批量接口按内容类型接收分集列表，响应中的 video_model 包含可直接播放的清晰度列表。
+		"mixed_video_id_map": map[string][]string{"1004": {videoID}},
 		"biz_param": map[string]any{
 			"detail_page_version": 0, "device_level": 3, "disable_digg_stat": false,
 			"need_all_video_definition": true, "need_mp4_align": false,
 			"use_os_player": false, "use_server_dns": false, "video_platform": 1024,
 		},
 	}
-	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/multi_video_model/preload/v1/", nil, payload)
+	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/multi_video_model/v1/", nil, payload)
 	if err != nil {
 		return providerMedia{}, err
 	}

@@ -173,14 +173,18 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 		request.Header.Set("X-XS-From-Web", "0")
 		request.Header.Set("Sdk-Version", "2")
 		comment, _ := ctx.Value(hongguoCommentKey{}).(bool)
-		var commentNonce hongguoCommentNonce
-		if comment {
-			commentNonce, err = newHongguoCommentNonce()
+		modelSign, _ := ctx.Value(hongguoModelSignKey{}).(bool)
+		var legacyNonce hongguoCommentNonce
+		if !modelSign {
+			// 目录和详情接口使用带 X-Argus/X-Ladon 的旧版签名；评论接口额外携带评论头。
+			legacyNonce, err = newHongguoCommentNonce()
 			if err != nil {
-				return nil, errors.New("无法准备文字请求")
+				return nil, errors.New("无法准备请求签名")
 			}
-			request.Header.Set("Comment-Source", "601")
-			request.Header.Set("Server-Channel", "1000")
+			if comment {
+				request.Header.Set("Comment-Source", "601")
+				request.Header.Set("Server-Channel", "1000")
+			}
 		}
 		if payload != nil {
 			request.Header.Set("Content-Type", "application/json; charset=utf-8")
@@ -189,10 +193,10 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 			now := time.Now()
 			query.Set("_rticket", strconv.FormatInt(now.UnixMilli(), 10))
 			prepared.URL.RawQuery = query.Encode()
-			if comment {
-				signHongguoCommentRequest(prepared, commentNonce, now)
+			if modelSign {
+				signHongguoModelRequest(prepared, body, now)
 			} else {
-				signHongguoRequest(prepared, body, now)
+				signHongguoCommentRequest(prepared, legacyNonce, now)
 			}
 		})
 		if err != nil {

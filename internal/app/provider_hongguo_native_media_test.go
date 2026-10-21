@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-func TestHongguoPreloadRequestsExactEpisode(t *testing.T) {
+func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 	const episode = "7695350271685168152"
 	model := map[string]any{"video_duration": 40.868, "video_list": []any{map[string]any{
 		"main_url": "https://media.example.test/requested.mp4", "video_meta": map[string]any{"codec_type": "h264", "definition": "1080p"},
@@ -22,22 +22,21 @@ func TestHongguoPreloadRequestsExactEpisode(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 				var payload struct {
-					IDs   map[string][]string `json:"mixed_video_id_map"`
-					Scene string              `json:"dr_scene"`
-					Biz   struct {
+					IDs map[string][]string `json:"mixed_video_id_map"`
+					Biz struct {
 						Platform int  `json:"video_platform"`
 						All      bool `json:"need_all_video_definition"`
 					} `json:"biz_param"`
 				}
-				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/multi_video_model/preload/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
-					t.Fatal("incorrect preload request")
+				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/multi_video_model/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
+					t.Fatal("incorrect model request")
 				}
 				ids := payload.IDs["1004"]
-				if len(payload.IDs) != 1 || len(ids) != 1 || ids[0] != episode || payload.Scene != "preload" || payload.Biz.Platform != 1024 || !payload.Biz.All {
-					t.Fatal("preload request lost episode or required parameters")
+				if len(payload.IDs) != 1 || len(ids) != 1 || ids[0] != episode || payload.Biz.Platform != 1024 || !payload.Biz.All {
+					t.Fatal("model request lost episode or required parameters")
 				}
-				if request.Header.Get("X-Gorgon") == "" || request.Header.Get("X-SS-STUB") == "" {
-					t.Fatal("preload request was not signed")
+				if request.Header.Get("X-Gorgon") == "" || request.Header.Get("X-SS-STUB") == "" || request.Header.Get("X-Argus") == "" || request.Header.Get("X-Ladon") == "" {
+					t.Fatal("model request was not signed")
 				}
 				var value any = model
 				if format == "string" {
@@ -50,7 +49,7 @@ func TestHongguoPreloadRequestsExactEpisode(t *testing.T) {
 			})
 			media, err := d.resolveHongguoAppMedia(context.Background(), episode)
 			if err != nil || media.URL != "https://media.example.test/requested.mp4" || media.Quality != 1080 || media.Duration != 40868*time.Millisecond {
-				t.Fatalf("preload did not select requested media: %v", err)
+				t.Fatalf("model did not select requested media: %v", err)
 			}
 		})
 	}
@@ -66,7 +65,7 @@ func TestHongguoPreloadRequestsExactEpisode(t *testing.T) {
 	}
 }
 
-func TestLiveHongguoPreloadPlayback(t *testing.T) {
+func TestLiveHongguoModelPlayback(t *testing.T) {
 	if os.Getenv("DUANJU_LIVE_PLAYBACK") != "1" {
 		t.Skip("仅在手动验收站源播放时启用")
 	}

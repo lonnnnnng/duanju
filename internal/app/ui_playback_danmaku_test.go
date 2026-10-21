@@ -88,8 +88,14 @@ func TestHongguoDanmakuCacheAndConcurrentRequests(t *testing.T) {
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		count := calls.Add(1)
 		if request.URL.Path == "/novel/player/video_detail/v1/" {
-			if request.Header.Get("X-Argus") != "" || request.Header.Get("X-Ladon") != "" || request.Header.Get("Comment-Source") != "" {
-				t.Error("comment signatures leaked into the regular player request")
+			// 详情接口需要旧版 X-Argus/X-Ladon 签名，但不能带上评论专用请求头。
+			if request.Header.Get("Comment-Source") != "" || request.Header.Get("Server-Channel") != "" {
+				t.Error("comment-only headers leaked into the regular player request")
+			}
+			for _, name := range []string{"X-Gorgon", "X-Argus", "X-Ladon", "X-Khronos"} {
+				if request.Header.Get(name) == "" {
+					t.Errorf("missing legacy signature: %s", name)
+				}
 			}
 			return rankingHTTPResponse(request, 200, `{"code":0}`), nil
 		}
