@@ -2,7 +2,9 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 	"net/url"
 	"strconv"
 	"strings"
@@ -25,8 +27,8 @@ type hongguoSearchCall struct {
 
 func hongguoSearchKeyword(keyword string) (string, error) {
 	keyword = strings.TrimSpace(keyword)
-	if keyword == "" || !utf8.ValidString(keyword) || utf8.RuneCountInString(keyword) > 80 || strings.IndexFunc(keyword, unicode.IsControl) >= 0 {
-		return "", errors.New("请输入 1 至 80 个字符的搜索词")
+	if keyword == "" || !utf8.ValidString(keyword) || utf8.RuneCountInString(keyword) > 30 || strings.IndexFunc(keyword, unicode.IsControl) >= 0 {
+		return "", errors.New("请输入 1 至 30 个字符的搜索词")
 	}
 	return keyword, nil
 }
@@ -74,14 +76,24 @@ func (downloader *Downloader) searchHongguoDramas(ctx context.Context, keyword s
 }
 
 func (downloader *Downloader) fetchHongguoSearch(ctx context.Context, keyword string) (hongguoSearchEntry, error) {
+	// long: 官网搜索页已改为客户端渲染，直接请求其使用的搜索接口，避免解析不到 _ROUTER_DATA。
+	searchURL := hongguoBaseURL + "/api/search/result?" + url.Values{"query": {keyword}}.Encode()
 	pageURL := hongguoBaseURL + "/search/" + url.PathEscape(keyword)
-	body, err := downloader.fetchProviderText(ctx, pageURL, hongguoBaseURL+"/")
+	body, err := downloader.fetchProviderText(ctx, searchURL, pageURL)
 	if err != nil {
 		return hongguoSearchEntry{}, err
 	}
-	page := routerLoaderMap(parseRouterData(body), "search_(keyword)/page", "search_")
-	rows, valid := page["searchList"].([]any)
-	if page["isSuccess"] != true || !valid || mapString(page, "query") != keyword {
+	var result map[string]any
+	decoder := json.NewDecoder(strings.NewReader(body))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil || result == nil {
+		return hongguoSearchEntry{}, errors.New("搜索接口返回格式异常")
+	}
+	if code := mapString(result, "code"); code != "" && code != "0" {
+		return hongguoSearchEntry{}, fmt.Errorf("搜索接口暂不可用（%s）", truncate(code, 20))
+	}
+	rows, valid := result["searchList"].([]any)
+	if !valid {
 		return hongguoSearchEntry{}, errors.New("搜索未返回有效结果")
 	}
 	entry := hongguoSearchEntry{Dramas: make([]Drama, 0, len(rows))}
@@ -99,7 +111,7 @@ func (downloader *Downloader) fetchHongguoSearch(ctx context.Context, keyword st
 	if len(rows) > 0 && len(entry.Dramas) == 0 {
 		return hongguoSearchEntry{}, errors.New("搜索结果中没有可识别的剧集")
 	}
-	entry.Total, _ = strconv.Atoi(mapString(page, "totalCount"))
+	entry.Total, _ = strconv.Atoi(mapString(result, "totalCount"))
 	if entry.Total < len(entry.Dramas) {
 		entry.Total = len(entry.Dramas)
 	}

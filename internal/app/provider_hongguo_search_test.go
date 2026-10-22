@@ -9,16 +9,16 @@ import (
 	"testing"
 )
 
-const searchSortFixture = `<script>window._ROUTER_DATA={"loaderData":{"search_layout":null,"search_(keyword)/page":{"query":"测试","isSuccess":true,"totalCount":30,"searchList":[
+const searchSortFixture = `{"totalCount":30,"searchList":[
 {"video_data":{"series_id":"7000000000000000001","series_title":"测试甲","create_time":"1787626382","hot_score_data":{"score":20019,"text":"2万热度"}}},
 {"video_data":{"series_id":"7000000000000000002","series_title":"测试乙","create_time":"1786502463","hot_score_data":{"score":0,"text":"0热度"}}},
 {"video_data":{"series_id":"7000000000000000003","series_title":"测试丙","create_time":"1788610261","score":"9.9"}}
-]}}}</script>`
+]}`
 
 func TestHongguoSearchSortMetadata(t *testing.T) {
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
-		if request.URL.Host != "hongguoduanju.com" || request.URL.Path != "/search/测试" {
-			t.Fatalf("unexpected request: %s", request.URL.Path)
+		if request.URL.Host != "hongguoduanju.com" || request.URL.Path != "/api/search/result" || request.URL.Query().Get("query") != "测试" {
+			t.Fatalf("unexpected request: %s", request.URL.String())
 		}
 		return rankingHTTPResponse(request, http.StatusOK, searchSortFixture), nil
 	})
@@ -65,7 +65,10 @@ func TestLibrarySearchReturnsMergedSortMetadata(t *testing.T) {
 	var calls atomic.Int32
 	release := make(chan struct{})
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
-		if request.URL.Path == "/search/测试" {
+		if request.URL.Path == "/api/search/result" {
+			if request.URL.Query().Get("query") != "测试" {
+				t.Errorf("unexpected search query: %s", request.URL.Query().Get("query"))
+			}
 			calls.Add(1)
 			return rankingHTTPResponse(request, http.StatusOK, searchSortFixture), nil
 		}
