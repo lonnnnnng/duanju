@@ -93,6 +93,7 @@ class PlayerActivity : AppCompatActivity() {
                             player.seekTo(pendingSeekMs)
                             pendingSeekMs = 0
                         }
+                        if (fullscreen) playerView.hideController()
                     }
                     Player.STATE_ENDED -> main.post { onEpisodeEnded() }
                 }
@@ -122,7 +123,7 @@ class PlayerActivity : AppCompatActivity() {
         findViewById<View>(R.id.fullscreen_back).setOnClickListener { toggleFullscreen() }
         playerView.setControllerVisibilityListener(object : PlayerControlView.VisibilityListener {
             override fun onVisibilityChange(visibility: Int) {
-                if (fullscreen && visibility == View.VISIBLE) showFullscreenTopBar()
+                if (fullscreen) fullscreenTopBar.visibility = visibility
             }
         })
 
@@ -186,9 +187,8 @@ statusView = findViewById(R.id.status)
         header.visibility = if (fullscreen) View.GONE else View.VISIBLE
         episodePanel.visibility = if (fullscreen) View.GONE else View.VISIBLE
         if (fullscreen) {
-            showFullscreenTopBar()
+            fullscreenTopBar.visibility = View.VISIBLE
         } else {
-            main.removeCallbacks(hideFullscreenBar)
             fullscreenTopBar.visibility = View.GONE
         }
         if (fullscreen) {
@@ -237,15 +237,7 @@ statusView = findViewById(R.id.status)
         }
     }
 
-    private val hideFullscreenBar = Runnable {
-        if (fullscreen) fullscreenTopBar.visibility = View.GONE
-    }
-
-    private fun showFullscreenTopBar() {
-        main.removeCallbacks(hideFullscreenBar)
-        fullscreenTopBar.visibility = View.VISIBLE
-        main.postDelayed(hideFullscreenBar, 3000)
-    }
+    
 
     private fun play(episode: Int, startMs: Long) {
         selectedEpisode = episode
