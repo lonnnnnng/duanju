@@ -5,30 +5,10 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="服务器地址" />
-
-    <EditText
-        android:id="@+id/base_url"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="http://192.168.1.2:3333"
-        android:inputType="textUri" />
-
-    <Switch
-        android:id="@+id/direct_mode"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
-        android:text="零服务器直连（本地解密）" />
-
     <Switch
         android:id="@+id/auto_next"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="16dp"
         android:text="自动连播下一集" />
 
     <LinearLayout
