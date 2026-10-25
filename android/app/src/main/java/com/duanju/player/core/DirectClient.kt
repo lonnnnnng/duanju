@@ -1,5 +1,6 @@
 package com.duanju.player.core
 
+
 import android.content.Context
 import org.json.JSONArray
 import org.json.JSONObject
@@ -137,13 +138,18 @@ object DirectClient {
     /** 本地 ffmpeg 解密下载：CDN 直链 → -c copy -decryption_key → 清晰 MP4。
      *  写临时文件，成功后原子重命名，避免进程被杀留下无 moov 的坏文件。 */
     fun decryptTo(sourceUrl: String, keyHex: String, outFile: File) {
+        // 手机端：先 Java 层下载原片到本地，再让 ffmpeg 只做本地解密，
+        // 规避设备网络栈（代理/VPN/HTTPDNS）导致 ffmpeg 直连 I/O error。
+        val local = File(outFile.parentFile, outFile.name + ".src")
+        if (!local.exists() || local.length() == 0L) {
+            javaDownload(sourceUrl, local)
+        }
         val tmp = File(outFile.parentFile, outFile.name + ".tmp")
         val args = arrayOf(
             "-y", "-hide_banner", "-loglevel", "error", "-nostdin",
-            "-rw_timeout", "20000000",
-            "-protocol_whitelist", "http,https,tcp,tls,crypto",
+            "-protocol_whitelist", "file,pipe",
             "-decryption_key", keyHex,
-            "-i", sourceUrl,
+            "-i", local.absolutePath,
             "-map", "0:v:0", "-map", "0:a:0?",
             "-c", "copy",
             "-avoid_negative_ts", "make_zero",
@@ -161,6 +167,24 @@ object DirectClient {
             tmp.delete()
             throw DirectException("缓存写入失败")
         }
+    }
+
+    /** Java 层直连下载（带 Referer，支持断点不需要）。 */
+    private fun javaDownload(url: String, target: File) {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15000
+            readTimeout = 60000
+            setRequestProperty("User-Agent", HongguoSign.UA_MODEL)
+            setRequestProperty("Referer", "https://novel.snssdk.com/")
+        }
+        if (conn.responseCode !in 200..299) {
+            conn.disconnect()
+            throw DirectException("下载失败 HTTP " + conn.responseCode)
+        }
+        target.outputStream().use { out -> conn.inputStream.copyTo(out, 64 * 1024) }
+        conn.disconnect()
+        if (target.length() == 0L) throw DirectException("下载为空")
     }
 
     /** 清理残缺的临时文件。 */
@@ -204,14 +228,15 @@ object DirectClient {
         val dramas = ArrayList<DirectDrama>(rows.length())
         for (i in 0 until rows.length()) {
             val row = rows.optJSONObject(i) ?: continue
+            // 分类接口行内字段：title / cover / episode_cnt / series_id（与 detail、搜索接口的 series_title/series_cover 不同）
             val id = row.optString("series_id")
             if (id.isEmpty()) continue
             dramas.add(
                 DirectDrama(
                     id = id,
-                    title = row.optString("series_title").ifEmpty { "短剧" },
+                    title = row.optString("title").ifEmpty { row.optString("series_title").ifEmpty { "短剧" } },
                     episodes = row.optInt("episode_cnt", 0),
-                    coverUrl = row.optString("series_cover").ifEmpty { null }
+                    coverUrl = row.optString("cover").ifEmpty { row.optString("series_cover") }.ifEmpty { null }
                 )
             )
         }
@@ -221,6 +246,37 @@ object DirectClient {
             hasMore = data.optBoolean("has_more", false),
             sessionId = data.optString("session_id", "")
         )
+    }
+
+    fun dumpCatalogRaw(
+        genreKey: String, genreScene: String, offset: Int, sessionId: String,
+        deviceId: String, installId: String
+    ): String {
+        val query = HongguoSign.encodeQuery(
+            HongguoSign.baseQuery(deviceId, installId) + listOf("_rticket" to System.currentTimeMillis().toString())
+        )
+        val headers = HongguoSign.signLegacyHeaders(query, "8662")
+        val payload = JSONObject().apply {
+            put("req_scene", genreScene)
+            put("offset", offset)
+            put("limit", 18)
+            put("req_type", "only_content")
+            put("need_selector_panel", false)
+            put("client_req_type", if (offset > 0) 2 else 3)
+            put("session_id", sessionId)
+            put("filter_ids", "")
+            put("select_items", JSONObject().apply {
+                put("genre", JSONArray().put(genreKey))
+                put("sort", JSONArray().put("online_time"))
+                put("gender", JSONArray())
+                put("category_dim_theme", JSONArray())
+                put("category_dim_role", JSONArray())
+                put("category_dim_epoch", JSONArray())
+                put("online_time", JSONArray())
+                put("creation_status", JSONArray())
+            })
+        }
+        return httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
     }
 
     /** 官网搜索（无签名，GET hongguoduanju.com/api/search/result）。 */

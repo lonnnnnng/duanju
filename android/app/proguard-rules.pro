@@ -7,3 +7,7 @@
 # 播放器组件可能通过反射/资源名访问，保留 media3 的控制器与 UI。
 -keep class androidx.media3.** { *; }
 -keep class com.google.android.exoplayer2.** { *; }
+
+# FFmpegKitNext：协议白名单等字符串常量与 native 桥接类不能被裁剪/改名
+-keep class com.arthenica.ffmpegkit.** { *; }
+-dontwarn com.arthenica.ffmpegkit.**
