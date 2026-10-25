@@ -10,7 +10,7 @@
         android:theme="@style/Theme.DuanjuPlayer">
 
         <activity
-            android:name=".LibraryActivity"
+            android:name=".MainActivity"
             android:exported="true"
             android:configChanges="orientation|screenSize|keyboardHidden">
             <intent-filter>

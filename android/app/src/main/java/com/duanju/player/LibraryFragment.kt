@@ -6,19 +6,20 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.view.LayoutInflater
 import android.view.View
+import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.TextView
-import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import java.util.concurrent.Executors
 
-class LibraryActivity : AppCompatActivity() {
+class LibraryFragment : Fragment() {
 
-    private lateinit var baseField: EditText
     private lateinit var searchField: EditText
     private lateinit var statusView: TextView
     private lateinit var progress: ProgressBar
@@ -30,28 +31,19 @@ class LibraryActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-        setContentView(R.layout.activity_library)
-        base = getSharedPreferences("duanju", MODE_PRIVATE).getString("base", base)!!
-        baseField = findViewById(R.id.base_url)
-        baseField.setText(base)
-        searchField = findViewById(R.id.search)
-        statusView = findViewById(R.id.status)
-        progress = findViewById(R.id.progress)
-        listView = findViewById(R.id.library_list)
-        adapter = DramaAdapter(base) { drama ->
-            startActivity(
-                Intent(this, PlayerActivity::class.java)
-                    .putExtra("base", base)
-                    .putExtra("dramaId", drama.id)
-                    .putExtra("title", drama.title)
-                    .putExtra("episodes", drama.episodes)
-            )
-        }
-        listView.layoutManager = LinearLayoutManager(this)
+    override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
+        inflater.inflate(R.layout.fragment_library, container, false)
+
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        base = AppSettings.base(requireContext())
+        searchField = view.findViewById(R.id.search)
+        statusView = view.findViewById(R.id.status)
+        progress = view.findViewById(R.id.progress)
+        listView = view.findViewById(R.id.library_list)
+        adapter = DramaAdapter(base) { drama -> openPlayer(drama) }
+        listView.layoutManager = LinearLayoutManager(requireContext())
         listView.adapter = adapter
-        findViewById<Button>(R.id.refresh).setOnClickListener { load() }
+        view.findViewById<Button>(R.id.refresh).setOnClickListener { load() }
         searchField.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) {}
             override fun onTextChanged(s: CharSequence?, a: Int, b: Int, c: Int) { filter(s?.toString() ?: "") }
@@ -60,13 +52,22 @@ class LibraryActivity : AppCompatActivity() {
         load()
     }
 
+    private fun openPlayer(drama: Drama) {
+        startActivity(
+            Intent(requireContext(), PlayerActivity::class.java)
+                .putExtra("base", base)
+                .putExtra("dramaId", drama.id)
+                .putExtra("title", drama.title)
+                .putExtra("episodes", drama.episodes)
+        )
+    }
+
     private fun load() {
-        base = baseField.text.toString().trim().trimEnd('/')
+        base = AppSettings.base(requireContext()).trimEnd('/')
         if (base.isEmpty()) {
-            status("请输入服务器地址")
+            status("请在「设置」页填写服务器地址")
             return
         }
-        getSharedPreferences("duanju", MODE_PRIVATE).edit().putString("base", base).apply()
         progress.visibility = View.VISIBLE
         status("加载剧库…")
         executor.execute {
