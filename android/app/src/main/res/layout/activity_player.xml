@@ -56,7 +56,8 @@
             android:id="@+id/player_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:resize_mode="fit" />
+            app:resize_mode="fit"
+            app:controller_layout_id="@layout/duanju_controller" />
 
         <ProgressBar
             android:id="@+id/loading"
@@ -66,46 +67,6 @@
             android:indeterminate="true"
             android:visibility="gone"
             style="?android:attr/progressBarStyleLarge" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:orientation="vertical">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="end"
-                android:padding="8dp">
-
-                <Button
-                    android:id="@+id/speed_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="1.0×"
-                    android:minWidth="0dp" />
-
-                <Button
-                    android:id="@+id/mute_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="静音"
-                    android:minWidth="0dp" />
-
-                <Button
-                    android:id="@+id/fullscreen_button"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="全屏"
-                    android:minWidth="0dp" />
-            </LinearLayout>
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
-        </LinearLayout>
     </FrameLayout>
 
     <LinearLayout

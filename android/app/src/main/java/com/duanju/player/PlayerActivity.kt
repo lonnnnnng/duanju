@@ -41,6 +41,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var fullscreenButton: Button
     private lateinit var header: View
     private lateinit var episodePanel: View
+    private lateinit var root: View
 
     private var base = "http://192.168.1.2:3333"
     private var dramaId = ""
@@ -111,12 +112,13 @@ class PlayerActivity : AppCompatActivity() {
         playerView.player = player
         header = findViewById(R.id.header)
         episodePanel = findViewById(R.id.episode_panel)
+        root = findViewById(R.id.root)
 
-        statusView = findViewById(R.id.status)
+statusView = findViewById(R.id.status)
         loading = findViewById(R.id.loading)
-        speedButton = findViewById(R.id.speed_button)
-        muteButton = findViewById(R.id.mute_button)
-        fullscreenButton = findViewById(R.id.fullscreen_button)
+        speedButton = playerView.findViewById(R.id.custom_speed)
+        muteButton = playerView.findViewById(R.id.custom_mute)
+        fullscreenButton = playerView.findViewById(R.id.custom_fullscreen)
         speedButton.text = speedLabel(currentSpeed)
         findViewById<Switch>(R.id.auto_next).apply {
             isChecked = autoNext
@@ -172,6 +174,8 @@ class PlayerActivity : AppCompatActivity() {
         header.visibility = if (fullscreen) View.GONE else View.VISIBLE
         episodePanel.visibility = if (fullscreen) View.GONE else View.VISIBLE
         if (fullscreen) {
+            root.setPadding(0, 0, 0, 0)
+            WindowCompat.setDecorFitsSystemWindows(window, false)
             requestedOrientation = if (isLandscapeVideo()) {
                 ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
             } else {
@@ -182,6 +186,9 @@ class PlayerActivity : AppCompatActivity() {
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
             }
         } else {
+            val padding = (8 * resources.displayMetrics.density).toInt()
+            root.setPadding(padding, padding, padding, padding)
+            WindowCompat.setDecorFitsSystemWindows(window, true)
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         }
