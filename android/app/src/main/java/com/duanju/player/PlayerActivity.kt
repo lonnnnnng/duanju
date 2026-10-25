@@ -27,7 +27,6 @@ import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
-import org.json.JSONObject
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -48,7 +47,6 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var fullscreenTopBar: View
     private lateinit var fullscreenTitle: TextView
 
-    private var base = "http://192.168.1.2:3333"
     private var dramaId = ""
     private var title = ""
     private var episodes = 1
@@ -71,7 +69,6 @@ class PlayerActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
-        base = intent.getStringExtra("base") ?: base
         dramaId = intent.getStringExtra("dramaId") ?: ""
         title = intent.getStringExtra("title") ?: "短剧"
         episodes = intent.getIntExtra("episodes", 1).coerceAtLeast(1)
@@ -251,11 +248,7 @@ statusView = findViewById(R.id.status)
         status("准备播放…")
         executor.execute {
             try {
-                val headers = Network.viewerHeaders(base)
-                val payload = """{"dramaId":"$dramaId","episode":$episode}"""
-                val body = Network.postJson("$base/api/ui/playback/native/hls", payload, headers, readTimeoutMs = 180000)
-                val hls = JSONObject(body)
-                main.post { playHls(hls) }
+                playDirect(episode, startMs)
             } catch (e: Exception) {
                 main.post {
                     loading.visibility = View.GONE
@@ -265,16 +258,38 @@ statusView = findViewById(R.id.status)
         }
     }
 
-    private fun playHls(hls: JSONObject) {
-        loading.visibility = View.GONE
-        val relative = hls.getString("url")
-        val url = if (relative.startsWith("http")) relative else base + relative
-        val source = HlsMediaSource.Factory(DefaultHttpDataSource.Factory())
-            .createMediaSource(MediaItem.fromUri(url))
-        player.setMediaSource(source)
-        player.prepare()
-        player.playWhenReady = true
-        player.setPlaybackSpeed(currentSpeed)
+
+    /** 直连播放：手机直接调官方接口 + 本地 ffmpeg 解密，全程不经服务器。 */
+    private fun playDirect(episode: Int, startMs: Long) {
+        val (deviceId, installId) = com.duanju.player.core.DirectClient.identity(this)
+        val seriesId = dramaId.substringAfter(':')
+        val start = System.currentTimeMillis()
+        val chapters = com.duanju.player.core.DirectClient.chapters(seriesId, deviceId, installId)
+        if (episode > chapters.size) throw com.duanju.player.core.DirectClient.DirectException("集数超出范围")
+        val videoId = chapters[episode - 1]
+        val media = com.duanju.player.core.DirectClient.media(videoId, deviceId, installId)
+        val resolveMs = System.currentTimeMillis() - start
+        main.post { status("已解析(${resolveMs}ms) ${media.quality}p，本地解密中…") }
+        val cacheDir = File(cacheDir, "direct").apply { mkdirs() }
+        com.duanju.player.core.DirectClient.cleanPartial(cacheDir)
+        val outFile = File(cacheDir, "${seriesId}_$episode.mp4")
+        val dlStart = System.currentTimeMillis()
+        if (!outFile.exists() || outFile.length() == 0L) {
+            com.duanju.player.core.DirectClient.decryptTo(media.url, media.keyHex, outFile)
+        }
+        val dlMs = System.currentTimeMillis() - dlStart
+        main.post {
+            loading.visibility = View.GONE
+            status("第${selectedEpisode}集 ${media.quality}p · 解析${resolveMs}ms 下载${dlMs}ms")
+            val source = androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(
+                androidx.media3.datasource.DefaultDataSource.Factory(this)
+            ).createMediaSource(androidx.media3.common.MediaItem.fromUri(android.net.Uri.fromFile(outFile)))
+            pendingSeekMs = startMs
+            player.setMediaSource(source)
+            player.prepare()
+            player.playWhenReady = true
+            player.setPlaybackSpeed(currentSpeed)
+        }
     }
 
     private fun onEpisodeEnded() {

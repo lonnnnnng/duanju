@@ -8,7 +8,7 @@ import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 
 class DramaAdapter(
-    private val base: String,
+    @Suppress("unused") private val base: String,
     private val onClick: (Drama) -> Unit
 ) : RecyclerView.Adapter<DramaAdapter.Holder>() {
 
@@ -33,8 +33,7 @@ class DramaAdapter(
         if (cover.isNullOrBlank()) {
             holder.cover.setImageBitmap(null)
         } else {
-            val url = if (cover.startsWith("http")) cover else base + cover
-            BitmapLoader.load(url, holder.cover)
+            BitmapLoader.load(cover, holder.cover)
         }
         holder.itemView.setOnClickListener { onClick(drama) }
     }

@@ -1,118 +1,78 @@
-# Duanju Player（红果短剧安卓客户端）
+# 短剧（Duanju Player 安卓客户端）
 
-一个自用的局域网红果短剧播放器，配合自建 `duanju` 服务使用。手机端硬件解码 HEVC 原片，
-不再让服务器的低功耗 CPU 做实时 H.264 转码。
+一个**完全不依赖自建服务器**的红果短剧安卓播放器：手机直接调官方接口（内置签名）、
+直连 CDN 下载、本地 CENC 解密、硬件解码 HEVC。出门在 4G/5G 下即可使用。
 
 ---
 
-## 1. 为什么会有这个 App
+## 1. 为什么是"零服务器"
 
-`duanju` 的网页端在手机浏览器上播放后续分集时会卡顿。排查结论是：源片只有 **HEVC 1080p** 一种编码，
-而安卓浏览器的 MSE 普遍不支持 HEVC 解码，于是服务器只能把 HEVC 实时转成 H.264，而服务器是低功耗
-Xeon（E3-1265L v3），转码余量不足，导致卡顿缓冲。
+早期方案是「服务器解密 + 拷贝封装 HLS + 手机播放」，解决了服务器实时转码卡顿的问题，
+但视频数据仍要经过家里服务器（流量 + 临时磁盘 + 出门不可用）。
 
-官方 App 之所以流畅，是因为它直接用手机 GPU **硬解 HEVC 原片**，从字节 CDN 拉流，还能做自适应码率。
+本版本把整条链路搬进手机：
 
-于是做这个安卓 App，让手机代替网页端做「拉直链 → 解密 → 硬解」，服务器不再承担转码。这样既绕开了
-服务器的算力瓶颈，又保留了「用自建服务统一管理和续播」的体验。
+1. **解析**：手机直接调用红果官方 App 接口（`video_detail` / `multi_video_model`），
+   签名算法（新版 X-Gorgon、旧版 X-Gorgon/X-Argus/X-Ladon、SM3）全部内置。
+2. **取流**：手机直连字节 CDN 下载原片（HEVC 1080p）。
+3. **解密**：内置 FFmpegKitNext（源码自编译）执行 `-c copy -decryption_key`，
+   只解密、不转码，输出本地 MP4。
+4. **播放**：ExoPlayer + 硬件 HEVC 解码。
 
-## 2. 它是如何产生的（关键取舍）
+服务器（duanju Go 服务）从此只作为可选的家庭 Emby 源，与本 App 无任何关联。
 
-- 最初想做「App 本地 ffmpeg 解密 + 硬解」，但发现标准的安卓内置 ffmpeg 库 **ffmpeg-kit 已于 2025 年
-  退役**，Maven/GitHub 上的二进制全部下架，自带 NDK 交叉编译 ffmpeg + OpenSSL 又太重。
-- 因此改为**等价且仍然不转码**的方案：服务器做「AES-CTR 解密 + `-c copy` 转封装成 HLS」——这只是复制
-  封装，不是重编码，CPU 可忽略；App 端用 **Media3 ExoPlayer + 硬件 HEVC 解码**直接播放。
-- 服务器为此新增了两个轻量接口（详见第 5 节），App 不需要内置 ffmpeg，APK 体积很小。
+## 2. 它是怎么来的（关键节点）
 
-## 3. 实现方式
+- 网页端卡顿 → 排查出根因：服务器低功耗 CPU 实时 HEVC→H.264 转码扛不住。
+- 想做手机本地解密 → ffmpeg-kit 于 2025-01 退役、二进制全下架。
+- 2026-07 原作者发布 **FFmpegKitNext**（source-only）→ 本地编译出 AAR。
+- 签名算法从服务器 Go 实现 1:1 移植到 Kotlin，用**固定向量 + 真实 spade_a 样本**
+  双向验证字节级一致（移植过程中靠向量测试抓出 3 处位运算/字节语义 bug）。
+- 最终移除服务器依赖：剧库、搜索、封面、解析、解密全部手机直连。
 
-技术栈：**Kotlin + 原生 View（XML）+ ExoPlayer/Media3 1.4**，`minSdk 24 / targetSdk 34 / compileSdk 35`。
+## 3. 能力
 
-### 3.1 页面结构
+- 剧库：官方分类接口分页加载（下拉刷新、上滑加载更多、偶发断连自动重试）。
+- 搜索：官网搜索接口（搜索按钮/软键盘搜索键触发）。
+- 播放历史：本地续播（集数+秒数）、长按删除。
+- 播放器：HEVC 硬解、倍速(1×–4×)/静音/全屏按钮、自动连播、进度拖拽、屏幕常亮。
+- 全屏：横/竖屏视频自适应（横屏旋转、竖屏填充+安全边）、沉浸式、
+  顶部「返回图标 + 剧名 - 第几集」导航栏、与控制器同步显示/隐藏。
+- 本地解密缓存：按剧+集缓存 MP4，二次进入秒开；临时文件原子写入防损坏。
 
-- `MainActivity`：宿主，底部三个 Tab（`BottomNavigationView`）：
-  - **播放**（`LibraryFragment`）：剧库列表，搜索 + 下拉刷新 + 上滑加载更多。
-  - **历史**（`HistoryFragment`）：播放历史，点击续播、长按删除。
-  - **设置**（`SettingsFragment`）：服务器地址、自动连播、默认倍速。
-- `PlayerActivity`：上方播放器窗口，下方选集网格。
+## 4. 直连使用的接口
 
-### 3.2 播放链路
-
-1. 进入播放页 → 从本地 `HistoryStore` 取续播记录（集数 + 秒数），无记录则从第 1 集开始。
-2. 请求服务器 `POST /api/ui/playback/native/hls`，服务器解密并 `-c copy` 生成一份 VOD HLS。
-3. ExoPlayer 用 `HlsMediaSource` 播放，走后端硬件 HEVC 解码。
-4. 播放中每秒把进度写回本地 `SharedPreferences`（历史续播）。
-
-### 3.3 关键实现点
-
-- `Network.kt`：`HttpURLConnection` + `CookieManager`，封装 viewer 身份引导（`/api/ui/viewer?confirm=1`）。
-- `HistoryStore.kt`：历史记录以 JSON 数组存在 `SharedPreferences`（上限 100 条）。
-- `AppSettings.kt`：全局设置（服务器地址、自动连播、默认倍速）持久化。
-- `PlayerActivity`：
-  - 自定义 Media3 控制器 `duanju_controller.xml`（保留进度条/播放暂停/时间，额外加 倍速/静音/全屏 三个按钮）。
-  - 全屏：根据视频横竖自动决定是否旋转，横屏片旋转、竖屏片填充屏幕并留安全边（`RESIZE_MODE_FIT`，不裁剪）；
-    顶部导航栏显示「返回图标 + 剧名 - 第几集」，跟随控制器一起显示/隐藏。
-  - 屏幕常亮（`FLAG_KEEP_SCREEN_ON`），自动连播下一集。
-
-## 4. 目前的能力
-
-- 剧库列表（封面缩略图、标题、集数），下拉刷新、上滑加载更多。
-- 服务端搜索（搜索按钮触发，结果复用服务端官方搜索接口）。
-- 播放历史：续播、长按删除。
-- 全局设置：服务器地址、自动连播、默认播放倍速（1.0~4×）。
-- 播放器：HEVC 硬解、进度拖拽、倍速/静音/全屏按钮、自动连播、选集中带历史续播。
-- 全屏：横竖屏自适应、沉浸式、顶部导航栏自动隐藏。
-
-## 5. 依赖的服务端接口
-
-所有请求都指向设置里的服务器地址（默认 `http://192.168.1.2:3333`，明文 HTTP，仅限局域网）。
-
-| 用途 | 接口 | 说明 |
+| 用途 | 接口 | 签名 |
 | --- | --- | --- |
-| 身份引导 | `GET /api/ui/viewer` → `GET /api/ui/viewer?confirm=1` | 取 viewer Cookie 与 `X-Duanju-Viewer` 头 |
-| 剧库列表 | `GET /api/ui/dramas`（`?more=1`、`?revision=N`） | 加载 / 加载更多 / 轮询 |
-| 搜索 | `GET /api/ui/search?q=<关键词>` | 服务端内部走官方 `/api/search/result` |
-| 封面代理 | `GET /api/ui/image?url=<原图>` | 服务端抓取剧集封面 |
-| 取流 | `POST /api/ui/playback/native/hls` | 入参 `{dramaId, episode}`，返回 `{url, duration, quality, title}` |
-| HLS 资源 | `GET /api/ui/playback/native/hls/<token>/...` | 播放器拉取 `index.m3u8` / `init.mp4` / `*.m4s` |
+| 剧库列表 | `POST api5-normal-sinfonlineb.fqnovel.com/reading/distribution/category/landpage/v/` | 旧版全套 |
+| 分集列表 | `POST …/novel/player/video_detail/v1/` | 旧版全套 |
+| 取流(直链+spade_a) | `POST …/novel/player/multi_video_model/v1/` | 新版 X-Gorgon |
+| 搜索 | `GET hongguoduanju.com/api/search/result?query=` | 无 |
+| 封面 | CDN 图片直链 | 无 |
+| 视频下载 | CDN 直链（本地 ffmpeg 解密） | 无 |
 
-> 播放类接口需要 viewer 身份；剧库 / 搜索 / 封面是公开接口。
+设备身份由 App 首次运行随机生成并持久化（避免公开固定 ID 被风控 110001）。
 
-## 6. 构建与打包
-
-环境要求：JDK 17+、Android SDK（`compileSdk 35`）。已提交 Gradle Wrapper。
+## 5. 构建
 
 ```bash
 cd android
-./gradlew :app:assembleDebug    # 调试包
-./gradlew :app:assembleRelease  # 带 R8 压缩的发行包
+./gradlew :app:testDebugUnitTest   # 含签名向量回归（防止算法被无意改坏）
+./gradlew :app:assembleRelease     # R8 压缩 + 本地签名
 ```
 
-- `release` 构建已开启 **R8 压缩 + 资源瘦身**。
-- 签名使用本地 `keystore.properties`（已 gitignore，不提交仓库），缺失时回退 debug 签名以便本地构建。
-- 产物：`app/build/outputs/apk/release/app-release.apk`。
+- FFmpegKitNext AAR 已随仓库提供（`android/libs/ffmpeg-kit-next-maven/`，arm64-v8a，源码编译）。
+- 签名 keystore 在 `android/keystore/`（gitignore，丢失将无法覆盖升级，请自行备份）。
 
-安装：
+## 6. 维护须知（上游改签名时）
 
-```bash
-adb install -r app/build/outputs/apk/release/app-release.apk
-```
+所有签名与密钥逻辑集中在两个文件，上游变更只需改这里并发新版 App：
 
-## 7. 目录与依赖库
+- `app/src/main/java/com/duanju/player/core/HongguoSign.kt`（签名 + spade_a 派生）
+- `app/src/main/java/com/duanju/player/core/DirectClient.kt`（接口调用 + 参数）
 
-```text
-app/src/main/java/com/duanju/player/
-  MainActivity.kt      底部导航宿主
-  LibraryFragment.kt   剧库 + 搜索 + 下拉刷新/加载更多
-  HistoryFragment.kt   播放历史
-  SettingsFragment.kt  设置
-  PlayerActivity.kt    播放器
-  Network.kt / Drama.kt / DramaAdapter.kt / EpisodeAdapter.kt
-  HistoryStore.kt / AppSettings.kt / BitmapLoader.kt
-```
+回归保障：`LegacySignVectorTest` / `HongguoSignVectorTest` / `ContentKeyVectorTest`
+对固定向量断言。改算法前先在服务器侧（Go 版仍可用）生成新向量替换。
 
-依赖库（`app/build.gradle.kts`）：
-
-- `androidx.media3:media3-exoplayer` / `media3-ui` / `media3-exoplayer-hls`
-- `androidx.appcompat` / `recyclerview` / `swiperefreshlayout`
-- `com.google.android.material`
+依赖库：Media3 1.4（exoplayer/ui/hls）、appcompat、recyclerview、
+swiperefreshlayout、material、FFmpegKitNext 9.0.2。

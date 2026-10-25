@@ -44,7 +44,6 @@ class HistoryFragment : Fragment() {
     private fun openPlayer(entry: HistoryEntry) {
         startActivity(
             Intent(requireContext(), PlayerActivity::class.java)
-                .putExtra("base", AppSettings.base(requireContext()))
                 .putExtra("dramaId", entry.id)
                 .putExtra("title", entry.title)
                 .putExtra("episodes", entry.episodes)

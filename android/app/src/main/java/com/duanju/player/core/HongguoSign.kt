@@ -141,28 +141,30 @@ object HongguoSign {
         seed[18] = ((stamp ushr 8) and 0xFF).toByte()
         seed[19] = (stamp and 0xFF).toByte()
         val key = byteArrayOf(0x4a, 0x00, 0x16, head3.toByte(), 0x47, 0x6c, 0x00, head2.toByte())
-        // KSA：标准交换
+        // KSA：byte j 自然回绕 + 单向赋值 box[i]=box[j]（与 Go 一致）
         val box = ByteArray(256) { it.toByte() }
-        var j = 0
+        var jb: Byte = 0
         for (i in 0 until 256) {
-            j = (j + u8(box[i]) + u8(key[i and 7])) and 0xFF
-            box[i] = box[j].also { box[j] = box[i] }
+            jb = (jb + box[i] + key[i and 7]).toByte()
+            box[i] = box[u8(jb)]
         }
-        j = 0
-        val out = ByteArray(20)
+        // PRGA：同样单向赋值
+        jb = 0
         for (offset in 0 until 20) {
-            val i = offset + 1
-            j = (j + u8(box[i])) and 0xFF
-            box[i] = box[j].also { box[j] = box[i] }
-            out[offset] = ((seed[offset].toInt()) xor box[(u8(box[i]) + u8(box[j])) and 0xFF].toInt()).toByte()
+            val i: Byte = (offset + 1).toByte()
+            jb = (jb + box[u8(i)]).toByte()
+            box[u8(i)] = box[u8(jb)]
+            // Go: box[box[i]+box[j]] —— byte 加法自然回绕
+            val idx: Byte = (box[u8(i)] + box[u8(jb)]).toByte()
+            seed[offset] = ((seed[offset].toInt()) xor (box[u8(idx)].toInt())).toByte()
         }
         for (i in 0 until 20) {
-            val v = u8(out[i])
+            val v = u8(seed[i])
             val rotated = ((v shl 4) or (v ushr 4)) and 0xFF
-            val next = u8(out[(i + 1) % 20])
-            out[i] = ((reverseBits8(next xor rotated) xor 0xEB).inv()).toByte()
+            val next = u8(seed[(i + 1) % 20])
+            seed[i] = ((reverseBits8(next xor rotated)) xor 0xEB).toByte()
         }
-        return (byteArrayOf(0x84.toByte(), 0x04, head2.toByte(), head3.toByte(), 0, 0) + out).toHex()
+        return (byteArrayOf(0x84.toByte(), 0x04, head2.toByte(), head3.toByte(), 0, 0) + seed).toHex()
     }
 
     private fun legacyLadon(aid: String, stamp: Long, nonce: Nonce): String {
@@ -182,14 +184,14 @@ object HongguoSign {
         }
         val data = pad16("$stamp-1611921764-3019".toByteArray(Charsets.UTF_8))
         for (off in data.indices step 16) {
-            var a = le64(data, off)
-            var b = le64(data, off + 8)
-            for (k in keys) {
-                b = k xor (a + ror64(b, 8))
-                a = b xor rol64(a, 61)
+            var l = le64(data, off)
+            var r = le64(data, off + 8)
+            for (key in keys) {
+                r = key xor (l + ror64(r, 8))
+                l = r xor rol64(l, 3)
             }
-            for (k in 0 until 8) data[off + k] = ((a ushr (8 * k)) and 0xFF).toByte()
-            for (k in 0 until 8) data[off + 8 + k] = ((b ushr (8 * k)) and 0xFF).toByte()
+            for (k in 0 until 8) data[off + k] = ((l ushr (8 * k)) and 0xFF).toByte()
+            for (k in 0 until 8) data[off + 8 + k] = ((r ushr (8 * k)) and 0xFF).toByte()
         }
         return Base64.getEncoder().encodeToString(prefix + data)
     }
@@ -228,7 +230,7 @@ object HongguoSign {
         for (i in 0 until 4) rounds[i] = le64(derived, i * 8)
         for (i in 4 until 72) {
             var mixed = ror64(rounds[i - 1], 3) xor rounds[i - 3]
-            mixed = mixed xor rol64(mixed, 63)
+            mixed = mixed xor ror64(mixed, 1)
             rounds[i] = rounds[i - 4].inv() xor mixed xor (((0x3dc94c3a046d678bL ushr ((i - 4) % 62)) and 1L)) xor 3L
         }
         var data = pad16(message)
@@ -236,9 +238,10 @@ object HongguoSign {
             var left = le64(data, off)
             var right = le64(data, off + 8)
             for (round in rounds) {
-                val newLeft = right xor (rol64(left, 1) and rol64(left, 8)) xor rol64(left, 2) xor round
-                right = left
+                val newLeft = right
+                val newRight = left xor (rol64(right, 1) and rol64(right, 8)) xor rol64(right, 2) xor round
                 left = newLeft
+                right = newRight
             }
             for (k in 0 until 8) data[off + k] = ((left ushr (8 * k)) and 0xFF).toByte()
             for (k in 0 until 8) data[off + 8 + k] = ((right ushr (8 * k)) and 0xFF).toByte()
@@ -285,6 +288,17 @@ object HongguoSign {
             "X-Ladon" to legacyLadon(aid, ts, nonce)
         )
     }
+
+    // ==================== 测试入口 ====================
+
+    fun legacyGorgonForTest(query: String, stamp: Long, nonce: ByteArray): String =
+        legacyGorgon(query, stamp, Nonce(nonce))
+
+    fun legacyLadonForTest(aid: String, stamp: Long, nonce: ByteArray): String =
+        legacyLadon(aid, stamp, Nonce(nonce))
+
+    fun legacyArgusForTest(query: String, stamp: Long, nonce: ByteArray): String =
+        legacyArgus(query, stamp, Nonce(nonce))
 
     // ==================== SM3 ====================
 

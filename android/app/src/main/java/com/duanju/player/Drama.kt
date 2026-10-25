@@ -24,8 +24,8 @@ object DramaParser {
                 ?: intOf(item, "episodeCount")
                 .takeIf { it > 0 }
                 ?: intOf(item, "total")
-            val coverValue = item.opt("cover")
-            val cover = (coverValue as? String)?.takeIf { it.isNotBlank() }
+            // 官网/App 接口的 series_cover 是绝对地址，直连使用
+            val cover = item.optString("series_cover").ifBlank { item.optString("cover") }.ifEmpty { null }
             list.add(Drama(id, title.ifBlank { "短剧" }, episodes, cover))
         }
         return list

@@ -1,6 +1,7 @@
 package com.duanju.player.core
 
 import android.content.Context
+import org.json.JSONArray
 import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
@@ -28,15 +29,31 @@ object DirectClient {
 
     class DirectException(message: String) : Exception(message)
 
+    data class DirectDrama(
+        val id: String,        // 纯数字 seriesId
+        val title: String,
+        val episodes: Int,
+        val coverUrl: String?  // 绝对地址
+    )
+
+    data class CatalogPage(
+        val dramas: List<DirectDrama>,
+        val nextOffset: Int,
+        val hasMore: Boolean,
+        val sessionId: String
+    )
+
     private val executor = Executors.newSingleThreadExecutor()
     private val random = SecureRandom()
 
     fun deviceId(): String {
+        // 与服务器一致：19 位正数，落在 [1e18, 9e18)
         val bytes = ByteArray(8)
         random.nextBytes(bytes)
         var v = 0L
         for (b in bytes) v = (v shl 8) or (b.toLong() and 0xFF)
-        return (1_000_000_000_000_000_000L + v % 8_000_000_000_000_000_000L).toString()
+        val positive = (v and Long.MAX_VALUE) % 8_000_000_000_000_000_000L
+        return (1_000_000_000_000_000_000L + positive).toString()
     }
 
     fun <T> submit(task: Callable<T>): Future<T> = executor.submit(task)
@@ -151,6 +168,96 @@ object DirectClient {
         cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
     }
 
+    /** 剧库列表（App 官方接口，旧版签名，分页）。 */
+    fun catalog(
+        genreKey: String, genreScene: String, offset: Int, sessionId: String,
+        deviceId: String, installId: String
+    ): CatalogPage {
+        val query = HongguoSign.encodeQuery(
+            HongguoSign.baseQuery(deviceId, installId) + listOf("_rticket" to System.currentTimeMillis().toString())
+        )
+        val headers = HongguoSign.signLegacyHeaders(query, "8662")
+        val payload = JSONObject().apply {
+            put("req_scene", genreScene)
+            put("offset", offset)
+            put("limit", 18)
+            put("req_type", "only_content")
+            put("need_selector_panel", false)
+            put("client_req_type", if (offset > 0) 2 else 3)
+            put("session_id", sessionId)
+            put("filter_ids", "")
+            put("select_items", JSONObject().apply {
+                put("genre", JSONArray().put(genreKey))
+                put("sort", JSONArray().put("online_time"))
+                put("gender", JSONArray())
+                put("category_dim_theme", JSONArray())
+                put("category_dim_role", JSONArray())
+                put("category_dim_epoch", JSONArray())
+                put("online_time", JSONArray())
+                put("creation_status", JSONArray())
+            })
+        }
+        val text = httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
+        val root = JSONObject(text)
+        val data = root.optJSONObject("data") ?: throw DirectException("分类数据为空")
+        val rows = data.optJSONArray("video_data") ?: throw DirectException("分类无剧集")
+        val dramas = ArrayList<DirectDrama>(rows.length())
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            val id = row.optString("series_id")
+            if (id.isEmpty()) continue
+            dramas.add(
+                DirectDrama(
+                    id = id,
+                    title = row.optString("series_title").ifEmpty { "短剧" },
+                    episodes = row.optInt("episode_cnt", 0),
+                    coverUrl = row.optString("series_cover").ifEmpty { null }
+                )
+            )
+        }
+        return CatalogPage(
+            dramas = dramas,
+            nextOffset = data.optInt("next_offset", offset + rows.length()),
+            hasMore = data.optBoolean("has_more", false),
+            sessionId = data.optString("session_id", "")
+        )
+    }
+
+    /** 官网搜索（无签名，GET hongguoduanju.com/api/search/result）。 */
+    fun searchOfficial(keyword: String): List<DirectDrama> {
+        val url = "https://hongguoduanju.com/api/search/result?query=" +
+            java.net.URLEncoder.encode(keyword, "UTF-8")
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15000
+            readTimeout = 30000
+            setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+            setRequestProperty("Referer", "https://hongguoduanju.com/")
+        }
+        val code = conn.responseCode
+        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+        conn.disconnect()
+        if (code != 200) throw DirectException("搜索 HTTP $code")
+        val root = JSONObject(text)
+        val rows = root.optJSONArray("searchList") ?: return emptyList()
+        val out = ArrayList<DirectDrama>(rows.length())
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            val vd = row.optJSONObject("video_data") ?: continue
+            val id = vd.optString("series_id")
+            if (id.isEmpty()) continue
+            out.add(
+                DirectDrama(
+                    id = id,
+                    title = vd.optString("series_title").ifEmpty { row.optString("name").ifEmpty { "短剧" } },
+                    episodes = vd.optInt("episode_cnt", 0),
+                    coverUrl = vd.optString("series_cover").ifEmpty { null }
+                )
+            )
+        }
+        return out
+    }
+
     private fun httpPost(url: String, query: String, body: String, headers: Map<String, String>): String {
         val conn = (URL("$url?$query").openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
@@ -168,6 +275,7 @@ object DirectClient {
         val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
         conn.disconnect()
         if (code != 200) throw DirectException("HTTP $code")
+        if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
         return text
     }
 
