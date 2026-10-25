@@ -12,6 +12,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.datasource.DefaultHttpDataSource
+import androidx.media3.common.PlaybackException
+import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.PlayerView
@@ -42,8 +44,14 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
 
         player = ExoPlayer.Builder(this).build()
+        player.addListener(object : Player.Listener {
+            override fun onPlayerError(error: PlaybackException) {
+                main.post { status("播放错误：${error.message}") }
+            }
+        })
         playerView = findViewById(R.id.player_view)
         playerView.player = player
+        startPositionTicker()
 
         baseField = findViewById(R.id.base_url)
         dramaField = findViewById(R.id.drama_id)
@@ -110,6 +118,21 @@ class MainActivity : AppCompatActivity() {
 
     private fun status(message: String) {
         statusView.text = message
+    }
+
+    private val ticker = object : Runnable {
+        override fun run() {
+            if (::player.isInitialized && player.isPlaying) {
+                val position = player.currentPosition / 1000
+                val duration = if (player.duration > 0) player.duration / 1000 else 0
+                status("播放中 ${position}s / ${duration}s")
+            }
+            main.postDelayed(this, 1000)
+        }
+    }
+
+    private fun startPositionTicker() {
+        main.postDelayed(ticker, 1000)
     }
 
     private fun httpGet(url: String): String {
