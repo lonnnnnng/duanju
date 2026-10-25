@@ -37,6 +37,13 @@
             android:text="播放" />
     </LinearLayout>
 
+    <Switch
+        android:id="@+id/auto_next"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="自动连播下一集"
+        android:checked="true" />
+
     <ProgressBar
         android:id="@+id/progress"
         android:layout_width="match_parent"

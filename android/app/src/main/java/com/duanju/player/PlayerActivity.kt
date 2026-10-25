@@ -7,6 +7,7 @@ import android.view.View
 import android.widget.Button
 import android.widget.NumberPicker
 import android.widget.ProgressBar
+import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.media3.common.MediaItem
@@ -33,6 +34,7 @@ class PlayerActivity : AppCompatActivity() {
     private var dramaId = ""
     private var title = ""
     private var episodes = 1
+    private var autoNext = true
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -48,6 +50,12 @@ class PlayerActivity : AppCompatActivity() {
 
         player = ExoPlayer.Builder(this).build()
         player.addListener(object : Player.Listener {
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_ENDED) {
+                    main.post { onEpisodeEnded() }
+                }
+            }
+
             override fun onPlayerError(error: PlaybackException) {
                 main.post { status("播放错误：${error.message}") }
             }
@@ -66,6 +74,7 @@ class PlayerActivity : AppCompatActivity() {
         statusView = findViewById(R.id.status)
         progress = findViewById(R.id.progress)
         findViewById<Button>(R.id.play_button).setOnClickListener { play() }
+        findViewById<Switch>(R.id.auto_next).setOnCheckedChangeListener { _, checked -> autoNext = checked }
         startPositionTicker()
     }
 
@@ -91,6 +100,19 @@ class PlayerActivity : AppCompatActivity() {
                     status("失败：${e.message}")
                 }
             }
+        }
+    }
+
+    private fun onEpisodeEnded() {
+        if (!autoNext) {
+            status("本集播放完毕，已暂停自动连播")
+            return
+        }
+        if (episodePicker.value < episodePicker.maxValue) {
+            episodePicker.value = episodePicker.value + 1
+            play()
+        } else {
+            status("已播放至最后一集")
         }
     }
 
