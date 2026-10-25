@@ -140,30 +140,19 @@ object DirectClient {
     fun decryptTo(sourceUrl: String, keyHex: String, outFile: File) {
         // 优先 ffmpeg 直接拉流（网络好时一步到位且不落加密原片）；
         // 设备代理/VPN 等导致 ffmpeg 网络 I/O 失败时，自动回退 Java 下载 + 本地解密。
-        val started = System.currentTimeMillis()
-        try {
-            decryptViaFfmpeg(sourceUrl, keyHex, outFile)
-            android.util.Log.d("DirectClient", "路径=ffmpeg直连 耗时=${System.currentTimeMillis() - started}ms 大小=${outFile.length()}")
-        } catch (e: Exception) {
-            android.util.Log.d("DirectClient", "路径=Java回退 原因=${e.message?.take(80)}")
-            val local = File(outFile.parentFile, outFile.name + ".src")
-            local.delete()
-            javaDownload(sourceUrl, local)
-            try {
-                decryptLocal(local, keyHex, outFile)
-                android.util.Log.d("DirectClient", "路径=Java回退成功 总耗时=${System.currentTimeMillis() - started}ms 大小=${outFile.length()}")
-            } finally {
-                local.delete()
-            }
-        }
+        decryptViaFfmpeg(sourceUrl, keyHex, outFile, exportSystemCa(File(outFile.parentFile, "system-ca.pem")))
     }
 
-    /** ffmpeg 直接拉流并解密（源是 http/https）。 */
-    private fun decryptViaFfmpeg(sourceUrl: String, keyHex: String, outFile: File) {
+    /** ffmpeg 直接拉流并解密（源是 http/https）。
+     *  ffmpeg 的 openssl 不带 Android 系统CA，证书验证会失败；
+     *  这里把系统 cacerts 合并导出为 PEM，经 -cafile 交给 ffmpeg，正常完成校验。 */
+    private fun decryptViaFfmpeg(sourceUrl: String, keyHex: String, outFile: File, caFile: File?) {
+        val tlsArgs = if (caFile != null) arrayOf("-tls_verify", "1", "-cafile", caFile.absolutePath) else emptyArray()
         val args = arrayOf(
-            "-y", "-hide_banner", "-loglevel", "error", "-nostdin",
+            "-y", "-hide_banner", "-loglevel", "verbose", "-nostdin",
             "-rw_timeout", "20000000",
             "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
+            *tlsArgs,
             "-decryption_key", keyHex,
             "-i", sourceUrl,
             "-map", "0:v:0", "-map", "0:a:0?",
@@ -175,28 +164,12 @@ object DirectClient {
         finishFfmpeg(args, File(outFile.parentFile, outFile.name + ".tmp"), outFile)
     }
 
-    /** ffmpeg 解密本地加密原片。 */
-    private fun decryptLocal(local: File, keyHex: String, outFile: File) {
-        val tmp = File(outFile.parentFile, outFile.name + ".tmp")
-        val args = arrayOf(
-            "-y", "-hide_banner", "-loglevel", "error", "-nostdin",
-            "-protocol_whitelist", "file,pipe",
-            "-decryption_key", keyHex,
-            "-i", local.absolutePath,
-            "-map", "0:v:0", "-map", "0:a:0?",
-            "-c", "copy",
-            "-avoid_negative_ts", "make_zero",
-            "-movflags", "+faststart",
-            "-f", "mp4", tmp.absolutePath
-        )
-        finishFfmpeg(args, tmp, outFile)
-    }
-
     private fun finishFfmpeg(args: Array<String>, tmp: File, outFile: File) {
         val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(args)
         val rc = session.getReturnCode()
         if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(rc) || !tmp.exists() || tmp.length() == 0L) {
             tmp.delete()
+            android.util.Log.d("DirectClient", "ffmpeg失败日志=" + session.getAllLogsAsString(2000))
             throw DirectException("解密失败: rc=" + rc?.value + " " + session.getOutput().takeLast(300))
         }
         if (outFile.exists()) outFile.delete()
@@ -206,27 +179,40 @@ object DirectClient {
         }
     }
 
-    /** Java 层直连下载（带 Referer，支持断点不需要）。 */
-    private fun javaDownload(url: String, target: File) {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15000
-            readTimeout = 60000
-            setRequestProperty("User-Agent", HongguoSign.UA_MODEL)
-            setRequestProperty("Referer", "https://novel.snssdk.com/")
+    /** 合并 Android 系统 CA 为单个 PEM（供 ffmpeg -cafile 使用，一次导出缓存复用）。 */
+    private fun exportSystemCa(target: File): File? {
+        if (target.exists() && target.length() > 0L) return target
+        val dirs = arrayOf(
+            "/apex/com.android.conscrypt/cacerts",
+            "/system/etc/security/cacerts"
+        )
+        val out = StringBuilder()
+        for (dir in dirs) {
+            val d = File(dir)
+            val files = d.listFiles() ?: continue
+            for (f in files) {
+                val pem = f.readText()
+                if (pem.contains("BEGIN CERTIFICATE")) out.append(pem).append('\n')
+            }
+            if (out.isNotEmpty()) break
         }
-        if (conn.responseCode !in 200..299) {
-            conn.disconnect()
-            throw DirectException("下载失败 HTTP " + conn.responseCode)
+        if (out.isEmpty()) {
+            android.util.Log.d("DirectClient", "CA导出失败：两个目录都无证书")
+            return null
         }
-        target.outputStream().use { out -> conn.inputStream.copyTo(out, 64 * 1024) }
-        conn.disconnect()
-        if (target.length() == 0L) throw DirectException("下载为空")
+        return try {
+            target.writeText(out.toString())
+            android.util.Log.d("DirectClient", "CA导出成功：${target.length()}字节 -> ${target.absolutePath}")
+            target
+        } catch (e: Exception) {
+            android.util.Log.d("DirectClient", "CA导出异常：${e.message}")
+            null
+        }
     }
 
     /** 清理残缺的临时文件。 */
     fun cleanPartial(cacheDir: File) {
-        cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp") || it.name.endsWith(".src")) it.delete() }
+        cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
     }
 
     /** 剧库列表（App 官方接口，旧版签名，分页）。 */
