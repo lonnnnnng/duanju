@@ -138,12 +138,45 @@ object DirectClient {
     /** 本地 ffmpeg 解密下载：CDN 直链 → -c copy -decryption_key → 清晰 MP4。
      *  写临时文件，成功后原子重命名，避免进程被杀留下无 moov 的坏文件。 */
     fun decryptTo(sourceUrl: String, keyHex: String, outFile: File) {
-        // 手机端：先 Java 层下载原片到本地，再让 ffmpeg 只做本地解密，
-        // 规避设备网络栈（代理/VPN/HTTPDNS）导致 ffmpeg 直连 I/O error。
-        val local = File(outFile.parentFile, outFile.name + ".src")
-        if (!local.exists() || local.length() == 0L) {
+        // 优先 ffmpeg 直接拉流（网络好时一步到位且不落加密原片）；
+        // 设备代理/VPN 等导致 ffmpeg 网络 I/O 失败时，自动回退 Java 下载 + 本地解密。
+        val started = System.currentTimeMillis()
+        try {
+            decryptViaFfmpeg(sourceUrl, keyHex, outFile)
+            android.util.Log.d("DirectClient", "路径=ffmpeg直连 耗时=${System.currentTimeMillis() - started}ms 大小=${outFile.length()}")
+        } catch (e: Exception) {
+            android.util.Log.d("DirectClient", "路径=Java回退 原因=${e.message?.take(80)}")
+            val local = File(outFile.parentFile, outFile.name + ".src")
+            local.delete()
             javaDownload(sourceUrl, local)
+            try {
+                decryptLocal(local, keyHex, outFile)
+                android.util.Log.d("DirectClient", "路径=Java回退成功 总耗时=${System.currentTimeMillis() - started}ms 大小=${outFile.length()}")
+            } finally {
+                local.delete()
+            }
         }
+    }
+
+    /** ffmpeg 直接拉流并解密（源是 http/https）。 */
+    private fun decryptViaFfmpeg(sourceUrl: String, keyHex: String, outFile: File) {
+        val args = arrayOf(
+            "-y", "-hide_banner", "-loglevel", "error", "-nostdin",
+            "-rw_timeout", "20000000",
+            "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
+            "-decryption_key", keyHex,
+            "-i", sourceUrl,
+            "-map", "0:v:0", "-map", "0:a:0?",
+            "-c", "copy",
+            "-avoid_negative_ts", "make_zero",
+            "-movflags", "+faststart",
+            "-f", "mp4", File(outFile.parentFile, outFile.name + ".tmp").absolutePath
+        )
+        finishFfmpeg(args, File(outFile.parentFile, outFile.name + ".tmp"), outFile)
+    }
+
+    /** ffmpeg 解密本地加密原片。 */
+    private fun decryptLocal(local: File, keyHex: String, outFile: File) {
         val tmp = File(outFile.parentFile, outFile.name + ".tmp")
         val args = arrayOf(
             "-y", "-hide_banner", "-loglevel", "error", "-nostdin",
@@ -156,11 +189,15 @@ object DirectClient {
             "-movflags", "+faststart",
             "-f", "mp4", tmp.absolutePath
         )
+        finishFfmpeg(args, tmp, outFile)
+    }
+
+    private fun finishFfmpeg(args: Array<String>, tmp: File, outFile: File) {
         val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(args)
         val rc = session.getReturnCode()
         if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(rc) || !tmp.exists() || tmp.length() == 0L) {
             tmp.delete()
-            throw DirectException("解密失败: rc=${rc?.value} ${session.getOutput().takeLast(300)}")
+            throw DirectException("解密失败: rc=" + rc?.value + " " + session.getOutput().takeLast(300))
         }
         if (outFile.exists()) outFile.delete()
         if (!tmp.renameTo(outFile)) {
@@ -189,7 +226,7 @@ object DirectClient {
 
     /** 清理残缺的临时文件。 */
     fun cleanPartial(cacheDir: File) {
-        cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
+        cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp") || it.name.endsWith(".src")) it.delete() }
     }
 
     /** 剧库列表（App 官方接口，旧版签名，分页）。 */
