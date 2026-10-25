@@ -10,6 +10,7 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
+        maven { url = uri(rootProject.projectDir.resolve("libs/ffmpeg-kit-next-maven").toURI()) }
     }
 }
 rootProject.name = "duanju-player"

@@ -13,4 +13,7 @@ object AppSettings {
 
     fun speed(context: Context): Float = prefs(context).getFloat("speed", 1f)
     fun setSpeed(context: Context, value: Float) = prefs(context).edit().putFloat("speed", value).apply()
+
+    fun direct(context: Context): Boolean = prefs(context).getBoolean("direct_mode", false)
+    fun setDirect(context: Context, value: Boolean) = prefs(context).edit().putBoolean("direct_mode", value).apply()
 }

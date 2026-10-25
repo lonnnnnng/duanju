@@ -52,6 +52,10 @@ class SettingsFragment : Fragment() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
+        val direct = view.findViewById<Switch>(R.id.direct_mode)
+        direct.isChecked = AppSettings.direct(requireContext())
+        direct.setOnCheckedChangeListener { _, checked -> AppSettings.setDirect(requireContext(), checked) }
+
         view.findViewById<TextView>(R.id.version).text = "版本 ${BuildConfig.VERSION_NAME}"
     }
 }

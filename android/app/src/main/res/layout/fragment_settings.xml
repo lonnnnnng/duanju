@@ -18,6 +18,13 @@
         android:inputType="textUri" />
 
     <Switch
+        android:id="@+id/direct_mode"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:text="零服务器直连（本地解密）" />
+
+    <Switch
         android:id="@+id/auto_next"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
