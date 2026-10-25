@@ -42,6 +42,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var header: View
     private lateinit var episodePanel: View
     private lateinit var root: View
+    private lateinit var fullscreenTopBar: View
+    private lateinit var fullscreenEpisodeLabel: TextView
 
     private var base = "http://192.168.1.2:3333"
     private var dramaId = ""
@@ -113,6 +115,11 @@ class PlayerActivity : AppCompatActivity() {
         header = findViewById(R.id.header)
         episodePanel = findViewById(R.id.episode_panel)
         root = findViewById(R.id.root)
+        fullscreenTopBar = findViewById(R.id.fullscreen_top_bar)
+        findViewById<TextView>(R.id.fullscreen_title).text = title
+        fullscreenEpisodeLabel = findViewById(R.id.fullscreen_episode)
+        updateFullscreenEpisode()
+        findViewById<View>(R.id.fullscreen_back).setOnClickListener { toggleFullscreen() }
 
 statusView = findViewById(R.id.status)
         loading = findViewById(R.id.loading)
@@ -173,6 +180,7 @@ statusView = findViewById(R.id.status)
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         header.visibility = if (fullscreen) View.GONE else View.VISIBLE
         episodePanel.visibility = if (fullscreen) View.GONE else View.VISIBLE
+        fullscreenTopBar.visibility = if (fullscreen) View.VISIBLE else View.GONE
         if (fullscreen) {
             root.setPadding(0, 0, 0, 0)
             WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -213,8 +221,15 @@ statusView = findViewById(R.id.status)
         return width > height
     }
 
+    private fun updateFullscreenEpisode() {
+        if (::fullscreenEpisodeLabel.isInitialized) {
+            fullscreenEpisodeLabel.text = "第${selectedEpisode}集"
+        }
+    }
+
     private fun play(episode: Int, startMs: Long) {
         selectedEpisode = episode
+        updateFullscreenEpisode()
         episodeAdapter.setSelected(episode)
         pendingSeekMs = startMs
         loading.visibility = View.VISIBLE
