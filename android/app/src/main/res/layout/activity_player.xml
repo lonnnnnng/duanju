@@ -5,41 +5,37 @@
     android:orientation="vertical"
     android:padding="12dp">
 
-    <EditText
-        android:id="@+id/base_url"
+    <TextView
+        android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:hint="服务器地址"
-        android:inputType="textUri"
-        android:text="http://192.168.1.2:3333" />
+        android:textSize="16sp"
+        android:maxLines="2"
+        android:ellipsize="end" />
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal">
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
 
-        <EditText
-            android:id="@+id/drama_id"
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="选集" />
+
+        <NumberPicker
+            android:id="@+id/episode_picker"
+            android:layout_width="120dp"
+            android:layout_height="wrap_content" />
+
+        <Button
+            android:id="@+id/play_button"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:hint="剧集 ID"
-            android:text="7693084026969525273" />
-
-        <EditText
-            android:id="@+id/episode"
-            android:layout_width="80dp"
-            android:layout_height="wrap_content"
-            android:hint="集数"
-            android:inputType="number"
-            android:text="5" />
+            android:text="播放" />
     </LinearLayout>
-
-    <Button
-        android:id="@+id/play_button"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="解析并播放" />
 
     <ProgressBar
         android:id="@+id/progress"
