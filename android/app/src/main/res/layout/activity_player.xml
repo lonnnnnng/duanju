@@ -43,13 +43,6 @@
                 android:textSize="13sp"
                 android:gravity="end" />
         </LinearLayout>
-
-        <ProgressBar
-            android:id="@+id/progress"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:indeterminate="true"
-            android:visibility="gone" />
     </LinearLayout>
 
     <FrameLayout
@@ -63,35 +56,27 @@
             android:id="@+id/player_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            app:use_controller="false" />
+            app:resize_mode="fit" />
+
+        <ProgressBar
+            android:id="@+id/loading"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:indeterminate="true"
+            android:visibility="gone"
+            style="?android:attr/progressBarStyleLarge" />
 
         <LinearLayout
-            android:id="@+id/video_overlay"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center">
-
-            <TextView
-                android:id="@+id/seek_preview"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="#AA000000"
-                android:textColor="#FFFFFF"
-                android:textSize="18sp"
-                android:padding="12dp"
-                android:visibility="gone" />
-
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="0dp"
-                android:layout_weight="1" />
+            android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center"
+                android:gravity="end"
                 android:padding="8dp">
 
                 <Button
@@ -115,6 +100,11 @@
                     android:text="全屏"
                     android:minWidth="0dp" />
             </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1" />
         </LinearLayout>
     </FrameLayout>
 

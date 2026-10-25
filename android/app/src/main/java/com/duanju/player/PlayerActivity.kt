@@ -4,7 +4,6 @@ import android.content.pm.ActivityInfo
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
-import android.view.MotionEvent
 import android.view.View
 import android.widget.Button
 import android.widget.ProgressBar
@@ -28,7 +27,6 @@ import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import org.json.JSONObject
 import java.util.concurrent.Executors
-import kotlin.math.abs
 
 @UnstableApi
 class PlayerActivity : AppCompatActivity() {
@@ -36,9 +34,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var player: ExoPlayer
     private lateinit var playerView: PlayerView
     private lateinit var statusView: TextView
-    private lateinit var progress: ProgressBar
+    private lateinit var loading: ProgressBar
     private lateinit var episodeAdapter: EpisodeAdapter
-    private lateinit var seekPreview: TextView
     private lateinit var speedButton: Button
     private lateinit var muteButton: Button
     private lateinit var fullscreenButton: Button
@@ -55,12 +52,6 @@ class PlayerActivity : AppCompatActivity() {
     private var currentSpeed = 1f
     private var muted = false
     private var fullscreen = false
-
-    private var downX = 0f
-    private var downY = 0f
-    private var downPosition = 0L
-    private var dragging = false
-    private val seekMsPerPx = 150f
 
     private var videoWidth = 0
     private var videoHeight = 0
@@ -116,15 +107,13 @@ class PlayerActivity : AppCompatActivity() {
 
         findViewById<TextView>(R.id.title).text = title
         playerView = findViewById(R.id.player_view)
-        playerView.useController = false
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         playerView.player = player
         header = findViewById(R.id.header)
         episodePanel = findViewById(R.id.episode_panel)
 
         statusView = findViewById(R.id.status)
-        progress = findViewById(R.id.progress)
-        seekPreview = findViewById(R.id.seek_preview)
+        loading = findViewById(R.id.loading)
         speedButton = findViewById(R.id.speed_button)
         muteButton = findViewById(R.id.mute_button)
         fullscreenButton = findViewById(R.id.fullscreen_button)
@@ -145,8 +134,6 @@ class PlayerActivity : AppCompatActivity() {
         }
         fullscreenButton.setOnClickListener { toggleFullscreen() }
 
-        findViewById<View>(R.id.video_container).setOnTouchListener { _, event -> onVideoTouch(event) }
-
         val list = findViewById<RecyclerView>(R.id.episode_list)
         list.layoutManager = GridLayoutManager(this, 6)
         episodeAdapter = EpisodeAdapter(episodes) { episode -> play(episode, 0L) }
@@ -166,47 +153,6 @@ class PlayerActivity : AppCompatActivity() {
         super.onDestroy()
         saveProgress()
         player.release()
-    }
-
-    private fun onVideoTouch(event: MotionEvent): Boolean = when (event.actionMasked) {
-        MotionEvent.ACTION_DOWN -> {
-            downX = event.x
-            downY = event.y
-            downPosition = player.currentPosition.coerceAtLeast(0)
-            dragging = false
-            true
-        }
-        MotionEvent.ACTION_MOVE -> {
-            val dx = event.x - downX
-            val dy = event.y - downY
-            if (!dragging && abs(dx) > 20f && abs(dx) > abs(dy)) dragging = true
-            if (dragging) showSeekPreview(downPosition + (dx * seekMsPerPx).toLong())
-            true
-        }
-        MotionEvent.ACTION_UP -> {
-            if (dragging) {
-                val target = downPosition + ((event.x - downX) * seekMsPerPx).toLong()
-                player.seekTo(coercePosition(target))
-                dragging = false
-                seekPreview.visibility = View.GONE
-            } else {
-                if (player.isPlaying) player.pause() else player.play()
-            }
-            true
-        }
-        else -> false
-    }
-
-    private fun showSeekPreview(target: Long) {
-        val seconds = coercePosition(target) / 1000
-        val duration = if (player.duration > 0) player.duration / 1000 else 0
-        seekPreview.text = "${seconds}s / ${duration}s"
-        seekPreview.visibility = View.VISIBLE
-    }
-
-    private fun coercePosition(value: Long): Long {
-        val duration = player.duration
-        return if (duration > 0) value.coerceIn(0L, duration) else value.coerceAtLeast(0L)
     }
 
     private fun cycleSpeed() {
@@ -264,7 +210,7 @@ class PlayerActivity : AppCompatActivity() {
         selectedEpisode = episode
         episodeAdapter.setSelected(episode)
         pendingSeekMs = startMs
-        progress.visibility = View.VISIBLE
+        loading.visibility = View.VISIBLE
         status("准备播放…")
         executor.execute {
             try {
@@ -275,7 +221,7 @@ class PlayerActivity : AppCompatActivity() {
                 main.post { playHls(hls) }
             } catch (e: Exception) {
                 main.post {
-                    progress.visibility = View.GONE
+                    loading.visibility = View.GONE
                     status("失败：${e.message}")
                 }
             }
@@ -283,7 +229,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     private fun playHls(hls: JSONObject) {
-        progress.visibility = View.GONE
+        loading.visibility = View.GONE
         val relative = hls.getString("url")
         val url = if (relative.startsWith("http")) relative else base + relative
         val source = HlsMediaSource.Factory(DefaultHttpDataSource.Factory())
