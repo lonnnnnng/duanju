@@ -87,6 +87,8 @@ type UIApp struct {
 	directoryPicker       func(context.Context, string) (string, error)
 	playbackMu            sync.Mutex
 	playbacks             map[string]*playbackSession
+	nativeHLSMu           sync.Mutex
+	nativeHLS             map[string]*nativeHLSSession
 	playbackPrefetchSlots chan struct{}
 	playbackResourcesOnce sync.Once
 	playbackResources     *playbackResources

@@ -93,6 +93,8 @@ func (app *UIApp) registerPlaybackRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/ui/playback/history/remove", app.handlePlaybackHistoryRemove)
 	mux.HandleFunc("/api/ui/playback/progress", app.handlePlaybackProgress)
 	mux.HandleFunc("/api/ui/playback/native", app.handlePlaybackResolve)
+	mux.HandleFunc("/api/ui/playback/native/hls", app.handlePlaybackNativeStream)
+	mux.HandleFunc("/api/ui/playback/native/hls/", app.handlePlaybackNativeHLSAsset)
 }
 
 func playbackRequestAllowed(writer http.ResponseWriter, request *http.Request, method string) bool {
