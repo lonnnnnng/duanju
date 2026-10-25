@@ -10,15 +10,44 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"time"
 )
 
-// nativeHLSSession 是一次已完成「解密 + 拷贝封装」的 HLS 结果，供原生播放器直接拉取。
-// 服务器只做 AES-CTR 解密和 `-c copy` 转封装，不重编码，因此不会消耗转码级 CPU。
+// nativeHLSSession 是一路「解密 + 拷贝封装」的 HLS 流。服务器只做 AES-CTR 解密和
+// `-c copy` 转封装，不重编码；采用渐进式生成：首段可播即返回，后续分片边生成边拉取，
+// 避免切集时为下载整集而卡顿数秒。
 type nativeHLSSession struct {
-	id    string
-	dir   string
-	media providerMedia
+	id     string
+	dir    string
+	media  providerMedia
+	cancel context.CancelFunc
+	done   chan struct{}
+	mu     sync.Mutex
+	err    error
+}
+
+func (session *nativeHLSSession) setErr(err error) {
+	session.mu.Lock()
+	if session.err == nil {
+		session.err = err
+	}
+	session.mu.Unlock()
+}
+
+func (session *nativeHLSSession) getErr() error {
+	session.mu.Lock()
+	defer session.mu.Unlock()
+	return session.err
+}
+
+func (session *nativeHLSSession) ended() bool {
+	select {
+	case <-session.done:
+		return true
+	default:
+		return false
+	}
 }
 
 const nativeHLSIdleTimeout = 20 * time.Minute
@@ -44,9 +73,9 @@ func (app *UIApp) handlePlaybackNativeStream(writer http.ResponseWriter, request
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "剧集 ID 无效"})
 		return
 	}
-	ctx, cancel := context.WithTimeout(request.Context(), 3*time.Minute)
-	defer cancel()
-	title, chapters, err := app.downloader.GetDramaChapters(ctx, seriesID)
+	resolveCtx, cancelResolve := context.WithTimeout(request.Context(), 60*time.Second)
+	defer cancelResolve()
+	title, chapters, err := app.downloader.GetDramaChapters(resolveCtx, seriesID)
 	if err != nil {
 		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "获取选集失败：" + app.redactError(err)})
 		return
@@ -60,7 +89,7 @@ func (app *UIApp) handlePlaybackNativeStream(writer http.ResponseWriter, request
 		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "章节媒体 ID 无效，请刷新剧库后重试"})
 		return
 	}
-	media, err := app.downloader.resolveHongguoAppMedia(ctx, videoID)
+	media, err := app.downloader.resolveHongguoAppMedia(resolveCtx, videoID)
 	if err != nil {
 		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "解析播放地址失败：" + app.redactError(err)})
 		return
@@ -69,7 +98,7 @@ func (app *UIApp) handlePlaybackNativeStream(writer http.ResponseWriter, request
 		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "未返回该集可用的媒体和密钥"})
 		return
 	}
-	ffmpeg, err := app.downloader.ensureFFmpeg(ctx)
+	ffmpeg, err := app.downloader.ensureFFmpeg(resolveCtx)
 	if err != nil {
 		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": err.Error()})
 		return
@@ -79,43 +108,29 @@ func (app *UIApp) handlePlaybackNativeStream(writer http.ResponseWriter, request
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "无法准备媒体目录"})
 		return
 	}
-	command := ffmpegMediaCommand(ctx, ffmpeg, playbackNativeHLSArgs(media, directory)...)
-	var output bytes.Buffer
-	command.Stdout = &output
-	command.Stderr = &output
-	if err := command.Run(); err != nil {
-		_ = os.RemoveAll(directory)
-		detail := output.String()
-		if len(detail) > 2000 {
-			detail = detail[len(detail)-2000:]
-		}
-		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "媒体封装失败：" + app.redactError(fmt.Errorf("%s", detail))})
-		return
-	}
-	if _, err := os.Stat(filepath.Join(directory, "index.m3u8")); err != nil {
-		_ = os.RemoveAll(directory)
-		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": "未生成播放列表"})
-		return
-	}
 	id := randomHex(24)
 	if id == "" {
 		_ = os.RemoveAll(directory)
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "无法创建播放会话"})
 		return
 	}
+	jobCtx, jobCancel := context.WithCancel(context.Background())
+	session := &nativeHLSSession{id: id, dir: directory, media: media, cancel: jobCancel, done: make(chan struct{})}
 	app.nativeHLSMu.Lock()
 	if app.nativeHLS == nil {
 		app.nativeHLS = map[string]*nativeHLSSession{}
 	}
 	if len(app.nativeHLS) >= nativeHLSMaxSessions {
-		for key, session := range app.nativeHLS {
-			_ = os.RemoveAll(session.dir)
+		for key, old := range app.nativeHLS {
+			old.cancel()
+			_ = os.RemoveAll(old.dir)
 			delete(app.nativeHLS, key)
 			break
 		}
 	}
-	app.nativeHLS[id] = &nativeHLSSession{id: id, dir: directory, media: media}
+	app.nativeHLS[id] = session
 	app.nativeHLSMu.Unlock()
+	go runNativeHLSJob(jobCtx, session, ffmpeg)
 	time.AfterFunc(nativeHLSIdleTimeout, func() { app.removeNativeHLS(id) })
 	writeJSON(writer, http.StatusOK, map[string]any{
 		"url":      "/api/ui/playback/native/hls/" + id + "/index.m3u8",
@@ -125,12 +140,28 @@ func (app *UIApp) handlePlaybackNativeStream(writer http.ResponseWriter, request
 	})
 }
 
+func runNativeHLSJob(ctx context.Context, session *nativeHLSSession, ffmpeg string) {
+	defer close(session.done)
+	command := ffmpegMediaCommand(ctx, ffmpeg, playbackNativeHLSArgs(session.media, session.dir)...)
+	var output bytes.Buffer
+	command.Stdout = &output
+	command.Stderr = &output
+	if err := command.Run(); err != nil && ctx.Err() == nil {
+		detail := output.String()
+		if len(detail) > 2000 {
+			detail = detail[len(detail)-2000:]
+		}
+		session.setErr(fmt.Errorf("媒体封装失败：%s", detail))
+	}
+}
+
 func (app *UIApp) removeNativeHLS(id string) {
 	app.nativeHLSMu.Lock()
 	session := app.nativeHLS[id]
 	delete(app.nativeHLS, id)
 	app.nativeHLSMu.Unlock()
 	if session != nil {
+		session.cancel()
 		_ = os.RemoveAll(session.dir)
 	}
 }
@@ -161,15 +192,17 @@ func (app *UIApp) handlePlaybackNativeHLSAsset(writer http.ResponseWriter, reque
 		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "资源名称无效"})
 		return
 	}
-	path := filepath.Join(session.dir, name)
-	info, err := os.Stat(path)
-	if err != nil || info.IsDir() {
+	timeout := 60 * time.Second
+	if name == "index.m3u8" || name == "init.mp4" {
+		timeout = 10 * time.Second
+	}
+	file, info, err := session.waitForFile(name, timeout)
+	if err == os.ErrNotExist {
 		writeJSON(writer, http.StatusNotFound, map[string]string{"error": "资源不存在"})
 		return
 	}
-	file, err := os.Open(path)
 	if err != nil {
-		writeJSON(writer, http.StatusNotFound, map[string]string{"error": "资源不可读"})
+		writeJSON(writer, http.StatusBadGateway, map[string]string{"error": app.redactError(err)})
 		return
 	}
 	defer file.Close()
@@ -179,6 +212,33 @@ func (app *UIApp) handlePlaybackNativeHLSAsset(writer http.ResponseWriter, reque
 	}
 	writer.Header().Set("Content-Type", contentType)
 	http.ServeContent(writer, request, name, info.ModTime(), file)
+}
+
+func (session *nativeHLSSession) waitForFile(name string, timeout time.Duration) (*os.File, os.FileInfo, error) {
+	path := filepath.Join(session.dir, name)
+	deadline := time.Now().Add(timeout)
+	for {
+		info, err := os.Stat(path)
+		if err == nil && !info.IsDir() {
+			file, err := os.Open(path)
+			if err == nil {
+				return file, info, nil
+			}
+		}
+		if session.ended() {
+			if jobErr := session.getErr(); jobErr != nil {
+				return nil, nil, jobErr
+			}
+			if _, err := os.Stat(path); os.IsNotExist(err) {
+				return nil, nil, os.ErrNotExist
+			}
+			continue
+		}
+		if time.Now().After(deadline) {
+			return nil, nil, os.ErrNotExist
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
 }
 
 func isNativeHLSFileName(name string) bool {
@@ -208,9 +268,9 @@ func playbackNativeHLSArgs(media providerMedia, directory string) []string {
 		"-c", "copy",
 		"-avoid_negative_ts", "make_zero",
 		"-f", "hls", "-hls_time", "2", "-hls_list_size", "0",
-		"-hls_playlist_type", "vod", "-hls_segment_type", "fmp4",
+		"-hls_playlist_type", "event", "-hls_segment_type", "fmp4",
 		"-hls_fmp4_init_filename", "init.mp4",
-		"-hls_flags", "independent_segments",
+		"-hls_flags", "independent_segments+temp_file",
 		"-hls_segment_filename", filepath.ToSlash(filepath.Join(directory, "%06d.m4s")),
 		filepath.ToSlash(filepath.Join(directory, "index.m3u8")),
 	}
