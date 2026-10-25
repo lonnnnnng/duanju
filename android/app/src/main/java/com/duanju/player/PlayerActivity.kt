@@ -22,6 +22,7 @@ import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
+import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -43,7 +44,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var episodePanel: View
     private lateinit var root: View
     private lateinit var fullscreenTopBar: View
-    private lateinit var fullscreenEpisodeLabel: TextView
+    private lateinit var fullscreenTitle: TextView
 
     private var base = "http://192.168.1.2:3333"
     private var dramaId = ""
@@ -116,10 +117,14 @@ class PlayerActivity : AppCompatActivity() {
         episodePanel = findViewById(R.id.episode_panel)
         root = findViewById(R.id.root)
         fullscreenTopBar = findViewById(R.id.fullscreen_top_bar)
-        findViewById<TextView>(R.id.fullscreen_title).text = title
-        fullscreenEpisodeLabel = findViewById(R.id.fullscreen_episode)
+        fullscreenTitle = findViewById(R.id.fullscreen_title)
         updateFullscreenEpisode()
         findViewById<View>(R.id.fullscreen_back).setOnClickListener { toggleFullscreen() }
+        playerView.setControllerVisibilityListener(object : PlayerControlView.VisibilityListener {
+            override fun onVisibilityChange(visibility: Int) {
+                if (fullscreen && visibility == View.VISIBLE) showFullscreenTopBar()
+            }
+        })
 
 statusView = findViewById(R.id.status)
         loading = findViewById(R.id.loading)
@@ -180,7 +185,12 @@ statusView = findViewById(R.id.status)
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         header.visibility = if (fullscreen) View.GONE else View.VISIBLE
         episodePanel.visibility = if (fullscreen) View.GONE else View.VISIBLE
-        fullscreenTopBar.visibility = if (fullscreen) View.VISIBLE else View.GONE
+        if (fullscreen) {
+            showFullscreenTopBar()
+        } else {
+            main.removeCallbacks(hideFullscreenBar)
+            fullscreenTopBar.visibility = View.GONE
+        }
         if (fullscreen) {
             root.setPadding(0, 0, 0, 0)
             WindowCompat.setDecorFitsSystemWindows(window, false)
@@ -222,9 +232,19 @@ statusView = findViewById(R.id.status)
     }
 
     private fun updateFullscreenEpisode() {
-        if (::fullscreenEpisodeLabel.isInitialized) {
-            fullscreenEpisodeLabel.text = "第${selectedEpisode}集"
+        if (::fullscreenTitle.isInitialized) {
+            fullscreenTitle.text = "$title - 第${selectedEpisode}集"
         }
+    }
+
+    private val hideFullscreenBar = Runnable {
+        if (fullscreen) fullscreenTopBar.visibility = View.GONE
+    }
+
+    private fun showFullscreenTopBar() {
+        main.removeCallbacks(hideFullscreenBar)
+        fullscreenTopBar.visibility = View.VISIBLE
+        main.postDelayed(hideFullscreenBar, 3000)
     }
 
     private fun play(episode: Int, startMs: Long) {
