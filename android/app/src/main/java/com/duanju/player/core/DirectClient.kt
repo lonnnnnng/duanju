@@ -302,21 +302,121 @@ object DirectClient {
         return httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
     }
 
-    /** 官网搜索（无签名，GET hongguoduanju.com/api/search/result）。 */
-    fun searchOfficial(keyword: String): List<DirectDrama> {
-        val url = "https://hongguoduanju.com/api/search/result?query=" +
-            java.net.URLEncoder.encode(keyword, "UTF-8")
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+    private const val APP_SEARCH_HOST = "https://api5-normal-sinfonlineb.fqnovel.com"
+
+    /** App 官方搜索（bookapi/search/tab/v，旧版签名）——任何网络直连可用。 */
+    fun searchApp(keyword: String, deviceId: String, installId: String, offset: Int = 0): Pair<List<DirectDrama>, Boolean> {
+        val query = HongguoSign.encodeQuery(
+            HongguoSign.baseQuery(deviceId, installId) + listOf(
+                "query" to keyword, "count" to "20", "offset" to offset.toString(),
+                "tab_type" to "11", "bookshelf_search_plan" to "4",
+                "use_correct" to "true", "user_is_login" to "0",
+                "ts" to (System.currentTimeMillis() / 1000).toString(),
+                "_rticket" to System.currentTimeMillis().toString()
+            )
+        )
+        val headers = HongguoSign.signLegacyHeaders(query, "8662")
+        val text = httpGet("$APP_SEARCH_HOST/reading/bookapi/search/tab/v", query, headers)
+        val root = JSONObject(text)
+        if (root.optInt("code", -1) != 0) throw DirectException("搜索失败(${root.optInt("code", -1)})")
+        val container = root.optJSONObject("data") ?: root
+        val tabs = container.optJSONArray("search_tabs") ?: return Pair(emptyList(), false)
+        var tab: JSONObject? = null
+        for (i in 0 until tabs.length()) {
+            val t = tabs.optJSONObject(i) ?: continue
+            if (t.optInt("tab_type") == 11) { tab = t; break }
+        }
+        tab ?: return Pair(emptyList(), false)
+        val cells = tab.optJSONArray("data") ?: return Pair(emptyList(), false)
+        val out = ArrayList<DirectDrama>(cells.length() * 2)
+        for (i in 0 until cells.length()) {
+            val cell = cells.optJSONObject(i) ?: continue
+            // lynx 卡片内还嵌一层 cell_data
+            val candidates = ArrayList<JSONObject>()
+            candidates.add(cell)
+            val lynx = cell.optString("lynx_data")
+            if (lynx.isNotEmpty()) {
+                try {
+                    val payload = JSONObject(lynx)
+                    val inner = payload.optJSONArray("cell_data")
+                    for (j in 0 until (inner?.length() ?: 0)) inner?.optJSONObject(j)?.let { candidates.add(it) }
+                } catch (_: Exception) {}
+            }
+            for (c in candidates) {
+                val vds = c.optJSONArray("video_data") ?: continue
+                var video: JSONObject? = null
+                for (j in 0 until vds.length()) {
+                    val v = vds.optJSONObject(j) ?: continue
+                    video = v; break
+                }
+                val v = video ?: continue
+                val id = v.optString("series_id").ifEmpty { c.optString("book_id") }
+                if (id.isEmpty()) continue
+                val title = c.optJSONObject("search_high_light")?.optJSONObject("title")?.optString("text")
+                    ?.takeIf { it.isNotBlank() } ?: v.optString("title").ifEmpty { c.optString("cell_name") }
+                out.add(
+                    DirectDrama(
+                        id = id,
+                        title = title.ifEmpty { "短剧" },
+                        episodes = v.optInt("episode_cnt", 0),
+                        coverUrl = v.optString("cover").ifEmpty { v.optString("cover_url") }.ifEmpty { null }
+                    )
+                )
+            }
+        }
+        return Pair(out, tab.optBoolean("has_more", false))
+    }
+
+    private fun httpGet(url: String, query: String, headers: Map<String, String>): String {
+        val conn = (URL("$url?$query").openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
-            setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-            setRequestProperty("Referer", "https://hongguoduanju.com/")
         }
+        conn.setRequestProperty("User-Agent", HongguoSign.UA_LEGACY)
+        conn.setRequestProperty("Accept", "application/json; charset=utf-8,application/x-protobuf")
+        headers.forEach { (k, v) -> if (v.isNotEmpty()) conn.setRequestProperty(k, v) }
         val code = conn.responseCode
         val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
         conn.disconnect()
-        if (code != 200) throw DirectException("搜索 HTTP $code")
+        if (code != 200) throw DirectException("HTTP $code")
+        if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
+        return text
+    }
+
+    /**
+     * 官网搜索（服务器 web 端 /api/ui/search 的同款逻辑）：
+     * GET hongguoduanju.com/api/search/result?query=…，浏览器 UA + 搜索页 Referer，重试 3 次。
+     * 该域名仅在代理/透明代理网络可达（家用路由器已接管），移动网络直连不通。
+     */
+    fun searchOfficial(keyword: String): List<DirectDrama> {
+        val url = "https://hongguoduanju.com/api/search/result?query=" +
+            java.net.URLEncoder.encode(keyword, "UTF-8")
+        var text: String? = null
+        var lastError: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
+                    setRequestProperty("Referer", "https://hongguoduanju.com/search/" + java.net.URLEncoder.encode(keyword, "UTF-8"))
+                    setRequestProperty("Accept", "application/json, text/plain, */*")
+                }
+                val code = conn.responseCode
+                val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+                conn.disconnect()
+                if (code != 200) throw DirectException("搜索 HTTP $code")
+                if (body.isEmpty()) throw DirectException("搜索空响应")
+                text = body
+                break
+            } catch (e: Exception) {
+                lastError = e
+                if (attempt < 3) Thread.sleep(attempt * 1000L)
+            }
+        }
+        if (text == null) throw lastError ?: DirectException("搜索失败")
         val root = JSONObject(text)
         val rows = root.optJSONArray("searchList") ?: return emptyList()
         val out = ArrayList<DirectDrama>(rows.length())

@@ -16,13 +16,16 @@ object HongguoSign {
     const val UA_LEGACY = UA_MODEL
 
     fun baseQuery(deviceId: String, installId: String): List<Pair<String, String>> = listOf(
+        "iid" to installId, "device_id" to deviceId, "ac" to "wifi", "channel" to "update_64",
         "aid" to "8662", "app_name" to "novelread", "version_code" to "73532",
-        "version_name" to "7.3.5.32", "manifest_version_code" to "73532",
-        "update_version_code" to "73532", "channel" to "update_64",
-        "device_platform" to "android", "os" to "android", "ssmix" to "a",
-        "device_type" to "25053RT47C", "device_brand" to "Redmi", "language" to "zh",
-        "os_api" to "36", "os_version" to "16", "resolution" to "1280*2772",
-        "dpi" to "520", "ac" to "wifi", "device_id" to deviceId, "iid" to installId
+        "version_name" to "7.3.5.32", "device_platform" to "android", "os" to "android",
+        "ssmix" to "a", "device_type" to "25053RT47C", "device_brand" to "Redmi",
+        "language" to "zh", "os_api" to "36", "os_version" to "16",
+        "manifest_version_code" to "73532", "resolution" to "1280*2772", "dpi" to "520",
+        "update_version_code" to "73532", "host_abi" to "arm64-v8a",
+        "dragon_device_type" to "phone", "pv_player" to "73532",
+        "compliance_status" to "0", "need_personal_recommend" to "1",
+        "player_so_load" to "1", "is_android_pad_screen" to "0"
     )
 
     fun encodeQuery(pairs: List<Pair<String, String>>): String =
