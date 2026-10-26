@@ -10,7 +10,8 @@ data class HistoryEntry(
     val episodes: Int,
     val episode: Int,
     val positionMs: Long,
-    val updatedAt: Long
+    val updatedAt: Long,
+    val cover: String = ""
 )
 
 object HistoryStore {
@@ -30,7 +31,8 @@ object HistoryStore {
                     episodes = item.optInt("episodes"),
                     episode = item.optInt("episode"),
                     positionMs = item.optLong("positionMs"),
-                    updatedAt = item.optLong("updatedAt")
+                    updatedAt = item.optLong("updatedAt"),
+                    cover = item.optString("cover")
                 )
             )
         }
@@ -61,6 +63,7 @@ object HistoryStore {
                     .put("episode", entry.episode)
                     .put("positionMs", entry.positionMs)
                     .put("updatedAt", entry.updatedAt)
+                    .put("cover", entry.cover)
             )
         }
         prefs(context).edit().putString(KEY, array.toString()).apply()

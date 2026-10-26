@@ -38,6 +38,10 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var loading: ProgressBar
     private lateinit var episodeAdapter: EpisodeAdapter
+    private lateinit var groupsBox: android.widget.LinearLayout
+    private lateinit var groupScroll: View
+    private lateinit var groupLabel: TextView
+    private var activeGroup: IntRange? = null
     private lateinit var speedButton: Button
     private lateinit var muteButton: Button
     private lateinit var fullscreenButton: Button
@@ -49,6 +53,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private var dramaId = ""
     private var title = ""
+    private var cover = ""
     private var episodes = 1
     private var autoNext = true
     private var selectedEpisode = 1
@@ -71,13 +76,19 @@ class PlayerActivity : AppCompatActivity() {
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         dramaId = intent.getStringExtra("dramaId") ?: ""
         title = intent.getStringExtra("title") ?: "短剧"
+        cover = intent.getStringExtra("cover").orEmpty()
         episodes = intent.getIntExtra("episodes", 1).coerceAtLeast(1)
 
         autoNext = AppSettings.autoNext(this)
         val history = HistoryStore.find(this, dramaId)
         val savedEpisode = history?.episode ?: -1
         val savedPosition = history?.positionMs ?: 0L
-        selectedEpisode = if (savedEpisode in 1..episodes) savedEpisode else 1
+        val startEpisode = intent.getIntExtra("startEpisode", 0)
+        selectedEpisode = when {
+            startEpisode in 1..episodes -> startEpisode
+            savedEpisode in 1..episodes -> savedEpisode
+            else -> 1
+        }
         pendingSeekMs = if (selectedEpisode == savedEpisode) savedPosition else 0L
         currentSpeed = AppSettings.speed(this)
 
@@ -141,6 +152,8 @@ statusView = findViewById(R.id.status)
             }
         }
 
+        applyControlDispatcher()
+        updateEpisodeButtons()
         speedButton.setOnClickListener { cycleSpeed() }
         muteButton.setOnClickListener {
             muted = !muted
@@ -151,9 +164,12 @@ statusView = findViewById(R.id.status)
 
         val list = findViewById<RecyclerView>(R.id.episode_list)
         list.layoutManager = GridLayoutManager(this, 6)
-        episodeAdapter = EpisodeAdapter(episodes) { episode -> play(episode, 0L) }
+        groupsBox = findViewById(R.id.episode_groups)
+        groupScroll = findViewById(R.id.group_scroll)
+        groupLabel = findViewById(R.id.episode_group_label)
+        episodeAdapter = EpisodeAdapter { episode -> play(episode, 0L) }
         list.adapter = episodeAdapter
-        episodeAdapter.setSelected(selectedEpisode)
+        renderGroups(selectedEpisode)
         startPositionTicker()
 
         play(selectedEpisode, pendingSeekMs)
@@ -168,6 +184,94 @@ statusView = findViewById(R.id.status)
         super.onDestroy()
         saveProgress()
         player.release()
+    }
+
+    /** 选集按 30 集分组；切换剧集时自动跳到所在分组。 */
+    private fun renderGroups(selected: Int) {
+        val ranges = EpisodeGroups.ranges(episodes)
+        groupsBox.removeAllViews()
+        if (ranges.isEmpty()) {
+            groupScroll.visibility = View.GONE
+            return
+        }
+        if (ranges.size <= 1) {
+            groupScroll.visibility = View.GONE
+            activeGroup = ranges.first()
+            groupLabel.text = "共 ${episodes} 集"
+            episodeAdapter.submit((1..episodes).toList(), selected)
+            return
+        }
+        ranges.forEach { range ->
+            val chip = layoutInflater.inflate(R.layout.item_group_chip, groupsBox, false) as TextView
+            chip.text = EpisodeGroups.label(range)
+            chip.setOnClickListener { selectGroup(range, selected) }
+            groupsBox.addView(chip)
+        }
+        selectGroup(EpisodeGroups.groupOf(selected, episodes) ?: ranges.first(), selected)
+    }
+
+    private fun selectGroup(range: IntRange, selected: Int) {
+        activeGroup = range
+        for (i in 0 until groupsBox.childCount) {
+            val chip = groupsBox.getChildAt(i) as TextView
+            val isSelected = chip.text.toString() == EpisodeGroups.label(range)
+            chip.setBackgroundResource(if (isSelected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
+            chip.setTextColor(
+                if (isSelected) 0xFFFFFFFF.toInt()
+                else {
+                    val typed = theme.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
+                    val color = try { typed.getColor(0, 0xFF1A1A1A.toInt()) } finally { typed.recycle() }
+                    color
+                }
+            )
+        }
+        groupLabel.text = EpisodeGroups.label(range)
+        episodeAdapter.submit(range.toList(), selected)
+    }
+
+    private fun syncGroup(episode: Int) {
+        if (episodes <= EpisodeGroups.SIZE) return
+        val group = EpisodeGroups.groupOf(episode, episodes) ?: return
+        val selectedChip = activeGroup
+        if (selectedChip == group) {
+            episodeAdapter.setSelected(episode)
+            return
+        }
+        selectGroup(group, episode)
+        // 让当前分组 chip 滚入可视区
+        val index = groupsBox.indexOfChild(
+            (0 until groupsBox.childCount).map { groupsBox.getChildAt(it) }
+                .firstOrNull { (it as TextView).text.toString() == EpisodeGroups.label(group) }
+        )
+        if (index >= 0) groupScroll.post { (groupScroll as android.widget.HorizontalScrollView).smoothScrollTo(groupsBox.getChildAt(index).left, 0) }
+    }
+
+    /**
+     * 自定义控制器按钮：快退/快进 15 秒，上一集/下一集切换剧集。
+     * 不用 exo_prev/exo_next 原生按钮——PlayerView 每次刷新控制器都会重建它们的点击监听，
+     * 直接 setOnClickListener 会被覆盖（这就是“下一集点不动”的原因）。
+     */
+    private fun applyControlDispatcher() {
+        playerView.findViewById<View>(R.id.custom_rewind)?.setOnClickListener {
+            player.seekTo((player.currentPosition - 15000).coerceAtLeast(0))
+        }
+        playerView.findViewById<View>(R.id.custom_forward)?.setOnClickListener {
+            val duration = if (player.duration > 0) player.duration else Long.MAX_VALUE
+            player.seekTo((player.currentPosition + 15000).coerceAtMost(duration))
+        }
+        playerView.findViewById<View>(R.id.custom_prev)?.setOnClickListener {
+            if (selectedEpisode > 1) play(selectedEpisode - 1, 0L)
+        }
+        playerView.findViewById<View>(R.id.custom_next)?.setOnClickListener {
+            if (selectedEpisode < episodes) play(selectedEpisode + 1, 0L)
+        }
+    }
+
+    /** 首集/末集时置灰上一集/下一集按钮。 */
+    private fun updateEpisodeButtons() {
+        if (!::playerView.isInitialized) return
+        playerView.findViewById<View>(R.id.custom_prev)?.alpha = if (selectedEpisode > 1) 1f else 0.35f
+        playerView.findViewById<View>(R.id.custom_next)?.alpha = if (selectedEpisode < episodes) 1f else 0.35f
     }
 
     private fun cycleSpeed() {
@@ -243,6 +347,8 @@ statusView = findViewById(R.id.status)
         selectedEpisode = episode
         updateFullscreenEpisode()
         episodeAdapter.setSelected(episode)
+        syncGroup(episode)
+        updateEpisodeButtons()
         pendingSeekMs = startMs
         loading.visibility = View.VISIBLE
         status("准备播放…")
@@ -315,7 +421,8 @@ statusView = findViewById(R.id.status)
                 episodes = episodes,
                 episode = selectedEpisode,
                 positionMs = position,
-                updatedAt = System.currentTimeMillis()
+                updatedAt = System.currentTimeMillis(),
+                cover = cover
             )
         )
     }

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="accent">#FFFF4D4F</color>
+    <color name="accent_dark">#FFE53935</color>
+    <color name="app_bg">#FF0F0F10</color>
+    <color name="app_surface">#FF18181A</color>
+    <color name="app_surface_variant">#FF242426</color>
+    <color name="app_on_bg">#FFEDEDED</color>
+    <color name="app_on_surface_variant">#FFB0B0B4</color>
+    <color name="app_outline">#FF3A3A3D</color>
+    <color name="cover_placeholder">#33FFFFFF</color>
+</resources>

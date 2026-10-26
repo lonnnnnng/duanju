@@ -4,32 +4,43 @@ import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
-import android.widget.EditText
+import android.widget.HorizontalScrollView
+import android.widget.LinearLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.fragment.app.Fragment
-import androidx.recyclerview.widget.LinearLayoutManager
+import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.duanju.player.core.DirectClient
 import java.util.concurrent.Executors
 
+/**
+ * 首页：红果风格信息流（找剧 tab）。
+ * 接口 bookmall/tab（无签名），三层结构展开后 3 列网格展示，上滑加载更多。
+ */
 class LibraryFragment : Fragment() {
 
-    private lateinit var searchField: EditText
-    private lateinit var statusView: TextView
     private lateinit var swipe: SwipeRefreshLayout
-    private lateinit var listView: RecyclerView
-    private lateinit var adapter: DramaAdapter
+    private lateinit var grid: RecyclerView
+    private lateinit var adapter: HomeAdapter
+    private lateinit var loadingView: ProgressBar
+    private lateinit var errorBox: LinearLayout
+    private lateinit var errorText: TextView
+    private lateinit var emptyView: TextView
+    private lateinit var filterScroll: HorizontalScrollView
+    private lateinit var filterChips: LinearLayout
 
-    private var all: MutableList<Drama> = mutableListOf()
-    private var catalogOffset = 0
-    private var catalogSession = ""
-    private var catalogHasMore = true
+    private var offset = 0
+    private var sessionId = ""
+    private var hasMore = true
     private var loading = false
+    private var selectedFilter: String? = null
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -38,172 +49,175 @@ class LibraryFragment : Fragment() {
         inflater.inflate(R.layout.fragment_library, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        searchField = view.findViewById(R.id.search)
-        statusView = view.findViewById(R.id.status)
         swipe = view.findViewById(R.id.swipe)
-        listView = view.findViewById(R.id.library_list)
+        grid = view.findViewById(R.id.home_grid)
+        loadingView = view.findViewById(R.id.home_loading)
+        errorBox = view.findViewById(R.id.home_error)
+        errorText = view.findViewById(R.id.home_error_text)
+        emptyView = view.findViewById(R.id.home_empty)
+        filterScroll = view.findViewById(R.id.filter_scroll)
+        filterChips = view.findViewById(R.id.filter_chips)
 
-        adapter = DramaAdapter("") { drama -> openPlayer(drama) }
-        listView.layoutManager = LinearLayoutManager(requireContext())
-        listView.adapter = adapter
-
-        view.findViewById<Button>(R.id.search_button).setOnClickListener { search() }
-        searchField.setOnEditorActionListener { _, actionId, _ ->
-            if (actionId == android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH) {
-                search()
-                true
-            } else {
-                false
-            }
+        adapter = HomeAdapter { drama -> openDetail(drama) }
+        val layoutManager = GridLayoutManager(requireContext(), 3)
+        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
+            override fun getSpanSize(position: Int): Int = if (adapter.isFooter(position)) 3 else 1
         }
+        grid.layoutManager = layoutManager
+        grid.adapter = adapter
+        swipe.setColorSchemeResources(R.color.accent)
 
-        swipe.setOnRefreshListener { loadFirstPage() }
-        listView.addOnScrollListener(object : RecyclerView.OnScrollListener() {
+        view.findViewById<View>(R.id.search_pill).setOnClickListener {
+            startActivity(Intent(requireContext(), SearchActivity::class.java))
+        }
+        view.findViewById<Button>(R.id.home_retry).setOnClickListener { load(reset = true) }
+
+        swipe.setOnRefreshListener { load(reset = true) }
+        grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
-                if (dy > 0 && catalogHasMore && !loading && !recyclerView.canScrollVertically(1)) {
-                    loadMore()
+                if (dy > 0 && hasMore && !loading && !recyclerView.canScrollVertically(1)) {
+                    load(reset = false)
                 }
             }
         })
 
-        if (all.isEmpty()) loadFirstPage()
+        if (adapter.size() == 0) load(reset = true)
     }
 
-    private fun openPlayer(drama: Drama) {
+    private fun openDetail(drama: DirectClient.HomeDrama) {
         startActivity(
-            Intent(requireContext(), PlayerActivity::class.java)
+            Intent(requireContext(), DetailActivity::class.java)
                 .putExtra("dramaId", drama.id)
                 .putExtra("title", drama.title)
                 .putExtra("episodes", drama.episodes)
+                .putExtra("cover", drama.cover.orEmpty())
         )
     }
 
-    private fun identity(): Pair<String, String> = DirectClient.identity(requireContext())
-
-    private fun status(message: String) {
-        statusView.text = message
-    }
-
-    private fun loadFirstPage() {
-        if (loading) return
-        loading = true
-        catalogOffset = 0
-        catalogSession = ""
-        status("加载剧库…")
-        executor.execute {
-            try {
-                val (deviceId, installId) = identity()
-                var page = DirectClient.catalog("short_play", "default", 0, "", deviceId, installId)
-                val dramas = page.dramas.map { it.toDrama() }.toMutableList()
-                // 首屏至少拉两页，列表不至于太空
-                if (page.hasMore) {
-                    val page2 = DirectClient.catalog("short_play", "default", page.nextOffset, page.sessionId, deviceId, installId)
-                    dramas.addAll(page2.dramas.map { it.toDrama() })
-                    page = page2
-                }
-                val fetched = page
-                main.post {
-                    loading = false
-                    swipe.isRefreshing = false
-                    all = dedupe(dramas)
-                    adapter.submit(all)
-                    catalogOffset = fetched.nextOffset
-                    catalogSession = fetched.sessionId
-                    catalogHasMore = fetched.hasMore
-                    status("共 ${all.size} 部${if (fetched.hasMore) "（上滑加载更多）" else ""}")
-                }
-            } catch (e: Exception) {
-                main.post {
-                    loading = false
-                    swipe.isRefreshing = false
-                    status("加载失败：${e.message}")
-                }
-            }
+    /** 异步结果回到主线程时，页面可能已被销毁（例如已进入详情/播放页），必须丢弃。 */
+    private fun postUi(block: () -> Unit) {
+        main.post {
+            if (!isAdded || view == null) return@post
+            block()
         }
     }
 
-    private fun loadMore() {
+    private fun load(reset: Boolean) {
         if (loading) return
         loading = true
-        status("加载更多…")
+        if (reset) {
+            offset = 0
+            sessionId = ""
+            hasMore = true
+            showLoading(adapter.size() == 0)
+        } else {
+            adapter.setFooter(true, false)
+        }
+        errorBox.visibility = View.GONE
         executor.execute {
             try {
-                val (deviceId, installId) = identity()
-                var page = DirectClient.catalog("short_play", "default", catalogOffset, catalogSession, deviceId, installId)
-                // 分页偶发连接被断开（官方接口不稳定）：退避重试一次
-                var attempt = 0
-                while (attempt < 2) {
-                    try {
-                        page = DirectClient.catalog("short_play", "default", catalogOffset, catalogSession, deviceId, installId)
-                        break
-                    } catch (e: Exception) {
-                        attempt++
-                        if (attempt >= 2) throw e
-                        Thread.sleep(1500)
+                val (deviceId, installId) = DirectClient.identity(requireContext())
+                val page = DirectClient.homeTab(
+                    8, offset, sessionId, selectedFilter, deviceId, installId
+                )
+                postUi {
+                    loading = false
+                    swipe.isRefreshing = false
+                    showLoading(false)
+                    offset = page.nextOffset
+                    sessionId = page.sessionId
+                    hasMore = page.hasMore
+                    if (reset) adapter.submit(page.items) else adapter.append(page.items)
+                    adapter.setFooter(false, !hasMore && adapter.size() > 0)
+                    if (adapter.size() == 0) {
+                        emptyView.visibility = View.VISIBLE
+                    } else {
+                        emptyView.visibility = View.GONE
+                    }
+                    if (reset) renderFilters(page.filters)
+                }
+            } catch (e: Exception) {
+                postUi {
+                    loading = false
+                    swipe.isRefreshing = false
+                    showLoading(false)
+                    adapter.setFooter(false, false)
+                    if (adapter.size() == 0) {
+                        errorText.text = e.message ?: "加载失败"
+                        errorBox.visibility = View.VISIBLE
                     }
                 }
-                main.post {
-                    loading = false
-                    val known = all.map { it.id }.toHashSet()
-                    val fresh = page.dramas.map { it.toDrama() }.filter { !known.contains(it.id) }
-                    all.addAll(fresh)
-                    adapter.submit(all)
-                    catalogOffset = page.nextOffset
-                    catalogSession = page.sessionId
-                    catalogHasMore = page.hasMore
-                    status("共 ${all.size} 部${if (page.hasMore) "（上滑加载更多）" else "（已全部加载）"}")
-                }
-            } catch (e: Exception) {
-                main.post {
-                    loading = false
-                    catalogHasMore = false
-                    status("加载更多失败：${e.message}")
-                }
             }
         }
     }
 
-    private fun search() {
-        val keyword = searchField.text.toString().trim()
-        if (keyword.isEmpty()) {
-            if (all.isNotEmpty()) return
-            loadFirstPage()
+    private fun showLoading(show: Boolean) {
+        loadingView.visibility = if (show) View.VISIBLE else View.GONE
+        if (show) {
+            emptyView.visibility = View.GONE
+            errorBox.visibility = View.GONE
+        }
+    }
+
+    private fun renderFilters(filters: List<DirectClient.HomeFilter>) {
+        filterChips.removeAllViews()
+        if (filters.isEmpty()) {
+            filterScroll.visibility = View.GONE
             return
         }
-        loading = true
-        status("搜索中…")
-        executor.execute {
-            try {
-                val list = DirectClient.searchOfficial(keyword).map { it.toDrama() }
-                main.post {
-                    loading = false
-                    val known = all.map { it.id }.toHashSet()
-                    val fresh = list.filter { !known.contains(it.id) }
-                    all.addAll(0, fresh)
-                    adapter.submit(all)
-                    status("搜索到 ${list.size} 部")
-                }
-            } catch (e: Exception) {
-                main.post {
-                    loading = false
-                    status("搜索失败：${e.message}")
-                }
-            }
-        }
+        filterScroll.visibility = View.VISIBLE
+        addChip("推荐", null)
+        filters.forEach { addChip(it.name, it.id) }
     }
 
-    private fun com.duanju.player.core.DirectClient.DirectDrama.toDrama() =
-        Drama(id, title, episodes, coverUrl)
-
-    private fun dedupe(list: List<Drama>): MutableList<Drama> {
-        val seen = HashSet<String>()
-        val out = ArrayList<Drama>(list.size)
-        for (d in list) {
-            if (!seen.contains(d.id)) {
-                seen.add(d.id)
-                out.add(d)
-            }
+    private fun addChip(label: String, id: String?) {
+        val chip = TextView(requireContext()).apply {
+            text = label
+            textSize = 13f
+            gravity = Gravity.CENTER
+            setPadding(dp(14), dp(6), dp(14), dp(6))
+            isClickable = true
+            isFocusable = true
+            setOnClickListener { selectFilter(id) }
         }
-        return out
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { marginEnd = dp(8) }
+        chip.layoutParams = params
+        chip.tag = id ?: ""
+        filterChips.addView(chip)
+        styleChip(chip, id == selectedFilter)
     }
+
+    private fun selectFilter(id: String?) {
+        if (id == selectedFilter) return
+        selectedFilter = id
+        for (i in 0 until filterChips.childCount) {
+            val chip = filterChips.getChildAt(i) as TextView
+            styleChip(chip, chip.tag == (id ?: ""))
+        }
+        adapter.setShowRank(id == "ranklist_hot")
+        adapter.clear()
+        grid.scrollToPosition(0)
+        load(reset = true)
+    }
+
+    private fun styleChip(chip: TextView, selected: Boolean) {
+        chip.setTextColor(if (selected) 0xFFFFFFFF.toInt() else resolveChipColor())
+        chip.setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
+    }
+
+    private fun resolveChipColor(): Int {
+        val attr = android.R.attr.textColorSecondary
+        val typed = requireContext().theme.obtainStyledAttributes(intArrayOf(attr))
+        val color = try {
+            typed.getColor(0, 0xFF606064.toInt())
+        } finally {
+            typed.recycle()
+        }
+        return color
+    }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

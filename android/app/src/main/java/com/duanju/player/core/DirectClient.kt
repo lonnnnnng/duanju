@@ -7,10 +7,12 @@ import org.json.JSONObject
 import java.io.File
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.security.SecureRandom
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 /**
  * 零服务器直连客户端：手机直接调用红果官方接口（内置签名），
@@ -19,6 +21,13 @@ import java.util.concurrent.Future
 object DirectClient {
 
     private const val API_HOST = "https://api5-normal-sinfonlineb.fqnovel.com"
+    /** 开放接口域名（搜索/详情无需签名）：sinfonlinec。 */
+    private val SEARCH_TYPES = setOf("短剧", "漫剧")
+
+    /** 签名接口的最大尝试次数（含首次）。 */
+    private const val SIGNED_RETRY = 10
+
+    private const val OPEN_HOST = "https://api5-normal-sinfonlinec.fqnovel.com"
 
     data class DirectMedia(
         val url: String,
@@ -29,6 +38,64 @@ object DirectClient {
     )
 
     class DirectException(message: String) : Exception(message)
+
+    /** 首页卡片（字段取自 bookmall/tab 的 video_data）。 */
+    data class HomeDrama(
+        val id: String,
+        val title: String,
+        val episodes: Int,
+        val cover: String?,
+        val score: String,
+        val playCount: Long,
+        val tag: String?,
+        val tagColor: String?,
+        val subTitle: String,
+        val contentType: Int,
+        /** 热度值（sub_title_list data_type=27，如 "8602万"）。 */
+        val hotValue: String,
+        /** 分类（sub_title_list data_type=3，如 "玄幻"）。 */
+        val category: String,
+        /** 推荐位名次（recommend_info.rank）。默认推荐流里等于位置，仅在榜单筛选下有意义。 */
+        val rank: Int
+    )
+
+    data class HomeFilter(val id: String, val name: String)
+
+    data class HomePage(
+        val items: List<HomeDrama>,
+        val nextOffset: Int,
+        val sessionId: String,
+        val hasMore: Boolean,
+        val filters: List<HomeFilter>
+    )
+
+    data class SeriesEpisode(
+        val index: Int,
+        val vid: String,
+        val durationSec: Int,
+        val disabled: Boolean
+    )
+
+    data class SeriesDetail(
+        val id: String,
+        val title: String,
+        val cover: String?,
+        val episodes: Int,
+        val playCount: Long,
+        val status: Int,
+        val intro: String,
+        val subTitles: List<String>,
+        val category: String,
+        val list: List<SeriesEpisode>
+    )
+
+    data class SearchHit(
+        val id: String,
+        val title: String,
+        val type: String,
+        val episodes: Int,
+        val cp: String
+    )
 
     data class DirectDrama(
         val id: String,        // 纯数字 seriesId
@@ -59,25 +126,30 @@ object DirectClient {
 
     fun <T> submit(task: Callable<T>): Future<T> = executor.submit(task)
 
-    /** 分集列表（detail 接口，旧版签名）。返回 videoID 列表（按集序）。 */
+    /**
+     * 分集列表：开放详情接口（无签名），按 vid_index 排序。
+     * 注意不能用 vid 字符串排序——那是雪花 id 的大小顺序，与集数无关（会打乱集数）。
+     */
     fun chapters(dramaId: String, deviceId: String, installId: String): List<String> {
-        val query = HongguoSign.encodeQuery(
-            HongguoSign.baseQuery(deviceId, installId) + listOf("_rticket" to System.currentTimeMillis().toString())
-        )
-        val headers = HongguoSign.signLegacyHeaders(query, "8662")
-        val body = """{"series_id":"$dramaId"}"""
-        val text = httpPost("$API_HOST/novel/player/video_detail/v1/", query, body, headers)
-        val root = JSONObject(text)
-        val data = root.optJSONObject("data")?.optJSONObject("video_data") ?: throw DirectException("详情无分集数据")
+        val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?${openCommon(deviceId)}" +
+            "&video_series_id=$dramaId&vs_id_type=1"
+        val root = JSONObject(httpGetOpenRetry(url))
+        val container = root.optJSONObject("data")?.optJSONObject("video_detail_data")
+            ?: throw DirectException("详情为空")
+        val entry = container.optJSONObject(dramaId) ?: container.keys().asSequence()
+            .mapNotNull { container.optJSONObject(it) }.firstOrNull() ?: throw DirectException("详情无数据")
+        val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
         val list = data.optJSONArray("video_list") ?: throw DirectException("分集列表为空")
-        val ids = ArrayList<String>(list.length())
+        val rows = ArrayList<Pair<Int, String>>(list.length())
         for (i in 0 until list.length()) {
             val row = list.optJSONObject(i) ?: continue
             val vid = row.optString("vid")
-            if (vid.isNotEmpty()) ids.add(vid)
+            if (vid.isEmpty() || row.optBoolean("disable_play", false)) continue
+            rows.add(row.optInt("vid_index", i + 1) to vid)
         }
-        ids.sortBy { vid -> vid }
-        return ids
+        if (rows.isEmpty()) throw DirectException("分集列表为空")
+        rows.sortBy { it.first }
+        return rows.map { it.second }
     }
 
     /** 播放模型（新版签名），返回直链 + 密钥 + 清晰度列表。 */
@@ -90,7 +162,7 @@ object DirectClient {
         )
         val body = """{"mixed_video_id_map":{"1004":["$videoId"]},"biz_param":{"detail_page_version":0,"device_level":3,"disable_digg_stat":false,"need_all_video_definition":true,"need_mp4_align":false,"use_os_player":false,"use_server_dns":false,"video_platform":1024}}"""
         val headers = HongguoSign.signModelHeaders(query, body.toByteArray(Charsets.UTF_8))
-        val text = httpPost("$API_HOST/novel/player/multi_video_model/v1/", query, body, headers)
+        val text = httpPostRetry("$API_HOST/novel/player/multi_video_model/v1/", query, body, headers)
         val root = JSONObject(text)
         if (root.optInt("code", 0) != 0) {
             throw DirectException("取流失败(${root.optInt("code", 0)})")
@@ -244,7 +316,7 @@ object DirectClient {
                 put("creation_status", JSONArray())
             })
         }
-        val text = httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
+        val text = httpPostRetry("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
         val root = JSONObject(text)
         val data = root.optJSONObject("data") ?: throw DirectException("分类数据为空")
         val rows = data.optJSONArray("video_data") ?: throw DirectException("分类无剧集")
@@ -302,139 +374,431 @@ object DirectClient {
         return httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
     }
 
-    private const val APP_SEARCH_HOST = "https://api5-normal-sinfonlineb.fqnovel.com"
-
-    /** App 官方搜索（bookapi/search/tab/v，旧版签名）——任何网络直连可用。 */
-    fun searchApp(keyword: String, deviceId: String, installId: String, offset: Int = 0): Pair<List<DirectDrama>, Boolean> {
-        val query = HongguoSign.encodeQuery(
-            HongguoSign.baseQuery(deviceId, installId) + listOf(
-                "query" to keyword, "count" to "20", "offset" to offset.toString(),
-                "tab_type" to "11", "bookshelf_search_plan" to "4",
-                "use_correct" to "true", "user_is_login" to "0",
-                "ts" to (System.currentTimeMillis() / 1000).toString(),
-                "_rticket" to System.currentTimeMillis().toString()
-            )
-        )
-        val headers = HongguoSign.signLegacyHeaders(query, "8662")
-        val text = httpGet("$APP_SEARCH_HOST/reading/bookapi/search/tab/v", query, headers)
-        val root = JSONObject(text)
-        if (root.optInt("code", -1) != 0) throw DirectException("搜索失败(${root.optInt("code", -1)})")
-        val container = root.optJSONObject("data") ?: root
-        val tabs = container.optJSONArray("search_tabs") ?: return Pair(emptyList(), false)
-        var tab: JSONObject? = null
-        for (i in 0 until tabs.length()) {
-            val t = tabs.optJSONObject(i) ?: continue
-            if (t.optInt("tab_type") == 11) { tab = t; break }
-        }
-        tab ?: return Pair(emptyList(), false)
-        val cells = tab.optJSONArray("data") ?: return Pair(emptyList(), false)
-        val out = ArrayList<DirectDrama>(cells.length() * 2)
-        for (i in 0 until cells.length()) {
-            val cell = cells.optJSONObject(i) ?: continue
-            // lynx 卡片内还嵌一层 cell_data
-            val candidates = ArrayList<JSONObject>()
-            candidates.add(cell)
-            val lynx = cell.optString("lynx_data")
-            if (lynx.isNotEmpty()) {
-                try {
-                    val payload = JSONObject(lynx)
-                    val inner = payload.optJSONArray("cell_data")
-                    for (j in 0 until (inner?.length() ?: 0)) inner?.optJSONObject(j)?.let { candidates.add(it) }
-                } catch (_: Exception) {}
+    /**
+     * 搜索 + 详情补齐，返回与首页同款的卡片数据。
+     * 搜索结果本身只有标题/类型，封面、集数、播放量、分类需逐条拉详情（8 线程并行）。
+     */
+    fun searchHomeItems(keyword: String, deviceId: String, installId: String): List<HomeDrama> {
+        val hits = searchHits(keyword, deviceId, installId)
+        if (hits.isEmpty()) return emptyList()
+        val pool = Executors.newFixedThreadPool(8)
+        return try {
+            val futures = hits.map { hit ->
+                hit to pool.submit(Callable { runCatching { detailBrief(hit.id, deviceId, installId) }.getOrNull() })
             }
-            for (c in candidates) {
-                val vds = c.optJSONArray("video_data") ?: continue
-                var video: JSONObject? = null
-                for (j in 0 until vds.length()) {
-                    val v = vds.optJSONObject(j) ?: continue
-                    video = v; break
-                }
-                val v = video ?: continue
-                val id = v.optString("series_id").ifEmpty { c.optString("book_id") }
-                if (id.isEmpty()) continue
-                val title = c.optJSONObject("search_high_light")?.optJSONObject("title")?.optString("text")
-                    ?.takeIf { it.isNotBlank() } ?: v.optString("title").ifEmpty { c.optString("cell_name") }
+            val out = ArrayList<HomeDrama>(hits.size)
+            for ((hit, future) in futures) {
+                val detail = runCatching { future.get(20, TimeUnit.SECONDS) }.getOrNull()
                 out.add(
-                    DirectDrama(
-                        id = id,
-                        title = title.ifEmpty { "短剧" },
-                        episodes = v.optInt("episode_cnt", 0),
-                        coverUrl = v.optString("cover").ifEmpty { v.optString("cover_url") }.ifEmpty { null }
+                    detail ?: HomeDrama(
+                        id = hit.id, title = hit.title, episodes = hit.episodes, cover = null,
+                        score = "", playCount = 0, tag = null, tagColor = null,
+                        subTitle = hit.type, contentType = 0, hotValue = "", category = hit.type, rank = 0
                     )
                 )
             }
+            out
+        } finally {
+            pool.shutdown()
         }
-        return Pair(out, tab.optBoolean("has_more", false))
     }
 
-    private fun httpGet(url: String, query: String, headers: Map<String, String>): String {
-        val conn = (URL("$url?$query").openConnection() as HttpURLConnection).apply {
+    /**
+     * 流式读取搜索响应，截取并解析 data 数组后立即断开。
+     * 该接口的 debug_info 会膨胀到数十 MB，完整读取会拖慢搜索且浪费流量。
+     */
+    private fun readSearchData(url: String): JSONArray? {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
         }
-        conn.setRequestProperty("User-Agent", HongguoSign.UA_LEGACY)
-        conn.setRequestProperty("Accept", "application/json; charset=utf-8,application/x-protobuf")
-        headers.forEach { (k, v) -> if (v.isNotEmpty()) conn.setRequestProperty(k, v) }
+        try {
+            if (conn.responseCode != 200) throw DirectException("HTTP ${conn.responseCode}")
+            val buffer = StringBuilder(256 * 1024)
+            val chunk = CharArray(32 * 1024)
+            var length: Int
+            var dataStart = -1
+            conn.inputStream.bufferedReader().use { reader ->
+                while (true) {
+                    length = reader.read(chunk)
+                    if (length <= 0) break
+                    buffer.append(chunk, 0, length)
+                    if (dataStart < 0) {
+                        dataStart = buffer.indexOf("\"data\":")
+                        if (dataStart >= 0) dataStart += 7
+                    }
+                    if (dataStart >= 0 && extractJsonArray(buffer, dataStart) != null) break
+                    if (buffer.length > 8 * 1024 * 1024) break
+                }
+            }
+            if (dataStart < 0) return null
+            val arrayJson = extractJsonArray(buffer, dataStart) ?: return null
+            return JSONArray(arrayJson)
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** 从上文 text 的 offset 处取一个完整 JSON 数组文本（含方括号）；未读完返回 null。 */
+    private fun extractJsonArray(text: CharSequence, offset: Int): String? {
+        var start = offset
+        while (start < text.length && text[start] != '[') {
+            val c = text[start]
+            if (c != ' ' && c != ':' && c != '\n' && c != '\r' && c != '\t') return null
+            start++
+        }
+        if (start >= text.length) return null
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until text.length) {
+            val c = text[i]
+            if (inString) {
+                when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> inString = false
+                }
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
+                '[' -> depth++
+                ']' -> {
+                    depth--
+                    if (depth == 0) return text.substring(start, i + 1)
+                }
+            }
+        }
+        return null
+    }
+
+    /** 详情页完整数据（无签名接口，封面 JPEG）。 */
+    fun seriesDetail(seriesId: String, deviceId: String, installId: String): SeriesDetail {
+        val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?" +
+            "${openCommonFull(deviceId, installId)}&video_series_id=$seriesId&vs_id_type=1"
+        val root = JSONObject(httpGetOpenRetry(url))
+        val container = root.optJSONObject("data")?.optJSONObject("video_detail_data")
+            ?: throw DirectException("详情为空")
+        val entry = container.optJSONObject(seriesId) ?: container.keys().asSequence()
+            .mapNotNull { container.optJSONObject(it) }.firstOrNull() ?: throw DirectException("详情无数据")
+        val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
+
+        var category = ""
+        val schema = data.optString("category_schema")
+        if (schema.isNotEmpty()) {
+            runCatching { org.json.JSONArray(schema).optJSONObject(0)?.optString("name")?.let { category = it } }
+        }
+        val subTitles = ArrayList<String>()
+        val subs = data.optJSONArray("series_sub_title_list")
+        for (i in 0 until (subs?.length() ?: 0)) {
+            val text = subs?.optString(i).orEmpty()
+            if (text.isNotEmpty()) subTitles.add(text)
+        }
+        val rows = data.optJSONArray("video_list") ?: throw DirectException("分集列表为空")
+        val list = ArrayList<SeriesEpisode>(rows.length())
+        for (i in 0 until rows.length()) {
+            val row = rows.optJSONObject(i) ?: continue
+            val vid = row.optString("vid")
+            if (vid.isEmpty()) continue
+            list.add(
+                SeriesEpisode(
+                    index = row.optInt("vid_index", i + 1),
+                    vid = vid,
+                    durationSec = row.optInt("duration", 0),
+                    disabled = row.optBoolean("disable_play", false)
+                )
+            )
+        }
+        list.sortBy { it.index }
+        if (list.isEmpty()) throw DirectException("分集列表为空")
+        return SeriesDetail(
+            id = seriesId,
+            title = data.optString("series_title").ifEmpty { "短剧" },
+            cover = data.optString("series_cover").ifEmpty { null },
+            episodes = data.optInt("episode_cnt", list.size),
+            playCount = data.optLong("series_play_cnt", 0),
+            status = data.optInt("series_status", 0),
+            intro = data.optString("series_intro"),
+            subTitles = subTitles,
+            category = category,
+            list = list
+        )
+    }
+
+    /** 无签名详情：取剧名/封面/集数/播放量/分类（封面为 JPEG，避免 HEIC 解码失败）。 */
+    private fun detailBrief(seriesId: String, deviceId: String, installId: String): HomeDrama {
+        val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?" +
+            "${openCommonFull(deviceId, installId)}&video_series_id=$seriesId&vs_id_type=1"
+        val root = JSONObject(httpGetOpenRetry(url))
+        val container = root.optJSONObject("data")?.optJSONObject("video_detail_data")
+            ?: throw DirectException("详情为空")
+        val entry = container.optJSONObject(seriesId) ?: container.keys().asSequence()
+            .mapNotNull { container.optJSONObject(it) }.firstOrNull() ?: throw DirectException("详情无数据")
+        val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
+        var category = ""
+        val schema = data.optString("category_schema")
+        if (schema.isNotEmpty()) {
+            runCatching {
+                org.json.JSONArray(schema).optJSONObject(0)?.optString("name")?.let { category = it }
+            }
+        }
+        var hotValue = ""
+        val subs = data.optJSONArray("series_sub_title_list")
+        for (i in 0 until (subs?.length() ?: 0)) {
+            val content = subs?.optString(i).orEmpty()
+            if (content.contains("热度")) hotValue = content.substringAfter("热度值").trim()
+        }
+        return HomeDrama(
+            id = seriesId,
+            title = data.optString("series_title").ifEmpty { "短剧" },
+            episodes = data.optInt("episode_cnt", 0),
+            cover = data.optString("series_cover").ifEmpty { null },
+            score = "",
+            playCount = data.optLong("series_play_cnt", 0),
+            tag = null,
+            tagColor = null,
+            subTitle = data.optString("episode_right_text"),
+            contentType = data.optInt("content_type", 0),
+            hotValue = hotValue,
+            category = category,
+            rank = 0
+        )
+    }
+
+    private fun cleanHtml(html: String): String =
+        html.replace(Regex("<[^>]+>"), "").replace("&nbsp;", " ").replace("&amp;", "&").trim()
+
+    /**
+     * 完整真机参数集：首页接口翻页/筛选依赖它（仅 5 个必需参数时 offset>0 会返回重复内容）。
+     */
+    private fun openCommonFull(deviceId: String, installId: String): String {
+        val dev = deviceId.takeIf { it.length >= 6 } ?: "1234567890123456"
+        val ins = installId.takeIf { it.length >= 6 } ?: "1234567890123456"
+        return "iid=$ins&device_id=$dev&ac=wifi&channel=hongguo_baidu_pz_kaiping0105_android" +
+            "&aid=8662&app_name=novelread&version_code=65532&version_name=6.5.5.32" +
+            "&device_platform=android&os=android&ssmix=a&device_type=Redmi+Note+8+Pro&device_brand=Redmi" +
+            "&language=zh&os_api=36&os_version=16&manifest_version_code=65532" +
+            "&resolution=1080*2198&dpi=440&update_version_code=65532&pv_player=65532&gender=2" +
+            "&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&host_abi=arm64-v8a" +
+            "&dragon_device_type=phone&rom_version=BP4A.251205.006+release-keys&compliance_status=0" +
+            "&cdid=1f1d14b3-8c25-4733-9f6b-2fdc01640081"
+    }
+
+    /**
+     * 首页信息流（bookmall/tab，无签名）。
+     * 三层结构 tab_item.cell_data[].cell_data[].video_data[]；hasMore 用 next_offset > offset 判断
+     * （offset=0 时 has_more 恒为 false，不可信）。
+     */
+    fun homeTab(
+        tabType: Int, offset: Int, sessionId: String, selectedItems: String?,
+        deviceId: String, installId: String
+    ): HomePage {
+        val url = buildString {
+            append("$OPEN_HOST/reading/bookapi/bookmall/tab/v/?")
+            append(openCommonFull(deviceId, installId))
+            append("&tab_type=$tabType&offset=$offset")
+            if (sessionId.isNotEmpty()) append("&session_id=").append(sessionId)
+            if (!selectedItems.isNullOrEmpty()) append("&selected_items=").append(selectedItems)
+        }
+        val root = JSONObject(httpGetOpenRetry(url))
+        val code = root.optInt("code", -1)
+        if (code != 0) throw DirectException("首页加载失败($code)")
+        val tabs = root.optJSONObject("data")?.optJSONArray("tab_item")
+            ?: throw DirectException("首页无 tab 数据")
+        var target: JSONObject? = null
+        for (i in 0 until tabs.length()) {
+            val tab = tabs.optJSONObject(i) ?: continue
+            if (tab.optString("cell_data").isEmpty() || tab.optJSONArray("cell_data")?.length() == 0) continue
+            if (tab.optInt("tab_type", -1) == tabType) { target = tab; break }
+            if (target == null) target = tab
+        }
+        val tab = target ?: return HomePage(emptyList(), offset, sessionId, false, emptyList())
+        val items = ArrayList<HomeDrama>()
+        val seen = HashSet<String>()
+        val cells = tab.optJSONArray("cell_data")
+        for (i in 0 until (cells?.length() ?: 0)) {
+            val cell = cells?.optJSONObject(i) ?: continue
+            val nested = cell.optJSONArray("cell_data")
+            for (j in 0 until (nested?.length() ?: 0)) {
+                collectHomeDramas(nested?.optJSONObject(j)?.optJSONArray("video_data"), items, seen)
+            }
+            collectHomeDramas(cell.optJSONArray("video_data"), items, seen)
+        }
+        var filters = emptyList<HomeFilter>()
+        for (i in 0 until (cells?.length() ?: 0)) {
+            val selector = cells?.optJSONObject(i)?.optJSONObject("cell_selector") ?: continue
+            val rows = selector.optJSONObject("outer_row")?.optJSONArray("items") ?: continue
+            val list = ArrayList<HomeFilter>()
+            for (j in 0 until rows.length()) {
+                val row = rows.optJSONObject(j) ?: continue
+                val id = row.optString("selector_item_id")
+                val name = row.optString("show_name")
+                if (id.isNotEmpty() && name.isNotEmpty()) list.add(HomeFilter(id, name))
+            }
+            if (list.isNotEmpty()) { filters = list; break }
+        }
+        val nextOffset = tab.optInt("next_offset", offset + 1)
+        return HomePage(
+            items = items,
+            nextOffset = nextOffset,
+            sessionId = tab.optString("session_id"),
+            hasMore = nextOffset > offset,
+            filters = filters
+        )
+    }
+
+    private fun collectHomeDramas(array: org.json.JSONArray?, out: MutableList<HomeDrama>, seen: MutableSet<String>) {
+        for (i in 0 until (array?.length() ?: 0)) {
+            val v = array?.optJSONObject(i) ?: continue
+            val id = v.optString("series_id").ifEmpty { v.optString("vid") }
+            if (id.isEmpty() || !seen.add(id)) continue
+            val title = v.optString("title").ifEmpty { v.optString("video_desc", "短剧") }
+            val tagInfo = v.optJSONObject("tag_info")
+            val tag = tagInfo?.optString("text")?.takeIf { it.isNotBlank() }
+            val tagColor = tagInfo?.optJSONArray("bg_color")?.optString(0)?.takeIf { it.isNotBlank() }
+            var hotValue = ""
+            var category = ""
+            val subList = v.optJSONArray("sub_title_list")
+            for (k in 0 until (subList?.length() ?: 0)) {
+                val entry = subList?.optJSONObject(k) ?: continue
+                val content = entry.optString("content")
+                if (content.isEmpty()) continue
+                when (entry.optInt("data_type", 0)) {
+                    27 -> if (hotValue.isEmpty()) hotValue = content
+                    3 -> if (category.isEmpty()) category = content
+                }
+            }
+            if (category.isEmpty()) {
+                category = v.optString("sub_title").substringBefore("·").trim()
+            }
+            val rank = runCatching {
+                JSONObject(v.optString("recommend_info")).optString("rank").toIntOrNull() ?: 0
+            }.getOrDefault(0)
+            out.add(
+                HomeDrama(
+                    id = id,
+                    title = title,
+                    episodes = v.optInt("episode_cnt", 0),
+                    cover = v.optString("cover").ifEmpty { v.optString("horiz_cover") }.ifEmpty { null },
+                    score = v.optString("score"),
+                    playCount = v.optLong("play_cnt", 0),
+                    tag = tag,
+                    tagColor = tagColor,
+                    subTitle = v.optString("sub_title"),
+                    contentType = v.optInt("content_type", 0),
+                    hotValue = hotValue,
+                    category = category,
+                    rank = rank
+                )
+            )
+        }
+    }
+
+    /** 热搜词（用于搜索页空态）。 */
+    fun hotWords(deviceId: String, installId: String): List<String> {
+        val url = "$OPEN_HOST/reading/bookapi/search/hot-search/v/?${openCommonFull(deviceId, installId)}"
+        val root = JSONObject(httpGetOpenRetry(url))
+        val data = root.optJSONArray("data") ?: return emptyList()
+        val out = ArrayList<String>(data.length())
+        for (i in 0 until data.length()) {
+            val word = data.optJSONObject(i)?.optString("tag_title").orEmpty()
+            if (word.isNotEmpty()) out.add(word)
+        }
+        return out
+    }
+
+    /**
+     * 搜索命中（无签名 fetch-debug）。返回列表页所需字段：类型/集数/CP方。
+     * 搜索结果本身不含封面，这也是官方 App 搜索页不放封面图的原因。
+     */
+    fun searchHits(keyword: String, deviceId: String, installId: String): List<SearchHit> {
+        val url = "$OPEN_HOST/reading/bookapi/search/fetch-debug/v/?${openCommonFull(deviceId, installId)}" +
+            "&query=" + URLEncoder.encode(keyword, "UTF-8") + "&count=20"
+        var rows: JSONArray? = null
+        var last: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                rows = readSearchData(url)
+                if (rows != null) break
+            } catch (e: Exception) {
+                last = e
+                if (attempt < 3) Thread.sleep(attempt * 600L)
+            }
+        }
+        val data = rows ?: run { if (last != null) throw last; return emptyList() }
+        val out = ArrayList<SearchHit>(data.length())
+        val seen = HashSet<String>()
+        for (i in 0 until data.length()) {
+            val row = data.optJSONObject(i) ?: continue
+            val id = row.optString("id")
+            val type = row.optString("type")
+            if (id.isEmpty() || type !in SEARCH_TYPES) continue
+            if (!seen.add(id)) continue
+            val display = row.optJSONObject("display")
+            val title = cleanHtml(display?.optString("title").orEmpty())
+            if (title.isEmpty()) continue
+            val summary = display?.optString("summary").orEmpty()
+            val episodes = Regex("\"集数\"\\s*:\\s*\"?\\s*(\\d+)")
+                .find(summary)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+            val cp = Regex("\"CP方\"\\s*:\\s*\"([^\"]*)\"")
+                .find(summary)?.groupValues?.get(1).orEmpty()
+            out.add(SearchHit(id, title, type, episodes, cp))
+        }
+        return out
+    }
+
+    private fun openCommon(deviceId: String): String =
+        "aid=8662&device_id=" + (deviceId.takeIf { it.length >= 6 } ?: "1234567890123456") +
+            "&version_code=65532&update_version_code=65532&device_platform=android"
+
+    /** 无签名开放接口：偶发 200+空正文，重试 3 次。 */
+    private fun httpGetOpenRetry(url: String): String {
+        var last: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                return httpGetOpen(url)
+            } catch (e: Exception) {
+                last = e
+                if (attempt < 3) Thread.sleep(attempt * 600L)
+            }
+        }
+        throw last ?: DirectException("开放接口失败")
+    }
+
+    /** 无签名开放接口：GET，不复用签名 UA。 */
+    private fun httpGetOpen(url: String): String {
+        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+            requestMethod = "GET"
+            connectTimeout = 15000
+            readTimeout = 30000
+        }
         val code = conn.responseCode
-        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
+        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+            ?.bufferedReader()?.use { it.readText() } ?: ""
         conn.disconnect()
         if (code != 200) throw DirectException("HTTP $code")
         if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
         return text
     }
 
+
     /**
-     * 官网搜索（服务器 web 端 /api/ui/search 的同款逻辑）：
-     * GET hongguoduanju.com/api/search/result?query=…，浏览器 UA + 搜索页 Referer，重试 3 次。
-     * 该域名仅在代理/透明代理网络可达（家用路由器已接管），移动网络直连不通。
+     * 签名接口偶发 200 + 空正文（服务端风控/抖动），客户端表现为“空响应(HTTP 200)”。
+     * 最多重试 10 次，退避递增并封顶 1.5s（总等待上限约 12s）。
      */
-    fun searchOfficial(keyword: String): List<DirectDrama> {
-        val url = "https://hongguoduanju.com/api/search/result?query=" +
-            java.net.URLEncoder.encode(keyword, "UTF-8")
-        var text: String? = null
-        var lastError: Exception? = null
-        for (attempt in 1..3) {
+    private fun httpPostRetry(url: String, query: String, body: String, headers: Map<String, String>): String {
+        var last: Exception? = null
+        for (attempt in 1..SIGNED_RETRY) {
             try {
-                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-                    requestMethod = "GET"
-                    connectTimeout = 15000
-                    readTimeout = 30000
-                    setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36")
-                    setRequestProperty("Referer", "https://hongguoduanju.com/search/" + java.net.URLEncoder.encode(keyword, "UTF-8"))
-                    setRequestProperty("Accept", "application/json, text/plain, */*")
-                }
-                val code = conn.responseCode
-                val body = (if (code in 200..299) conn.inputStream else conn.errorStream)?.bufferedReader()?.use { it.readText() } ?: ""
-                conn.disconnect()
-                if (code != 200) throw DirectException("搜索 HTTP $code")
-                if (body.isEmpty()) throw DirectException("搜索空响应")
-                text = body
-                break
+                return httpPost(url, query, body, headers)
             } catch (e: Exception) {
-                lastError = e
-                if (attempt < 3) Thread.sleep(attempt * 1000L)
+                last = e
+                if (attempt < SIGNED_RETRY) Thread.sleep(minOf(300L * attempt, 1500L))
             }
         }
-        if (text == null) throw lastError ?: DirectException("搜索失败")
-        val root = JSONObject(text)
-        val rows = root.optJSONArray("searchList") ?: return emptyList()
-        val out = ArrayList<DirectDrama>(rows.length())
-        for (i in 0 until rows.length()) {
-            val row = rows.optJSONObject(i) ?: continue
-            val vd = row.optJSONObject("video_data") ?: continue
-            val id = vd.optString("series_id")
-            if (id.isEmpty()) continue
-            out.add(
-                DirectDrama(
-                    id = id,
-                    title = vd.optString("series_title").ifEmpty { row.optString("name").ifEmpty { "短剧" } },
-                    episodes = vd.optInt("episode_cnt", 0),
-                    coverUrl = vd.optString("series_cover").ifEmpty { null }
-                )
-            )
-        }
-        return out
+        throw last ?: DirectException("请求失败")
     }
 
     private fun httpPost(url: String, query: String, body: String, headers: Map<String, String>): String {

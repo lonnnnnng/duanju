@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -19,7 +18,7 @@ class HistoryFragment : Fragment() {
         inflater.inflate(R.layout.fragment_history, container, false)
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        val empty = view.findViewById<TextView>(R.id.empty)
+        val empty = view.findViewById<View>(R.id.history_empty)
         val list = view.findViewById<RecyclerView>(R.id.history_list)
         list.layoutManager = LinearLayoutManager(requireContext())
         adapter = HistoryAdapter(
@@ -32,10 +31,16 @@ class HistoryFragment : Fragment() {
 
     override fun onResume() {
         super.onResume()
-        view?.let { refresh(it.findViewById(R.id.empty)) }
+        view?.let { refresh(it.findViewById(R.id.history_empty)) }
     }
 
-    private fun refresh(empty: TextView) {
+    /** 底部 tab 用 hide/show 切换，不触发 onResume，这里补刷新。 */
+    override fun onHiddenChanged(hidden: Boolean) {
+        super.onHiddenChanged(hidden)
+        if (!hidden) view?.let { refresh(it.findViewById(R.id.history_empty)) }
+    }
+
+    private fun refresh(empty: View) {
         val entries = HistoryStore.list(requireContext())
         adapter.submit(entries)
         empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
@@ -47,6 +52,7 @@ class HistoryFragment : Fragment() {
                 .putExtra("dramaId", entry.id)
                 .putExtra("title", entry.title)
                 .putExtra("episodes", entry.episodes)
+                .putExtra("cover", entry.cover)
         )
     }
 
@@ -57,7 +63,7 @@ class HistoryFragment : Fragment() {
             .setNegativeButton("取消", null)
             .setPositiveButton("删除") { _, _ ->
                 HistoryStore.remove(requireContext(), entry.id)
-                view?.let { refresh(it.findViewById(R.id.empty)) }
+                view?.let { refresh(it.findViewById(R.id.history_empty)) }
             }
             .show()
     }
