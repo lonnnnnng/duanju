@@ -238,7 +238,7 @@ object DirectClient {
     }
 
     /** 合并 Android 系统 CA 为单个 PEM（供 ffmpeg -cafile 使用，一次导出缓存复用）。 */
-    private fun exportSystemCa(target: File): File? {
+    fun exportSystemCa(target: File): File? {
         if (target.exists() && target.length() > 0L) return target
         val dirs = arrayOf(
             "/apex/com.android.conscrypt/cacerts",

@@ -1,8 +1,10 @@
 package com.duanju.player
 
 import android.content.pm.ActivityInfo
+import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
+import android.util.Log
 import android.os.Looper
 import android.view.View
 import android.view.WindowManager
@@ -19,14 +21,22 @@ import androidx.media3.common.PlaybackException
 import androidx.media3.common.Player
 import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.datasource.DataSource
 import androidx.media3.datasource.DefaultHttpDataSource
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.source.ProgressiveMediaSource
+import androidx.media3.extractor.ExtractorsFactory
+import androidx.media3.extractor.mp4.FragmentedMp4Extractor
 import androidx.media3.exoplayer.hls.HlsMediaSource
 import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.duanju.player.core.DirectClient
+import com.duanju.player.core.Fmp4Streamer
+import com.duanju.player.core.HlsStreamer
+import com.duanju.player.core.StreamDataSource
 import java.io.File
 import java.util.concurrent.Executors
 
@@ -38,6 +48,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var statusView: TextView
     private lateinit var loading: ProgressBar
     private lateinit var episodeAdapter: EpisodeAdapter
+    private var streamer: Fmp4Streamer? = null
+    private var hls: HlsStreamer? = null
     private lateinit var groupsBox: android.widget.LinearLayout
     private lateinit var groupScroll: View
     private lateinit var groupLabel: TextView
@@ -183,6 +195,8 @@ statusView = findViewById(R.id.status)
     override fun onDestroy() {
         super.onDestroy()
         saveProgress()
+        streamer?.cancel()
+        hls?.cancel()
         player.release()
     }
 
@@ -353,14 +367,91 @@ statusView = findViewById(R.id.status)
         loading.visibility = View.VISIBLE
         status("准备播放…")
         executor.execute {
+            streamer?.cancel()
+            hls?.cancel()
             try {
-                playDirect(episode, startMs)
+                playHls(episode, startMs)
             } catch (e: Exception) {
-                main.post {
-                    loading.visibility = View.GONE
-                    status("失败：${e.message}")
+                main.post { status("HLS 流式失败，回退整集解密：${e.message}") }
+                try {
+                    playDirect(episode, startMs)
+                } catch (fallback: Exception) {
+                    main.post {
+                        loading.visibility = View.GONE
+                        status("失败：${fallback.message}")
+                    }
                 }
             }
+        }
+    }
+
+    /**
+     * 方案二：ffmpeg 输出 HLS 分片，本地 HTTP 服务交给 ExoPlayer。
+     * 首片就绪即起播，且保留分片时长与 seek 能力。
+     */
+    private fun playHls(episode: Int, startMs: Long) {
+        val (deviceId, installId) = DirectClient.identity(this)
+        val seriesId = dramaId.substringAfter(':')
+        val started = System.currentTimeMillis()
+        val chapters = DirectClient.chapters(seriesId, deviceId, installId)
+        if (episode > chapters.size) throw DirectClient.DirectException("集数超出范围")
+        val media = DirectClient.media(chapters[episode - 1], deviceId, installId)
+        val resolveMs = System.currentTimeMillis() - started
+        val ca = DirectClient.exportSystemCa(File(cacheDir, "system-ca.pem"))
+        val baseDir = File(cacheDir, "hls").apply { mkdirs() }
+        val current = HlsStreamer(media.url, media.keyHex, ca, startMs / 1000.0, baseDir)
+        hls = current
+        current.start()
+        if (!current.awaitReady(15_000)) {
+            current.cancel()
+            throw DirectClient.DirectException(current.failure ?: "HLS 播放清单未就绪")
+        }
+        Log.d("PlayerActivity", "HLS 就绪 " + current.playlistUrl + " 解析=${resolveMs}ms")
+        main.post {
+            loading.visibility = View.GONE
+            status("第${selectedEpisode}集 ${media.quality}p · HLS 流式解析${resolveMs}ms")
+            val source = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(
+                DefaultHttpDataSource.Factory()
+            ).createMediaSource(MediaItem.fromUri(current.playlistUrl))
+            player.setMediaSource(source)
+            player.prepare()
+            player.playWhenReady = true
+            player.setPlaybackSpeed(currentSpeed)
+        }
+    }
+
+    /**
+     * 流式播放：ffmpeg 解密并转封装为 fMP4，经本地 TCP 交给 ExoPlayer，
+     * 首片到达即起播；续播位置通过 ffmpeg 输入侧 -ss 完成。
+     */
+    private fun playStream(episode: Int, startMs: Long) {
+        val (deviceId, installId) = DirectClient.identity(this)
+        val seriesId = dramaId.substringAfter(':')
+        val started = System.currentTimeMillis()
+        val chapters = DirectClient.chapters(seriesId, deviceId, installId)
+        if (episode > chapters.size) throw DirectClient.DirectException("集数超出范围")
+        val media = DirectClient.media(chapters[episode - 1], deviceId, installId)
+        val resolveMs = System.currentTimeMillis() - started
+        val ca = DirectClient.exportSystemCa(File(cacheDir, "system-ca.pem"))
+        val current = Fmp4Streamer(media.url, media.keyHex, ca, startMs / 1000.0)
+        streamer = current
+        current.start()
+        if (!current.awaitClient(15_000)) {
+            current.cancel()
+            throw DirectClient.DirectException(current.failure ?: "ffmpeg 未能建立本地流")
+        }
+        android.util.Log.d("PlayerActivity", "流式连接已建立 port=" + current.port)
+        main.post {
+            loading.visibility = View.GONE
+            status("第${selectedEpisode}集 ${media.quality}p · 流式解析${resolveMs}ms")
+            val factory = DataSource.Factory { StreamDataSource(current) }
+            val extractors = ExtractorsFactory { arrayOf(FragmentedMp4Extractor()) }
+            val source = ProgressiveMediaSource.Factory(factory, extractors)
+                .createMediaSource(MediaItem.fromUri(Uri.parse("duanju-stream://$seriesId/$episode")))
+            player.setMediaSource(source)
+            player.prepare()
+            player.playWhenReady = true
+            player.setPlaybackSpeed(currentSpeed)
         }
     }
 
