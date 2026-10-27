@@ -39,7 +39,43 @@ class SettingsFragment : Fragment() {
                 .show()
         }
 
-        view.findViewById<TextView>(R.id.version).text = "v${BuildConfig.VERSION_NAME}"
+        val version = view.findViewById<TextView>(R.id.version)
+        version.text = "v${BuildConfig.VERSION_NAME}"
+        view.findViewById<View>(R.id.row_version).setOnClickListener {
+            checkUpdate(version)
+        }
+    }
+
+    /** 点击版本行手动检查更新：有新版本弹窗，没有则提示已是最新。 */
+    private fun checkUpdate(version: TextView) {
+        if (!isAdded) return
+        val label = "v${BuildConfig.VERSION_NAME}"
+        version.text = "检查中…"
+        Thread {
+            val release = UpdateChecker.fetchLatest()
+            val context = context ?: return@Thread
+            activity?.runOnUiThread {
+                if (!isAdded) return@runOnUiThread
+                version.text = label
+                when {
+                    release == null -> AlertDialog.Builder(context)
+                        .setTitle("检查更新失败")
+                        .setMessage("无法获取最新版本，请稍后重试。")
+                        .setPositiveButton("知道了", null)
+                        .show()
+                    UpdateChecker.isNewer(release.version, BuildConfig.VERSION_NAME) ->
+                        showUpdateDialog(context, release)
+                    else -> AlertDialog.Builder(context)
+                        .setTitle("已是最新版本")
+                        .setMessage("当前版本 v${BuildConfig.VERSION_NAME}")
+                        .setPositiveButton("前往 GitHub 查看") { _, _ ->
+                            openUrl(context, release.pageUrl.ifEmpty { UpdateChecker.RELEASES_URL })
+                        }
+                        .setNegativeButton("知道了", null)
+                        .show()
+                }
+            }
+        }.start()
     }
 
     private fun renderSpeed(target: TextView) {

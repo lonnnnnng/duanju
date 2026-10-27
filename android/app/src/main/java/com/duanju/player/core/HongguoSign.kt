@@ -13,25 +13,6 @@ object HongguoSign {
 
     const val UA_MODEL =
         "com.phoenix.read/73532 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)"
-    const val UA_LEGACY = UA_MODEL
-
-    fun baseQuery(deviceId: String, installId: String): List<Pair<String, String>> = listOf(
-        "iid" to installId, "device_id" to deviceId, "ac" to "wifi", "channel" to "update_64",
-        "aid" to "8662", "app_name" to "novelread", "version_code" to "73532",
-        "version_name" to "7.3.5.32", "device_platform" to "android", "os" to "android",
-        "ssmix" to "a", "device_type" to "25053RT47C", "device_brand" to "Redmi",
-        "language" to "zh", "os_api" to "36", "os_version" to "16",
-        "manifest_version_code" to "73532", "resolution" to "1280*2772", "dpi" to "520",
-        "update_version_code" to "73532", "host_abi" to "arm64-v8a",
-        "dragon_device_type" to "phone", "pv_player" to "73532",
-        "compliance_status" to "0", "need_personal_recommend" to "1",
-        "player_so_load" to "1", "is_android_pad_screen" to "0"
-    )
-
-    fun encodeQuery(pairs: List<Pair<String, String>>): String =
-        pairs.joinToString("&") { (k, v) ->
-            java.net.URLEncoder.encode(k, "UTF-8") + "=" + java.net.URLEncoder.encode(v, "UTF-8")
-        }
 
     private fun md5(data: ByteArray): ByteArray = MessageDigest.getInstance("MD5").digest(data)
     private fun ByteArray.toHex(): String = joinToString("") { "%02x".format(it) }
@@ -101,31 +82,6 @@ object HongguoSign {
             ((random shr 8) and 0xFF).toByte(), 0x40, 0x01
         )
         return (prefix + out).toHex()
-    }
-
-    fun signModelHeaders(query: String, body: ByteArray?): Map<String, String> {
-        val tsMs = System.currentTimeMillis()
-        val ts = tsMs / 1000
-        val random = (System.nanoTime() and 0xFFFF).toInt()
-        val headers = mutableMapOf<String, String>()
-        if (body != null) headers["X-SS-STUB"] = md5(body).toHex().uppercase()
-        headers["X-Khronos"] = ts.toString()
-        headers["X-Gorgon"] = modelGorgon(query, body, ts, random)
-        headers["X-SS-Req-Ticket"] = tsMs.toString()
-        headers["X-Ladon"] = Base64.getEncoder().encodeToString(byteArrayOf(
-            ((ts ushr 24) and 0xFF).toByte(), ((ts ushr 16) and 0xFF).toByte(),
-            ((ts ushr 8) and 0xFF).toByte(), (ts and 0xFF).toByte()
-        ))
-        headers["X-Argus"] = Base64.getEncoder().encodeToString(byteArrayOf(
-            (ts and 0xFF).toByte(), ((ts shr 8) and 0xFF).toByte(),
-            ((ts shr 16) and 0xFF).toByte(), ((ts shr 24) and 0xFF).toByte()
-        ))
-        headers["X-Tt-Request-Tag"] = "t=0;n=0"
-        headers["Sdk-Version"] = "2"
-        headers["Passport-Sdk-Version"] = "50561"
-        headers["X-Xs-From-Web"] = "0"
-        headers["X-Vc-Bdturing-Sdk-Version"] = "3.7.2.cn"
-        return headers
     }
 
     // ==================== 旧版签名（详情/目录：X-Argus/X-Ladon/X-Gorgon） ====================
@@ -274,22 +230,6 @@ object HongguoSign {
         while (n > 127) { out.add(((n and 0x7F) or 0x80).toByte()); n = n ushr 7 }
         out.add(n.toByte())
         return out.toByteArray()
-    }
-
-    fun signLegacyHeaders(query: String, aid: String): Map<String, String> {
-        val tsMs = System.currentTimeMillis()
-        val ts = tsMs / 1000
-        val nonceBytes = ByteArray(11)
-        java.security.SecureRandom().nextBytes(nonceBytes)
-        val nonce = Nonce(nonceBytes)
-        return mapOf(
-            "X-Khronos" to ts.toString(),
-            "X-Gorgon" to legacyGorgon(query, ts, nonce),
-            "X-SS-Req-Ticket" to tsMs.toString(),
-            "X-SS-STUB" to "",
-            "X-Argus" to legacyArgus(query, ts, nonce),
-            "X-Ladon" to legacyLadon(aid, ts, nonce)
-        )
     }
 
     // ==================== 测试入口 ====================

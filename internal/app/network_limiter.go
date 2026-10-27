@@ -236,10 +236,6 @@ func (body *limitedResponseBody) Close() error {
 	return err
 }
 
-func (d *Downloader) doCatalogRequest(request *http.Request) (*http.Response, error) {
-	return d.doCatalogRequestWithTimeout(request, 0)
-}
-
 func (d *Downloader) doCatalogRequestWithTimeout(request *http.Request, timeout time.Duration) (*http.Response, error) {
 	return d.doPreparedCatalogRequest(request, timeout, nil)
 }

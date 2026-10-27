@@ -89,7 +89,6 @@ type UIApp struct {
 	playbacks             map[string]*playbackSession
 	nativeHLSMu           sync.Mutex
 	nativeHLS             map[string]*nativeHLSSession
-	playbackPrefetchSlots chan struct{}
 	playbackResourcesOnce sync.Once
 	playbackResources     *playbackResources
 	viewersOnce           sync.Once

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"net/http"
 	"strings"
 )
 
@@ -65,20 +64,4 @@ func isHongguoTask(task Task) bool {
 	}
 	_, _, valid := splitProviderDramaID(task.DramaID)
 	return valid
-}
-
-func readHongguoIDsRequest(writer http.ResponseWriter, request *http.Request) ([]string, bool) {
-	identifiers, valid := readIDsRequest(writer, request)
-	if !valid {
-		return nil, false
-	}
-	for index, identifier := range identifiers {
-		_, sourceID, supported := splitProviderDramaID(identifier)
-		if !supported {
-			writeJSON(writer, http.StatusBadRequest, map[string]string{"error": "此版本仅支持本站源剧集 ID"})
-			return nil, false
-		}
-		identifiers[index] = providerDramaID(sourceHongguo, sourceID)
-	}
-	return identifiers, true
 }

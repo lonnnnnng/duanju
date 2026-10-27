@@ -4,12 +4,12 @@
 
 ## 操作步骤
 
-1. 确认本次改动、工作区及新版本号（正式版本使用 `vX.Y.Z`）。
-2. 使用中文说明提交代码，推送到 `lonnnnnng/duanju` 的 `main`。本地旧 `origin` 不用于发布。
+1. 确认本次改动、工作区及新版本号（正式版本使用 `vX.Y.Z`）。Web 端与安卓共用同一版本号，发版前先把 `android/app/build.gradle.kts` 的 `versionName` 改为同一版本，`versionCode` 递增。
+2. 使用中文说明提交代码，推送到 `origin`（`lonnnnnng/duanju`）的 `main`。
 3. 推送成功后手动启动流水线，例如发布 `v0.1.12`：
 
    ```bash
-   git push duanju HEAD:main
+   git push origin HEAD:main
    gh workflow run release.yml --repo lonnnnnng/duanju --ref main -f version=v0.1.12
    gh run list --repo lonnnnnng/duanju --workflow release.yml --event workflow_dispatch --limit 5
    gh run watch <本次运行ID> --repo lonnnnnng/duanju --exit-status
@@ -17,7 +17,7 @@
 
    可通过 `-f notes='本次发布说明'` 补充说明；变更记录会自动生成。也可以在 GitHub **Actions → 手动构建并发布 Release → Run workflow** 中选 `main`、输入版本。
 
-4. 核对本次运行的 `headSha` 与推送提交一致，确认任务成功、Release 已正式公开、六个资产完整：
+4. 核对本次运行的 `headSha` 与推送提交一致，确认任务成功、Release 已正式公开、七个资产完整（五个平台程序、安卓 APK、`SHA256SUMS`）：
 
    ```bash
    gh run view <本次运行ID> --repo lonnnnnng/duanju --json headSha,status,conclusion,url
@@ -27,10 +27,11 @@
 ## 流水线内容
 
 - 使用触发时 `main` 的确切提交；校验版本格式、版本递增及标签/Release 不重复。
-- 安装 Go 稳定版、FFmpeg、Nginx；运行 `go test ./... -count=1` 和 `go vet ./...`。
+- 安装 Go 稳定版、FFmpeg、Nginx、JDK 17；运行 `go test ./... -count=1` 和 `go vet ./...`。
 - 复用 `scripts/build.sh`，构建 macOS arm64/amd64、Linux amd64/arm64、Windows amd64，注入版本、提交和构建时间。
-- 先创建草稿并上传五个程序和 `SHA256SUMS`；校验远端大小和 SHA-256 后正式发布为 latest。
-- 使用流水线自带的 `GITHUB_TOKEN`，无需额外配置发布密钥。真实源站和浏览器测试仍按项目现有开关手动验收。
+- 用仓库 Secrets 中的 `ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PROPERTIES` 还原签名，运行 `:app:testDebugUnitTest :app:assembleRelease`，把 APK 以 `duanju-<版本>-android.apk` 归集到 `dist/` 并写入 `SHA256SUMS`。
+- 先创建草稿并上传五个程序、APK 和 `SHA256SUMS`；校验远端大小和 SHA-256 后正式发布为 latest。
+- 使用流水线自带的 `GITHUB_TOKEN` 与安卓签名 Secrets，无需额外发布密钥。真实源站和浏览器测试仍按项目现有开关手动验收。
 
 若失败，查看该次运行日志；测试或构建失败时不会创建 Release，上传或校验失败可能保留草稿，正式发布后的复查失败需先核实远端实际状态。不要直接覆盖或删除历史版本。
 

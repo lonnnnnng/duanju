@@ -13,7 +13,6 @@ import (
 	"unicode"
 )
 
-const danmakuWindowMS = 30_000
 const danmakuMaxDurationMS = 24 * 60 * 60 * 1000
 
 type hongguoDanmakuItem struct {

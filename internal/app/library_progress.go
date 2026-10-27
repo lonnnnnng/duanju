@@ -32,10 +32,6 @@ func reportLibraryProgress(ctx context.Context, source string, items []Drama, er
 	}
 }
 
-func (a *UIApp) startLibraryRefreshLocked(source string) {
-	a.startLibraryLoadLocked(source, libraryLoadRefresh, nil)
-}
-
 func (a *UIApp) startLibraryLoadLocked(source string, mode libraryLoadMode, priority []string) {
 	base := context.Background()
 	if mode == libraryLoadUpdate || mode == libraryLoadMore {

@@ -107,11 +107,6 @@ func (d *Downloader) fetchHongguoRoute(ctx context.Context, route, category stri
 	return dramas, nil
 }
 
-func (d *Downloader) fetchHongguoCategory(ctx context.Context, route, category string) ([]Drama, error) {
-	items, _, err := d.fetchHongguoCategoryPage(ctx, route, category)
-	return items, err
-}
-
 func (d *Downloader) fetchHongguoCategoryPage(ctx context.Context, route, category string) ([]Drama, int, error) {
 	body, err := d.fetchProviderText(ctx, hongguoBaseURL+"/category/"+route, hongguoBaseURL+"/")
 	if err != nil {
@@ -353,12 +348,4 @@ func anyList(v any) []any {
 		}
 	}
 	return nil
-}
-
-func cloneValues(v url.Values) url.Values {
-	out := url.Values{}
-	for key, values := range v {
-		out[key] = append([]string(nil), values...)
-	}
-	return out
 }

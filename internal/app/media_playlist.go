@@ -2,8 +2,6 @@ package app
 
 import (
 	"math"
-	"net/url"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -27,23 +25,4 @@ func m3u8Duration(raw string) time.Duration {
 		total += time.Duration(seconds * float64(time.Second))
 	}
 	return total
-}
-
-func rewriteM3U8(raw, playlistURL string) string {
-	base, err := url.Parse(playlistURL)
-	lines := strings.Split(raw, "\n")
-	for i, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		if strings.Contains(trimmed, "URI=") && strings.Contains(trimmed, "/api/app/vid/sec") {
-			lines[i] = regexp.MustCompile(`URI="[^"]+"`).ReplaceAllString(line, `URI="key.bin"`)
-			continue
-		}
-		if err == nil && trimmed != "" && !strings.HasPrefix(trimmed, "#") && !strings.HasPrefix(trimmed, "http://") && !strings.HasPrefix(trimmed, "https://") {
-			ref, refErr := url.Parse(trimmed)
-			if refErr == nil {
-				lines[i] = base.ResolveReference(ref).String()
-			}
-		}
-	}
-	return strings.Join(lines, "\n")
 }

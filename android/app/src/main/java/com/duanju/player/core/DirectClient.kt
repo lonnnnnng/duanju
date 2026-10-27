@@ -24,9 +24,6 @@ object DirectClient {
     /** 开放接口域名（搜索/详情无需签名）：sinfonlinec。 */
     private val SEARCH_TYPES = setOf("短剧", "漫剧")
 
-    /** 签名接口的最大尝试次数（含首次）。 */
-    private const val SIGNED_RETRY = 10
-
     private const val OPEN_HOST = "https://api5-normal-sinfonlinec.fqnovel.com"
 
     data class DirectMedia(
@@ -98,20 +95,6 @@ object DirectClient {
         val type: String,
         val episodes: Int,
         val cp: String
-    )
-
-    data class DirectDrama(
-        val id: String,        // 纯数字 seriesId
-        val title: String,
-        val episodes: Int,
-        val coverUrl: String?  // 绝对地址
-    )
-
-    data class CatalogPage(
-        val dramas: List<DirectDrama>,
-        val nextOffset: Int,
-        val hasMore: Boolean,
-        val sessionId: String
     )
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -288,93 +271,6 @@ object DirectClient {
     /** 清理残缺的临时文件。 */
     fun cleanPartial(cacheDir: File) {
         cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
-    }
-
-    /** 剧库列表（App 官方接口，旧版签名，分页）。 */
-    fun catalog(
-        genreKey: String, genreScene: String, offset: Int, sessionId: String,
-        deviceId: String, installId: String
-    ): CatalogPage {
-        val query = HongguoSign.encodeQuery(
-            HongguoSign.baseQuery(deviceId, installId) + listOf("_rticket" to System.currentTimeMillis().toString())
-        )
-        val headers = HongguoSign.signLegacyHeaders(query, "8662")
-        val payload = JSONObject().apply {
-            put("req_scene", genreScene)
-            put("offset", offset)
-            put("limit", 18)
-            put("req_type", "only_content")
-            put("need_selector_panel", false)
-            put("client_req_type", if (offset > 0) 2 else 3)
-            put("session_id", sessionId)
-            put("filter_ids", "")
-            put("select_items", JSONObject().apply {
-                put("genre", JSONArray().put(genreKey))
-                put("sort", JSONArray().put("online_time"))
-                put("gender", JSONArray())
-                put("category_dim_theme", JSONArray())
-                put("category_dim_role", JSONArray())
-                put("category_dim_epoch", JSONArray())
-                put("online_time", JSONArray())
-                put("creation_status", JSONArray())
-            })
-        }
-        val text = httpPostRetry("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
-        val root = JSONObject(text)
-        val data = root.optJSONObject("data") ?: throw DirectException("分类数据为空")
-        val rows = data.optJSONArray("video_data") ?: throw DirectException("分类无剧集")
-        val dramas = ArrayList<DirectDrama>(rows.length())
-        for (i in 0 until rows.length()) {
-            val row = rows.optJSONObject(i) ?: continue
-            // 分类接口行内字段：title / cover / episode_cnt / series_id（与 detail、搜索接口的 series_title/series_cover 不同）
-            val id = row.optString("series_id")
-            if (id.isEmpty()) continue
-            dramas.add(
-                DirectDrama(
-                    id = id,
-                    title = row.optString("title").ifEmpty { row.optString("series_title").ifEmpty { "短剧" } },
-                    episodes = row.optInt("episode_cnt", 0),
-                    coverUrl = row.optString("cover").ifEmpty { row.optString("series_cover") }.ifEmpty { null }
-                )
-            )
-        }
-        return CatalogPage(
-            dramas = dramas,
-            nextOffset = data.optInt("next_offset", offset + rows.length()),
-            hasMore = data.optBoolean("has_more", false),
-            sessionId = data.optString("session_id", "")
-        )
-    }
-
-    fun dumpCatalogRaw(
-        genreKey: String, genreScene: String, offset: Int, sessionId: String,
-        deviceId: String, installId: String
-    ): String {
-        val query = HongguoSign.encodeQuery(
-            HongguoSign.baseQuery(deviceId, installId) + listOf("_rticket" to System.currentTimeMillis().toString())
-        )
-        val headers = HongguoSign.signLegacyHeaders(query, "8662")
-        val payload = JSONObject().apply {
-            put("req_scene", genreScene)
-            put("offset", offset)
-            put("limit", 18)
-            put("req_type", "only_content")
-            put("need_selector_panel", false)
-            put("client_req_type", if (offset > 0) 2 else 3)
-            put("session_id", sessionId)
-            put("filter_ids", "")
-            put("select_items", JSONObject().apply {
-                put("genre", JSONArray().put(genreKey))
-                put("sort", JSONArray().put("online_time"))
-                put("gender", JSONArray())
-                put("category_dim_theme", JSONArray())
-                put("category_dim_role", JSONArray())
-                put("category_dim_epoch", JSONArray())
-                put("online_time", JSONArray())
-                put("creation_status", JSONArray())
-            })
-        }
-        return httpPost("$API_HOST/reading/distribution/category/landpage/v/", query, payload.toString(), headers)
     }
 
     /**
@@ -724,19 +620,6 @@ object DirectClient {
         }
     }
 
-    /** 热搜词（用于搜索页空态）。 */
-    fun hotWords(deviceId: String, installId: String): List<String> {
-        val url = "$OPEN_HOST/reading/bookapi/search/hot-search/v/?${openCommonFull(deviceId, installId)}"
-        val root = JSONObject(httpGetOpenRetry(url))
-        val data = root.optJSONArray("data") ?: return emptyList()
-        val out = ArrayList<String>(data.length())
-        for (i in 0 until data.length()) {
-            val word = data.optJSONObject(i)?.optString("tag_title").orEmpty()
-            if (word.isNotEmpty()) out.add(word)
-        }
-        return out
-    }
-
     /**
      * 搜索命中（无签名 fetch-debug）。返回列表页所需字段：类型/集数/CP方。
      * 搜索结果本身不含封面，这也是官方 App 搜索页不放封面图的原因。
@@ -811,44 +694,6 @@ object DirectClient {
         return text
     }
 
-
-    /**
-     * 签名接口偶发 200 + 空正文（服务端风控/抖动），客户端表现为“空响应(HTTP 200)”。
-     * 最多重试 10 次，退避递增并封顶 1.5s（总等待上限约 12s）。
-     */
-    private fun httpPostRetry(url: String, query: String, body: String, headers: Map<String, String>): String {
-        var last: Exception? = null
-        for (attempt in 1..SIGNED_RETRY) {
-            try {
-                return httpPost(url, query, body, headers)
-            } catch (e: Exception) {
-                last = e
-                if (attempt < SIGNED_RETRY) Thread.sleep(minOf(300L * attempt, 1500L))
-            }
-        }
-        throw last ?: DirectException("请求失败")
-    }
-
-    private fun httpPost(url: String, query: String, body: String, headers: Map<String, String>): String {
-        val conn = (URL("$url?$query").openConnection() as HttpURLConnection).apply {
-            requestMethod = "POST"
-            connectTimeout = 15000
-            readTimeout = 60000
-            doOutput = true
-        }
-        conn.setRequestProperty("User-Agent", HongguoSign.UA_MODEL)
-        conn.setRequestProperty("Accept", "application/json")
-        conn.setRequestProperty("Content-Type", "application/json; charset=utf-8")
-        headers.forEach { (k, v) -> conn.setRequestProperty(k, v) }
-        conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-        val code = conn.responseCode
-        val stream = if (code in 200..299) conn.inputStream else conn.errorStream
-        val text = stream?.bufferedReader()?.use { it.readText() } ?: ""
-        conn.disconnect()
-        if (code != 200) throw DirectException("HTTP $code")
-        if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
-        return text
-    }
 
     // 设备身份持久化（与服务器无关，App 自己的随机身份）
     fun identity(context: Context): Pair<String, String> {

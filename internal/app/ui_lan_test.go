@@ -209,31 +209,6 @@ func newLANTestBrowser(t *testing.T, app *UIApp) *lanTestBrowser {
 	return browser
 }
 
-func (browser *lanTestBrowser) copy() *lanTestBrowser {
-	result := &lanTestBrowser{handler: browser.handler, cookies: map[string]*http.Cookie{}, id: browser.id, secure: browser.secure}
-	for name, cookie := range browser.cookies {
-		copy := *cookie
-		result.cookies[name] = &copy
-	}
-	return result
-}
-
-func (browser *lanTestBrowser) history(t *testing.T) []playbackHistoryEntry {
-	t.Helper()
-	result := browser.request(t, http.MethodGet, "/api/ui/playback/history", nil)
-	viewerResultOK(t, result)
-	var response struct {
-		Data []playbackHistoryEntry `json:"data"`
-	}
-	if err := json.Unmarshal(result.Body.Bytes(), &response); err != nil {
-		t.Fatal(err)
-	}
-	if !strings.Contains(result.Header().Get("Cache-Control"), "no-store") || !strings.Contains(result.Header().Get("Vary"), "Cookie") {
-		t.Fatal("browser history could be cached")
-	}
-	return response.Data
-}
-
 func (browser *lanTestBrowser) following(t *testing.T) []followingView {
 	t.Helper()
 	result := browser.request(t, http.MethodGet, "/api/ui/following", nil)
@@ -245,24 +220,4 @@ func (browser *lanTestBrowser) following(t *testing.T) []followingView {
 		t.Fatal(err)
 	}
 	return response.Data
-}
-
-func (browser *lanTestBrowser) watch(t *testing.T, app *UIApp, episode int, position float64) string {
-	t.Helper()
-	result := browser.request(t, http.MethodPost, "/api/ui/playback/open", map[string]any{"dramaId": historyFixtureDramaID})
-	viewerResultOK(t, result)
-	var opened struct {
-		Session string `json:"session"`
-	}
-	if err := json.Unmarshal(result.Body.Bytes(), &opened); err != nil || opened.Session == "" {
-		t.Fatal("missing playback session", err)
-	}
-	app.playbackMu.Lock()
-	session := app.playbacks[opened.Session]
-	session.run, session.currentIndex, session.state = 1, episode, "ended"
-	session.historyRuns = map[uint64]playbackHistoryRun{1: {episode: episode, duration: 90}}
-	app.playbackMu.Unlock()
-	progress := playbackHistoryProgress{Run: 1, Sequence: 1, Episode: episode, Position: position, Duration: 90}
-	viewerResultOK(t, browser.request(t, http.MethodPost, "/api/ui/playback/progress", map[string]any{"session": opened.Session, "progress": progress}))
-	return opened.Session
 }

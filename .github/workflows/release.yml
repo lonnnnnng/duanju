@@ -101,6 +101,37 @@ jobs:
       - name: 构建五个平台程序与校验清单
         run: bash scripts/build.sh
 
+      - name: 安装 JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: 还原安卓签名配置
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PROPERTIES: ${{ secrets.ANDROID_KEYSTORE_PROPERTIES }}
+        run: |
+          if [ -z "$ANDROID_KEYSTORE_BASE64" ] || [ -z "$ANDROID_KEYSTORE_PROPERTIES" ]; then
+            echo "缺少 ANDROID_KEYSTORE_BASE64 或 ANDROID_KEYSTORE_PROPERTIES，无法产出发版 APK" >&2
+            exit 1
+          fi
+          mkdir -p android/keystore
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/keystore/duanju.keystore
+          printf '%s\n' "$ANDROID_KEYSTORE_PROPERTIES" > android/keystore.properties
+          chmod 600 android/keystore.properties
+
+      - name: 测试并构建安卓 APK
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest :app:assembleRelease --no-daemon --stacktrace
+
+      - name: 归集安卓产物并更新校验清单
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "dist/duanju-${VERSION}-android.apk"
+          cd dist
+          shasum -a 256 "duanju-${VERSION}-android.apk" >> SHA256SUMS
+          shasum -a 256 -c SHA256SUMS
+
       - name: 上传到草稿并核对全部资产
         env:
           GH_TOKEN: ${{ github.token }}
@@ -113,6 +144,7 @@ jobs:
             "dist/duanju-${VERSION}-linux-amd64" \
             "dist/duanju-${VERSION}-linux-arm64" \
             "dist/duanju-${VERSION}-windows-amd64.exe" \
+            "dist/duanju-${VERSION}-android.apk" \
             dist/SHA256SUMS \
             --target "$GITHUB_SHA" --draft --title "$VERSION" \
             --generate-notes --notes "$RELEASE_NOTES"
@@ -131,7 +163,7 @@ jobs:
           root = pathlib.Path('dist')
           expected = {name: digest for digest, name in (
               line.split() for line in (root / 'SHA256SUMS').read_text().splitlines())}
-          assert len(expected) == 5
+          assert len(expected) == 6
           assert {asset['name'] for asset in release['assets']} == set(expected) | {'SHA256SUMS'}
           for asset in release['assets']:
               path = root / asset['name']
@@ -140,7 +172,7 @@ jobs:
               assert asset['digest'] == 'sha256:' + digest
               if path.name != 'SHA256SUMS':
                   assert expected[path.name] == digest
-          print('五个平台程序及 SHA256SUMS 的远端大小与摘要全部匹配')
+          print('五个平台程序、安卓 APK 及 SHA256SUMS 的远端大小与摘要全部匹配')
           PY
 
       - name: 正式发布并复查最新版本
@@ -157,10 +189,10 @@ jobs:
           release = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'duanju-latest-release.json').read_text())
           assert release['tag_name'] == os.environ['VERSION']
           assert not release['draft'] and not release['prerelease']
-          assert len(release['assets']) == 6
+          assert len(release['assets']) == 7
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('## 发布完成\n\n')
               summary.write('- Release：' + release['html_url'] + '\n')
               summary.write('- 提交：`' + os.environ['GITHUB_SHA'] + '`\n')
-              summary.write('- 五个平台程序与 SHA256SUMS 均已校验。\n')
+              summary.write('- 五个平台程序、安卓 APK 与 SHA256SUMS 均已校验。\n')
           PY

@@ -114,9 +114,3 @@ func buildPlaybackNativeMedia(media providerMedia, seriesID string, episode int,
 	}
 	return result, nil
 }
-
-func errorsNew(message string) error { return &nativeMediaError{message} }
-
-type nativeMediaError struct{ message string }
-
-func (e *nativeMediaError) Error() string { return e.message }
