@@ -153,26 +153,24 @@ object DirectClient {
     }
 
     /** 播放模型（新版签名），返回直链 + 密钥 + 清晰度列表。 */
+    /**
+     * 取流：开放接口（无签名），video_platform 必须为 1024。
+     * 旧的签名接口 novel/player/multi_video_model/v1 现已恒返回 200+空正文，改用此接口。
+     */
     fun media(videoId: String, deviceId: String, installId: String): DirectMedia {
-        val query = HongguoSign.encodeQuery(
-            HongguoSign.baseQuery(deviceId, installId) + listOf(
-                "_rticket" to System.currentTimeMillis().toString(),
-                "ts" to (System.currentTimeMillis() / 1000).toString()
-            )
-        )
-        val body = """{"mixed_video_id_map":{"1004":["$videoId"]},"biz_param":{"detail_page_version":0,"device_level":3,"disable_digg_stat":false,"need_all_video_definition":true,"need_mp4_align":false,"use_os_player":false,"use_server_dns":false,"video_platform":1024}}"""
-        val headers = HongguoSign.signModelHeaders(query, body.toByteArray(Charsets.UTF_8))
-        val text = httpPostRetry("$API_HOST/novel/player/multi_video_model/v1/", query, body, headers)
-        val root = JSONObject(text)
-        if (root.optInt("code", 0) != 0) {
-            throw DirectException("取流失败(${root.optInt("code", 0)})")
-        }
-        val entry = root.optJSONObject("data")?.optJSONObject(videoId)
+        val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_model/v/?" +
+            "${openCommonFull(deviceId, installId, "74232")}&video_id=$videoId" +
+            "&video_platform=1024&need_all_video_definition=1"
+        val root = JSONObject(httpGetOpenRetry(url))
+        val code = root.optInt("code", -1)
+        if (code != 0) throw DirectException("取流失败($code)")
+        val entry = root.optJSONObject("data")?.optJSONObject("video_model_data")?.optJSONObject(videoId)
             ?: throw DirectException("未返回该分集")
         val modelRaw = entry.opt("video_model")
         val model = when (modelRaw) {
             is String -> JSONObject(modelRaw)
-            else -> modelRaw as? JSONObject ?: throw DirectException("video_model 无效")
+            is JSONObject -> modelRaw
+            else -> throw DirectException("video_model 无效")
         }
         val videoList = model.optJSONArray("video_list") ?: throw DirectException("无清晰度列表")
         var best: JSONObject? = null
@@ -195,7 +193,9 @@ object DirectClient {
                 best = row
             }
         }
-        if (best == null) throw DirectException("无兼容媒体")
+        if (best == null) {
+            throw DirectException("该剧仅提供 H.266(bytevc2) 编码，暂不支持播放")
+        }
         val key = HongguoSign.contentKey(spadeA ?: "") ?: throw DirectException("密钥派生失败")
         val duration = model.optDouble("video_duration", 0.0)
         return DirectMedia(
@@ -573,14 +573,19 @@ object DirectClient {
     /**
      * 完整真机参数集：首页接口翻页/筛选依赖它（仅 5 个必需参数时 offset>0 会返回重复内容）。
      */
-    private fun openCommonFull(deviceId: String, installId: String): String {
+    private fun openCommonFull(
+        deviceId: String,
+        installId: String,
+        versionCode: String = "65532"
+    ): String {
         val dev = deviceId.takeIf { it.length >= 6 } ?: "1234567890123456"
         val ins = installId.takeIf { it.length >= 6 } ?: "1234567890123456"
+        val versionName = if (versionCode == "65532") "6.5.5.32" else "7.4.2.32"
         return "iid=$ins&device_id=$dev&ac=wifi&channel=hongguo_baidu_pz_kaiping0105_android" +
-            "&aid=8662&app_name=novelread&version_code=65532&version_name=6.5.5.32" +
+            "&aid=8662&app_name=novelread&version_code=$versionCode&version_name=$versionName" +
             "&device_platform=android&os=android&ssmix=a&device_type=Redmi+Note+8+Pro&device_brand=Redmi" +
-            "&language=zh&os_api=36&os_version=16&manifest_version_code=65532" +
-            "&resolution=1080*2198&dpi=440&update_version_code=65532&pv_player=65532&gender=2" +
+            "&language=zh&os_api=36&os_version=16&manifest_version_code=$versionCode" +
+            "&resolution=1080*2198&dpi=440&update_version_code=$versionCode&pv_player=$versionCode&gender=2" +
             "&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&host_abi=arm64-v8a" +
             "&dragon_device_type=phone&rom_version=BP4A.251205.006+release-keys&compliance_status=0" +
             "&cdid=1f1d14b3-8c25-4733-9f6b-2fdc01640081"
