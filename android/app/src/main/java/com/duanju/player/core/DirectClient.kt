@@ -61,12 +61,15 @@ object DirectClient {
 
     data class HomeFilter(val id: String, val name: String)
 
+    data class HomeFilterGroup(val name: String, val items: List<HomeFilter>)
+
     data class HomePage(
         val items: List<HomeDrama>,
         val nextOffset: Int,
         val sessionId: String,
         val hasMore: Boolean,
-        val filters: List<HomeFilter>
+        val filters: List<HomeFilter>,
+        val filterGroups: List<HomeFilterGroup> = emptyList()
     )
 
     data class SeriesEpisode(
@@ -644,13 +647,33 @@ object DirectClient {
             }
             if (list.isNotEmpty()) { filters = list; break }
         }
+        val groups = ArrayList<HomeFilterGroup>()
+        for (i in 0 until (cells?.length() ?: 0)) {
+            val selector = cells?.optJSONObject(i)?.optJSONObject("cell_selector") ?: continue
+            val innerRows = selector.optJSONArray("inner_rows") ?: continue
+            for (r in 0 until innerRows.length()) {
+                val row = innerRows.optJSONObject(r) ?: continue
+                val rowName = row.optString("row_name")
+                val rowItems = row.optJSONArray("items") ?: continue
+                val items = ArrayList<HomeFilter>()
+                for (j in 0 until rowItems.length()) {
+                    val item = rowItems.optJSONObject(j) ?: continue
+                    val id = item.optString("selector_item_id")
+                    val name = item.optString("show_name")
+                    if (id.isNotEmpty() && name.isNotEmpty()) items.add(HomeFilter(id, name))
+                }
+                if (rowName.isNotEmpty() && items.isNotEmpty()) groups.add(HomeFilterGroup(rowName, items))
+            }
+            if (groups.isNotEmpty()) break
+        }
         val nextOffset = tab.optInt("next_offset", offset + 1)
         return HomePage(
             items = items,
             nextOffset = nextOffset,
             sessionId = tab.optString("session_id"),
             hasMore = nextOffset > offset,
-            filters = filters
+            filters = filters,
+            filterGroups = groups
         )
     }
 

@@ -38,7 +38,7 @@
             android:textSize="14sp" />
     </LinearLayout>
 
-    <!-- 筛选器 -->
+    <!-- 快捷筛选 -->
     <HorizontalScrollView
         android:id="@+id/filter_scroll"
         android:layout_width="match_parent"

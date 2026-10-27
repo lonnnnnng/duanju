@@ -17,13 +17,13 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
-import androidx.recyclerview.widget.GridLayoutManager
+import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.duanju.player.core.DirectClient
 import java.util.concurrent.Executors
 
 /**
- * 搜索页：左热门搜索（接口返回）/ 右搜索历史（本地最近 10 条），结果与首页同款 3 列卡片。
+ * 搜索页：空态展示搜索历史（本地最近 10 条），结果以列表展示。
  * 只搜短剧/漫剧，不搜电影、听书、小说。
  */
 class SearchActivity : AppCompatActivity() {
@@ -32,12 +32,11 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var clearButton: ImageButton
     private lateinit var loadingView: ProgressBar
     private lateinit var emptyView: TextView
-    private lateinit var grid: RecyclerView
+    private lateinit var resultList: RecyclerView
     private lateinit var suggest: View
-    private lateinit var hotBox: LinearLayout
     private lateinit var historyBox: LinearLayout
     private lateinit var historyClear: TextView
-    private lateinit var adapter: HomeAdapter
+    private lateinit var adapter: SearchResultAdapter
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -51,19 +50,14 @@ class SearchActivity : AppCompatActivity() {
         clearButton = findViewById(R.id.search_clear)
         loadingView = findViewById(R.id.search_loading)
         emptyView = findViewById(R.id.search_empty)
-        grid = findViewById(R.id.search_grid)
+        resultList = findViewById(R.id.search_list)
         suggest = findViewById(R.id.search_suggest)
-        hotBox = findViewById(R.id.hot_words)
         historyBox = findViewById(R.id.history_words)
         historyClear = findViewById(R.id.history_clear)
 
-        adapter = HomeAdapter { openDetail(it) }
-        val layoutManager = GridLayoutManager(this, 3)
-        layoutManager.spanSizeLookup = object : GridLayoutManager.SpanSizeLookup() {
-            override fun getSpanSize(position: Int): Int = if (adapter.isFooter(position)) 3 else 1
-        }
-        grid.layoutManager = layoutManager
-        grid.adapter = adapter
+        adapter = SearchResultAdapter { openDetail(it) }
+        resultList.layoutManager = LinearLayoutManager(this)
+        resultList.adapter = adapter
 
         findViewById<ImageButton>(R.id.search_back).setOnClickListener { finish() }
         findViewById<Button>(R.id.search_go).setOnClickListener { search() }
@@ -75,7 +69,15 @@ class SearchActivity : AppCompatActivity() {
 
         input.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) {
-                clearButton.visibility = if (s.isNullOrEmpty()) View.GONE else View.VISIBLE
+                val empty = s.isNullOrEmpty()
+                clearButton.visibility = if (empty) View.GONE else View.VISIBLE
+                // 清空输入框后回到搜索历史，不残留上一次的结果
+                if (empty && !searching) {
+                    adapter.submit(emptyList())
+                    resultList.visibility = View.GONE
+                    emptyView.visibility = View.GONE
+                    suggest.visibility = View.VISIBLE
+                }
             }
 
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) = Unit
@@ -95,7 +97,6 @@ class SearchActivity : AppCompatActivity() {
                 .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
         }
         renderHistory()
-        loadHotWords()
     }
 
     private fun renderHistory() {
@@ -105,13 +106,8 @@ class SearchActivity : AppCompatActivity() {
         history.take(10).forEach { word -> historyBox.addView(wordRow(word)) }
     }
 
-    private fun renderHotWords(words: List<String>) {
-        hotBox.removeAllViews()
-        words.take(10).forEach { word -> hotBox.addView(wordRow(word)) }
-    }
-
     private fun wordRow(word: String): TextView {
-        val view = LayoutInflater.from(this).inflate(R.layout.item_word_row, hotBox, false) as TextView
+        val view = LayoutInflater.from(this).inflate(R.layout.item_word_row, historyBox, false) as TextView
         view.text = word
         view.setOnClickListener {
             input.setText(word)
@@ -140,32 +136,23 @@ class SearchActivity : AppCompatActivity() {
                     loadingView.visibility = View.GONE
                     adapter.submit(items)
                     if (items.isEmpty()) {
-                        grid.visibility = View.GONE
+                        resultList.visibility = View.GONE
                         emptyView.text = "没有找到相关短剧"
                         emptyView.visibility = View.VISIBLE
                     } else {
-                        grid.visibility = View.VISIBLE
-                        grid.scrollToPosition(0)
+                        resultList.visibility = View.VISIBLE
+                        resultList.scrollToPosition(0)
                     }
                 }
             } catch (e: Exception) {
                 main.post {
                     searching = false
                     loadingView.visibility = View.GONE
-                    grid.visibility = View.GONE
+                    resultList.visibility = View.GONE
                     emptyView.text = "搜索失败：${e.message}"
                     emptyView.visibility = View.VISIBLE
                 }
             }
-        }
-    }
-
-    private fun loadHotWords() {
-        executor.execute {
-            val (deviceId, installId) = DirectClient.identity(this)
-            val words = runCatching { DirectClient.hotWords(deviceId, installId) }.getOrDefault(emptyList())
-            if (words.isEmpty()) return@execute
-            main.post { renderHotWords(words) }
         }
     }
 
