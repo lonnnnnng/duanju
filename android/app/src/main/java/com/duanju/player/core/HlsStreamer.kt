@@ -73,7 +73,10 @@ class HlsStreamer(
         )
     }
 
-    /** 等播放清单里出现至少一个分片即可起播。 */
+    /**
+     * 等播放清单写完（#EXT-X-ENDLIST），此时分片时长已完整，ExoPlayer 的时长不会随后续分片增长。
+     * 超过 timeoutMs 仍未完成时，只要已有分片就先起播，避免慢网下一直黑屏。
+     */
     fun awaitReady(timeoutMs: Long): Boolean {
         val deadline = System.currentTimeMillis() + timeoutMs
         while (System.currentTimeMillis() < deadline) {
@@ -81,11 +84,13 @@ class HlsStreamer(
             val playlist = File(dir, "index.m3u8")
             if (playlist.isFile && playlist.length() > 0) {
                 val text = runCatching { playlist.readText() }.getOrDefault("")
-                if (text.contains("#EXTINF")) return true
+                if (text.contains("#EXT-X-ENDLIST")) return true
+                if (session == null) return false
             }
-            Thread.sleep(60)
+            Thread.sleep(40)
         }
-        return false
+        val text = runCatching { File(dir, "index.m3u8").readText() }.getOrDefault("")
+        return text.contains("#EXTINF")
     }
 
     /** 停止 ffmpeg、关闭本地服务并删除分片目录。 */

@@ -402,7 +402,7 @@ statusView = findViewById(R.id.status)
         val current = HlsStreamer(media.url, media.keyHex, ca, startMs / 1000.0, baseDir)
         hls = current
         current.start()
-        if (!current.awaitReady(15_000)) {
+        if (!current.awaitReady(20_000)) {
             current.cancel()
             throw DirectClient.DirectException(current.failure ?: "HLS 播放清单未就绪")
         }
@@ -410,6 +410,7 @@ statusView = findViewById(R.id.status)
         main.post {
             loading.visibility = View.GONE
             status("第${selectedEpisode}集 ${media.quality}p · HLS 流式解析${resolveMs}ms")
+            // 已等到 ENDLIST，播放列表完整，时长从起播就是定值。
             val source = androidx.media3.exoplayer.hls.HlsMediaSource.Factory(
                 DefaultHttpDataSource.Factory()
             ).createMediaSource(MediaItem.fromUri(current.playlistUrl))
