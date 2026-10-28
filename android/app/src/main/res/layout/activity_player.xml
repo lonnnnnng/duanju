@@ -124,14 +124,29 @@
             android:paddingHorizontal="14dp">
 
             <TextView
-                android:id="@+id/episode_title"
-                android:layout_width="0dp"
+                android:id="@+id/tab_episodes"
+                android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_weight="1"
                 android:fontFamily="sans-serif-medium"
+                android:paddingVertical="2dp"
                 android:text="选集"
-                android:textColor="?android:attr/textColorPrimary"
+                android:textColor="@color/accent"
                 android:textSize="15sp" />
+
+            <TextView
+                android:id="@+id/tab_related"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="18dp"
+                android:paddingVertical="2dp"
+                android:text="相关"
+                android:textColor="?android:attr/textColorSecondary"
+                android:textSize="15sp" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
 
             <TextView
                 android:id="@+id/episode_group_label"
@@ -165,5 +180,27 @@
             android:clipToPadding="false"
             android:paddingHorizontal="10dp"
             android:paddingBottom="8dp" />
+
+        <!-- 「相关」：同一部剧的其他季，紧凑列表 -->
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/related_list"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_marginTop="4dp"
+            android:layout_weight="1"
+            android:clipToPadding="false"
+            android:paddingBottom="8dp"
+            android:visibility="gone" />
+
+        <TextView
+            android:id="@+id/related_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingHorizontal="14dp"
+            android:paddingVertical="14dp"
+            android:text="加载中…"
+            android:textColor="?android:attr/textColorSecondary"
+            android:textSize="13sp"
+            android:visibility="gone" />
     </LinearLayout>
 </LinearLayout>

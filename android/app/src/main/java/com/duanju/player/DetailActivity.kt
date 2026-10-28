@@ -38,6 +38,13 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var errorText: TextView
     private lateinit var scroll: View
     private lateinit var topBar: TopBar
+    private lateinit var tabEpisodes: TextView
+    private lateinit var tabRelated: TextView
+    private lateinit var relatedList: RecyclerView
+    private lateinit var relatedStatus: TextView
+    private lateinit var relatedAdapter: RelatedAdapter
+    private var relatedLoaded = false
+    private var showingRelated = false
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -80,6 +87,16 @@ class DetailActivity : AppCompatActivity() {
         episodeView.layoutManager = GridLayoutManager(this, 6)
         episodeView.adapter = episodeAdapter
 
+        tabEpisodes = findViewById(R.id.detail_tab_episodes)
+        tabRelated = findViewById(R.id.detail_tab_related)
+        relatedList = findViewById(R.id.detail_related)
+        relatedStatus = findViewById(R.id.detail_related_status)
+        relatedAdapter = RelatedAdapter(seriesId) { season -> openSeason(season) }
+        relatedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        relatedList.adapter = relatedAdapter
+        tabEpisodes.setOnClickListener { showRelated(false) }
+        tabRelated.setOnClickListener { showRelated(true) }
+
         if (seriesTitle.isNotEmpty()) {
             topBar.setTitle(seriesTitle)
             title.text = seriesTitle
@@ -116,6 +133,9 @@ class DetailActivity : AppCompatActivity() {
         scroll.visibility = View.VISIBLE
         title.text = data.title
         topBar.setTitle(data.title)
+        // 标题可能来自首页卡片（简写），拿到详情后重算「相关」的搜索词。
+        relatedLoaded = false
+        if (showingRelated) showRelated(true)
 
         data.cover?.takeIf { it.isNotBlank() }?.let { BitmapLoader.load(it, cover) }
 
@@ -225,6 +245,63 @@ class DetailActivity : AppCompatActivity() {
             intro.ellipsize = android.text.TextUtils.TruncateAt.END
         }
         introToggle.text = if (introExpanded) "收起" else "展开"
+    }
+
+    /** 选集 / 相关 切换；相关页首次点击时才请求搜索接口。 */
+    private fun showRelated(show: Boolean) {
+        showingRelated = show
+        SectionTabs.apply(if (show) tabRelated else tabEpisodes, if (show) tabEpisodes else tabRelated)
+        groupScroll.visibility = if (show) View.GONE else View.VISIBLE
+        episodeView.visibility = if (show) View.GONE else View.VISIBLE
+        relatedList.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) {
+            relatedStatus.visibility = View.GONE
+            return
+        }
+        if (relatedLoaded) return
+        loadRelated()
+    }
+
+    private fun loadRelated() {
+        val current = detail?.title ?: seriesTitle
+        if (current.isBlank()) {
+            relatedStatus.text = "暂无可关联的剧集"
+            relatedStatus.visibility = View.VISIBLE
+            return
+        }
+        relatedStatus.text = "加载中…"
+        relatedStatus.visibility = View.VISIBLE
+        relatedList.visibility = View.GONE
+        Thread {
+            val seasons = runCatching {
+                val (deviceId, installId) = DirectClient.identity(this)
+                val firstVid = detail?.list?.firstOrNull { !it.disabled }?.vid
+                DirectClient.relatedSeasons(seriesId, firstVid, deviceId, installId, current, detail?.cover)
+            }.getOrElse { emptyList() }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                relatedLoaded = true
+                relatedAdapter.submit(seasons)
+                relatedStatus.visibility = if (seasons.isEmpty()) View.VISIBLE else View.GONE
+                if (seasons.isEmpty()) relatedStatus.text = "未找到相关剧集"
+                relatedList.visibility = if (seasons.isEmpty()) View.GONE else View.VISIBLE
+            }
+        }.start()
+    }
+
+    /** 打开某一季的详情；当前这一季直接忽略。 */
+    private fun openSeason(season: com.duanju.player.core.SeriesAggregator.Season) {
+        if (season.id == seriesId) return
+        if (!season.playable) {
+            android.widget.Toast.makeText(this, "该季还未上线", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            Intent(this, DetailActivity::class.java)
+                .putExtra("dramaId", season.id)
+                .putExtra("title", season.title)
+                .putExtra("episodes", season.episodes)
+        )
     }
 
     private fun play(episode: Int) {

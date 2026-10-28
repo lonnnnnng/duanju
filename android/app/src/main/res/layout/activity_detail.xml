@@ -121,16 +121,35 @@
                     android:textSize="12sp"
                     android:visibility="gone" />
 
-                <!-- 选集 -->
-                <TextView
-                    android:layout_width="wrap_content"
+                <!-- 选集 / 相关 -->
+                <LinearLayout
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
                     android:layout_marginTop="20dp"
-                    android:fontFamily="sans-serif-medium"
-                    android:text="选集"
-                    android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="15sp" />
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        android:id="@+id/detail_tab_episodes"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:fontFamily="sans-serif-medium"
+                        android:paddingVertical="2dp"
+                        android:text="选集"
+                        android:textColor="@color/accent"
+                        android:textSize="15sp" />
+
+                    <TextView
+                        android:id="@+id/detail_tab_related"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="18dp"
+                        android:paddingVertical="2dp"
+                        android:text="相关"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:textSize="15sp" />
+                </LinearLayout>
 
                 <HorizontalScrollView
                     android:id="@+id/detail_group_scroll"
@@ -154,6 +173,26 @@
                     android:layout_marginTop="10dp"
                     android:nestedScrollingEnabled="false"
                     android:paddingHorizontal="16dp" />
+
+                <!-- 「相关」：同一部剧的其他季，紧凑列表 -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/detail_related"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:nestedScrollingEnabled="false"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/detail_related_status"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="16dp"
+                    android:paddingVertical="14dp"
+                    android:text="加载中…"
+                    android:textColor="?android:attr/textColorSecondary"
+                    android:textSize="13sp"
+                    android:visibility="gone" />
             </LinearLayout>
         </androidx.core.widget.NestedScrollView>
 

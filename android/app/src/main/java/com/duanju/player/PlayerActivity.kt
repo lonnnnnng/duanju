@@ -55,6 +55,14 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var fullscreenTopBar: View
     private lateinit var fullscreenTitle: TextView
     private lateinit var topBar: TopBar
+    private lateinit var tabEpisodes: TextView
+    private lateinit var tabRelated: TextView
+    private lateinit var relatedList: RecyclerView
+    private lateinit var relatedStatus: TextView
+    private lateinit var relatedAdapter: RelatedAdapter
+    private lateinit var episodeList: RecyclerView
+    private var relatedLoaded = false
+    private var showingRelated = false
 
     private var dramaId = ""
     private var title = ""
@@ -81,6 +89,8 @@ class PlayerActivity : AppCompatActivity() {
     private var prefetchFuture: Future<*>? = null
     /** 当前播放器正在读取的缓存文件，LRU 清理时需跳过。 */
     @Volatile private var playingFile: File? = null
+    /** 当前集对应的 vid，用于「相关」页拼剧集页 URL。 */
+    @Volatile private var currentVideoId: String? = null
 
     // 状态行展示用的播放信息（集数进度之后的附加文案）。
     @Volatile private var mediaQuality = 0
@@ -210,7 +220,18 @@ statusView = findViewById(R.id.status)
         }
         fullscreenButton.setOnClickListener { toggleFullscreen() }
 
-        val list = findViewById<RecyclerView>(R.id.episode_list)
+        tabEpisodes = findViewById(R.id.tab_episodes)
+        tabRelated = findViewById(R.id.tab_related)
+        relatedList = findViewById(R.id.related_list)
+        relatedStatus = findViewById(R.id.related_status)
+        relatedAdapter = RelatedAdapter(dramaId.substringAfter(':')) { season -> openSeason(season) }
+        relatedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
+        relatedList.adapter = relatedAdapter
+        tabEpisodes.setOnClickListener { showRelated(false) }
+        tabRelated.setOnClickListener { showRelated(true) }
+
+        episodeList = findViewById(R.id.episode_list)
+        val list = episodeList
         list.layoutManager = GridLayoutManager(this, 6)
         groupsBox = findViewById(R.id.episode_groups)
         groupScroll = findViewById(R.id.group_scroll)
@@ -219,6 +240,7 @@ statusView = findViewById(R.id.status)
         list.adapter = episodeAdapter
         renderGroups(selectedEpisode)
         startPositionTicker()
+        root.post { applyVideoAspect() }
 
         play(selectedEpisode, pendingSeekMs)
     }
@@ -351,8 +373,12 @@ statusView = findViewById(R.id.status)
             } else {
                 9f / 16f
             }
-            val maxHeight = (metrics.heightPixels * 0.60f).toInt()
-            minOf(maxHeight, (metrics.widthPixels * ratio).toInt())
+            // 竖屏剧：播放器窗口与下方内容各占一半，避免播放器吃掉整屏；
+            // 横屏剧：按画面比例收紧，尽量不留黑边（通常比一半矮）。
+            val rootHeight = if (::root.isInitialized && root.height > 0) root.height else metrics.heightPixels
+            val barHeight = if (::topBar.isInitialized) topBar.height else 0
+            val half = ((rootHeight - barHeight) * 0.5f).toInt().coerceAtLeast(1)
+            minOf(half, (metrics.widthPixels * ratio).toInt())
         }
         videoContainer.layoutParams = params
     }
@@ -389,6 +415,7 @@ statusView = findViewById(R.id.status)
         }
         fullscreenButton.text = if (fullscreen) "退出全屏" else "全屏"
         applyVideoAspect()
+        if (!fullscreen) root.post { applyVideoAspect() }
     }
 
     private fun isLandscapeVideo(): Boolean {
@@ -459,6 +486,7 @@ statusView = findViewById(R.id.status)
         val chapters = com.duanju.player.core.DirectClient.chapters(seriesId, deviceId, installId)
         if (episode > chapters.size) throw com.duanju.player.core.DirectClient.DirectException("集数超出范围")
         val videoId = chapters[episode - 1]
+        currentVideoId = videoId
         val media = com.duanju.player.core.DirectClient.media(videoId, deviceId, installId)
         val resolveMs = System.currentTimeMillis() - start
         main.post { status("已解析(${resolveMs}ms) ${media.quality}p，本地解密中…") }
@@ -624,6 +652,59 @@ statusView = findViewById(R.id.status)
         ms <= 0L -> "-"
         ms < 1000L -> "${ms}ms"
         else -> String.format(java.util.Locale.US, "%.1fs", ms / 1000.0)
+    }
+
+    /** 选集 / 相关 切换；相关页首次点击时才请求搜索接口。 */
+    private fun showRelated(show: Boolean) {
+        showingRelated = show
+        SectionTabs.apply(if (show) tabRelated else tabEpisodes, if (show) tabEpisodes else tabRelated)
+        groupScroll.visibility = if (show) View.GONE else View.VISIBLE
+        episodeList.visibility = if (show) View.GONE else View.VISIBLE
+        relatedList.visibility = if (show) View.VISIBLE else View.GONE
+        if (!show) {
+            relatedStatus.visibility = View.GONE
+            return
+        }
+        if (relatedLoaded) return
+        loadRelated()
+    }
+
+    private fun loadRelated() {
+        val current = title
+        relatedStatus.text = "加载中…"
+        relatedStatus.visibility = View.VISIBLE
+        relatedList.visibility = View.GONE
+        Thread {
+            val seasons = runCatching {
+                val (deviceId, installId) = DirectClient.identity(this)
+                DirectClient.relatedSeasons(
+                    dramaId.substringAfter(':'), currentVideoId, deviceId, installId, current,
+                    cover.ifBlank { null }
+                )
+            }.getOrElse { emptyList() }
+            runOnUiThread {
+                if (isFinishing || isDestroyed) return@runOnUiThread
+                relatedLoaded = true
+                relatedAdapter.submit(seasons)
+                relatedStatus.text = "未找到相关剧集"
+                relatedStatus.visibility = if (seasons.isEmpty()) View.VISIBLE else View.GONE
+                relatedList.visibility = if (seasons.isEmpty()) View.GONE else View.VISIBLE
+            }
+        }.start()
+    }
+
+    /** 点击「相关」里的某一季，进入它的详情页。 */
+    private fun openSeason(season: com.duanju.player.core.SeriesAggregator.Season) {
+        if (!season.playable) {
+            android.widget.Toast.makeText(this, "该季还未上线", android.widget.Toast.LENGTH_SHORT).show()
+            return
+        }
+        startActivity(
+            android.content.Intent(this, DetailActivity::class.java)
+                .putExtra("dramaId", season.id)
+                .putExtra("title", season.title)
+                .putExtra("episodes", season.episodes)
+        )
     }
 
     /**

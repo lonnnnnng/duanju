@@ -26,6 +26,9 @@ object DirectClient {
     private val SEARCH_TYPES = setOf("短剧", "漫剧")
 
     private const val OPEN_HOST = "https://api5-normal-sinfonlinec.fqnovel.com"
+    private const val WEB_HOST = "https://hongguoduanju.com"
+    private const val UA_WEB = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
+        "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
 
     data class DirectMedia(
         val url: String,
@@ -657,6 +660,164 @@ object DirectClient {
                 )
             )
         }
+    }
+
+    /**
+     * 「相关」= 同剧的其他季。
+     *
+     * 优先读站点剧集页：`hongguoduanju.com/player/<seriesId>/<videoId>` 的
+     * `data-fn-args` 里一次性带出各季的 series_id / 名称 / 封面 / 集数（一次请求，无需签名），
+     * 比「搜索 + 逐季补详情」省掉 N 次请求。
+     * 站点页不可达时退回搜索聚合（搜索结果没有封面，只在本地补当前剧的）。
+     */
+    fun relatedSeasons(
+        seriesId: String,
+        videoId: String?,
+        deviceId: String,
+        installId: String,
+        currentTitle: String = "",
+        currentCover: String? = null
+    ): List<SeriesAggregator.Season> {
+        runCatching { seasonsFromPlayerPage(seriesId, videoId, deviceId, installId) }
+            .getOrNull()
+            ?.takeIf { it.isNotEmpty() }
+            ?.let { return it }
+
+        val keyword = SeriesAggregator.baseTitle(currentTitle).ifEmpty { currentTitle }.take(30)
+        if (keyword.isEmpty()) return emptyList()
+        val hits = searchHits(keyword, deviceId, installId)
+            .map { SeriesAggregator.Hit(it.id, it.title, it.type, it.episodes) }
+        return SeriesAggregator.aggregate(currentTitle, null, hits)
+            .map { if (it.id == seriesId && it.cover == null) it.copy(cover = currentCover) else it }
+    }
+
+    /**
+     * 站点剧集页 → 各季列表。页面把数据塞在 `data-fn-args='[...]'`，
+     * 第三项即 videoList（每项含 series_id / series_name / series_cover / episode_cnt）。
+     */
+    private fun seasonsFromPlayerPage(
+        seriesId: String,
+        videoId: String?,
+        deviceId: String,
+        installId: String
+    ): List<SeriesAggregator.Season> {
+        val vid = videoId ?: chapters(seriesId, deviceId, installId).firstOrNull() ?: return emptyList()
+        val page = httpGetWeb("$WEB_HOST/player/$seriesId/$vid")
+        val args = dataFnArgs(page) ?: return emptyList()
+        val list = args.optJSONArray(2) ?: return emptyList()
+        val hits = ArrayList<SeriesAggregator.Hit>(list.length() + 1)
+        // 页面里的 videoList 不含当前这一季，单独从 seriesDetail 补上。
+        val current = currentSeason(page)
+        if (current != null) hits.add(current)
+        for (i in 0 until list.length()) {
+            val row = list.optJSONObject(i) ?: continue
+            val id = row.optString("series_id")
+            val name = row.optString("series_name")
+            if (id.isEmpty() || name.isEmpty()) continue
+            hits.add(
+                SeriesAggregator.Hit(
+                    id = id,
+                    title = name,
+                    type = "",
+                    episodes = row.optInt("episode_cnt", 0),
+                    cover = row.optString("series_cover").ifEmpty { null }
+                )
+            )
+        }
+        return SeriesAggregator.aggregate(current?.title ?: "", null, hits)
+    }
+
+    /** 页面 `data-fn-args` 里的 JSON 数组；HTML 实体先还原。 */
+    private fun dataFnArgs(page: String): JSONArray? {
+        val marker = "data-fn-args='"
+        val start = page.indexOf(marker)
+        if (start < 0) return null
+        val end = page.indexOf('\'', start + marker.length)
+        if (end < 0) return null
+        val text = page.substring(start + marker.length, end)
+            .replace("&quot;", "\"")
+            .replace("&#39;", "'")
+            .replace("&apos;", "'")
+            .replace("&lt;", "<")
+            .replace("&gt;", ">")
+            .replace("&amp;", "&")
+        return runCatching { JSONArray(text) }.getOrNull()
+    }
+
+    /** 当前剧的 series_name / series_cover / episode_cnt（页面里的 seriesDetail）。 */
+    private fun currentSeason(page: String): SeriesAggregator.Hit? {
+        val marker = "\"seriesDetail\":{"
+        val start = page.indexOf(marker)
+        if (start < 0) return null
+        // 整段按 JSON 解析：封面 URL 是 \u002F 转义的，正则截取会拿到非法地址。
+        val json = extractJsonObject(page, start + marker.length - 1) ?: return null
+        val obj = runCatching { JSONObject(json) }.getOrNull() ?: return null
+        val id = obj.optString("series_id")
+        val name = obj.optString("series_name")
+        if (id.isEmpty() || name.isEmpty()) return null
+        return SeriesAggregator.Hit(
+            id = id,
+            title = name,
+            type = "",
+            episodes = obj.optInt("episode_cnt", 0),
+            cover = obj.optString("series_cover").ifEmpty { null }
+        )
+    }
+
+    /** 从 start（必须是 '{'）开始按括号配对截取一个完整 JSON 对象。 */
+    private fun extractJsonObject(text: String, start: Int): String? {
+        if (start !in text.indices || text[start] != '{') return null
+        var depth = 0
+        var inString = false
+        var escaped = false
+        for (i in start until text.length) {
+            val c = text[i]
+            if (inString) {
+                when {
+                    escaped -> escaped = false
+                    c == '\\' -> escaped = true
+                    c == '"' -> inString = false
+                }
+                continue
+            }
+            when (c) {
+                '"' -> inString = true
+                '{' -> depth++
+                '}' -> {
+                    depth--
+                    if (depth == 0) return text.substring(start, i + 1)
+                }
+            }
+        }
+        return null
+    }
+
+    /** 站点页面：浏览器 UA + Referer，失败重试 3 次。 */
+    private fun httpGetWeb(url: String): String {
+        var last: Exception? = null
+        for (attempt in 1..3) {
+            try {
+                val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+                    requestMethod = "GET"
+                    connectTimeout = 15000
+                    readTimeout = 30000
+                    setRequestProperty("User-Agent", UA_WEB)
+                    setRequestProperty("Referer", "$WEB_HOST/")
+                    setRequestProperty("Accept", "text/html,application/xhtml+xml")
+                }
+                val code = conn.responseCode
+                val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                    ?.bufferedReader()?.use { it.readText() } ?: ""
+                conn.disconnect()
+                if (code != 200) throw DirectException("网页 HTTP $code")
+                if (text.isEmpty()) throw DirectException("网页空响应")
+                return text
+            } catch (e: Exception) {
+                last = e
+                if (attempt < 3) Thread.sleep(attempt * 600L)
+            }
+        }
+        throw last ?: DirectException("网页加载失败")
     }
 
     /**
