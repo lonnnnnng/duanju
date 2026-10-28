@@ -81,4 +81,5 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     implementation("com.arthenica:ffmpeg-kit-next:9.0.2")
+    implementation("com.google.android.flexbox:flexbox:3.0.0")
 }
