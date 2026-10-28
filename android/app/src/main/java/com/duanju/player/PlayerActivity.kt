@@ -5,6 +5,7 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.view.View
+import android.view.ViewGroup
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.ProgressBar
@@ -35,6 +36,7 @@ class PlayerActivity : AppCompatActivity() {
 
     private lateinit var player: ExoPlayer
     private lateinit var playerView: PlayerView
+    private lateinit var videoContainer: View
     private lateinit var statusView: TextView
     private lateinit var loading: ProgressBar
     private lateinit var episodeAdapter: EpisodeAdapter
@@ -118,6 +120,7 @@ class PlayerActivity : AppCompatActivity() {
                 videoWidth = videoSize.width
                 videoHeight = videoSize.height
                 videoRotation = videoSize.unappliedRotationDegrees
+                applyVideoAspect()
             }
         })
 
@@ -125,6 +128,10 @@ class PlayerActivity : AppCompatActivity() {
         playerView = findViewById(R.id.player_view)
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         playerView.player = player
+        // 播放、切集都不主动弹出控制器，只有触摸播放器区域时显示。
+        playerView.controllerAutoShow = false
+        videoContainer = findViewById(R.id.video_container)
+        applyVideoAspect()
         header = findViewById(R.id.header)
         episodePanel = findViewById(R.id.episode_panel)
         root = findViewById(R.id.root)
@@ -285,6 +292,28 @@ statusView = findViewById(R.id.status)
     private fun speedLabel(value: Float): String =
         if (value == value.toInt().toFloat()) "${value.toInt()}×" else "${value}×"
 
+    /**
+     * 让视频容器贴合画面比例：横屏视频不再在上下留大块黑边，
+     * 竖屏视频受屏高上限约束，尽量增大画面宽度。
+     */
+    private fun applyVideoAspect() {
+        if (!::videoContainer.isInitialized) return
+        val metrics = resources.displayMetrics
+        val params = videoContainer.layoutParams
+        params.height = if (fullscreen) {
+            ViewGroup.LayoutParams.MATCH_PARENT
+        } else {
+            val ratio = if (videoWidth > 0 && videoHeight > 0) {
+                videoHeight.toFloat() / videoWidth
+            } else {
+                9f / 16f
+            }
+            val maxHeight = (metrics.heightPixels * 0.60f).toInt()
+            minOf(maxHeight, (metrics.widthPixels * ratio).toInt())
+        }
+        videoContainer.layoutParams = params
+    }
+
     private fun toggleFullscreen() {
         fullscreen = !fullscreen
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
@@ -315,6 +344,7 @@ statusView = findViewById(R.id.status)
             WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         }
         fullscreenButton.text = if (fullscreen) "退出全屏" else "全屏"
+        applyVideoAspect()
     }
 
     private fun isLandscapeVideo(): Boolean {
@@ -345,6 +375,7 @@ statusView = findViewById(R.id.status)
 
     private fun play(episode: Int, startMs: Long) {
         selectedEpisode = episode
+        playerView.hideController()
         updateFullscreenEpisode()
         episodeAdapter.setSelected(episode)
         syncGroup(episode)
