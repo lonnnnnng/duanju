@@ -29,8 +29,8 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="长按可删除"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+            android:textColor="@color/app_text_tertiary"
+            android:textSize="11sp" />
     </LinearLayout>
 
     <FrameLayout
@@ -43,8 +43,8 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
-            android:paddingHorizontal="12dp"
-            android:paddingBottom="12dp"
+            android:paddingHorizontal="14dp"
+            android:paddingBottom="90dp"
             android:scrollbars="none" />
 
         <LinearLayout
@@ -60,15 +60,15 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="暂无播放记录"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="14sp" />
+                android:textColor="@color/app_on_surface_variant"
+                android:textSize="13sp" />
 
             <TextView
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:text="去首页挑一部短剧吧"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="@color/app_text_tertiary"
                 android:textSize="12sp" />
         </LinearLayout>
     </FrameLayout>

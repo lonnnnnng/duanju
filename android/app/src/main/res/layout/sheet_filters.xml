@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:background="?android:attr/colorBackground"
+    android:background="@drawable/bg_sheet_top"
     android:orientation="vertical"
     android:paddingBottom="16dp">
 
@@ -22,7 +22,7 @@
             android:fontFamily="sans-serif-medium"
             android:text="筛选"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp" />
+            android:textSize="15sp" />
 
         <TextView
             android:id="@+id/filter_reset"
@@ -32,7 +32,7 @@
             android:paddingHorizontal="8dp"
             android:paddingVertical="4dp"
             android:text="重置"
-            android:textColor="@color/accent"
+            android:textColor="@color/accent_warm"
             android:textSize="13sp" />
     </LinearLayout>
 
@@ -40,13 +40,13 @@
     <LinearLayout
         android:id="@+id/filter_body"
         android:layout_width="match_parent"
-        android:layout_height="360dp"
+        android:layout_height="380dp"
         android:orientation="horizontal">
 
         <ScrollView
-            android:layout_width="104dp"
+            android:layout_width="96dp"
             android:layout_height="match_parent"
-            android:background="@color/app_surface_variant"
+            android:background="@drawable/bg_filter_groups"
             android:scrollbars="none">
 
             <LinearLayout

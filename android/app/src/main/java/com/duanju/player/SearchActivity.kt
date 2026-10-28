@@ -106,9 +106,9 @@ class SearchActivity : AppCompatActivity() {
         history.take(10).forEach { word -> historyBox.addView(wordRow(word)) }
     }
 
-    private fun wordRow(word: String): TextView {
-        val view = LayoutInflater.from(this).inflate(R.layout.item_word_row, historyBox, false) as TextView
-        view.text = word
+    private fun wordRow(word: String): View {
+        val view = LayoutInflater.from(this).inflate(R.layout.item_word_row, historyBox, false)
+        view.findViewById<TextView>(R.id.word).text = word
         view.setOnClickListener {
             input.setText(word)
             input.setSelection(word.length)

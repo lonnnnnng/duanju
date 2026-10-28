@@ -290,11 +290,7 @@ statusView = findViewById(R.id.status)
             chip.setBackgroundResource(if (isSelected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
             chip.setTextColor(
                 if (isSelected) 0xFFFFFFFF.toInt()
-                else {
-                    val typed = theme.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
-                    val color = try { typed.getColor(0, 0xFF1A1A1A.toInt()) } finally { typed.recycle() }
-                    color
-                }
+                else androidx.core.content.ContextCompat.getColor(this, R.color.app_on_surface_variant)
             )
         }
         groupLabel.text = EpisodeGroups.label(range)
@@ -636,7 +632,8 @@ statusView = findViewById(R.id.status)
                 episode = selectedEpisode,
                 positionMs = position,
                 updatedAt = System.currentTimeMillis(),
-                cover = cover
+                cover = cover,
+                durationMs = if (player.duration > 0) player.duration else 0L
             )
         )
     }

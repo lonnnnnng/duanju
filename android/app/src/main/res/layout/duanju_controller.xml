@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 自定义 Media3 控制器：保留进度条/播放暂停/时间，另加 倍速/静音/全屏 三个按钮。 -->
+<!-- 自定义 Media3 控制器：毛玻璃圆钮 + 渐变进度条 + 倍速/静音/全屏。 -->
 <merge xmlns:android="http://schemas.android.com/apk/res/android">
 
   <View android:id="@id/exo_controls_background"
@@ -43,37 +43,43 @@
         android:layoutDirection="ltr">
 
       <Button android:id="@+id/custom_speed"
-          android:layout_width="wrap_content"
-          android:layout_height="match_parent"
+          android:layout_width="44dp"
+          android:layout_height="34dp"
+          android:layout_gravity="center_vertical"
+          android:layout_marginEnd="6dp"
+          android:background="@drawable/bg_glass_button"
+          android:insetTop="0dp"
+          android:insetBottom="0dp"
           android:minWidth="0dp"
-          android:paddingStart="12dp"
-          android:paddingEnd="12dp"
-          android:background="?android:attr/selectableItemBackgroundBorderless"
           android:text="1.0×"
           android:textColor="#FFFFFF"
-          android:textSize="13sp"/>
+          android:textSize="11sp"/>
 
       <Button android:id="@+id/custom_mute"
-          android:layout_width="wrap_content"
-          android:layout_height="match_parent"
+          android:layout_width="44dp"
+          android:layout_height="34dp"
+          android:layout_gravity="center_vertical"
+          android:layout_marginEnd="6dp"
+          android:background="@drawable/bg_glass_button"
+          android:insetTop="0dp"
+          android:insetBottom="0dp"
           android:minWidth="0dp"
-          android:paddingStart="12dp"
-          android:paddingEnd="12dp"
-          android:background="?android:attr/selectableItemBackgroundBorderless"
           android:text="静音"
           android:textColor="#FFFFFF"
-          android:textSize="13sp"/>
+          android:textSize="11sp"/>
 
       <Button android:id="@+id/custom_fullscreen"
-          android:layout_width="wrap_content"
-          android:layout_height="match_parent"
+          android:layout_width="44dp"
+          android:layout_height="34dp"
+          android:layout_gravity="center_vertical"
+          android:layout_marginEnd="10dp"
+          android:background="@drawable/bg_glass_button"
+          android:insetTop="0dp"
+          android:insetBottom="0dp"
           android:minWidth="0dp"
-          android:paddingStart="12dp"
-          android:paddingEnd="12dp"
-          android:background="?android:attr/selectableItemBackgroundBorderless"
           android:text="全屏"
           android:textColor="#FFFFFF"
-          android:textSize="13sp"/>
+          android:textSize="11sp"/>
 
     </LinearLayout>
 
@@ -97,26 +103,32 @@
       android:layoutDirection="ltr">
 
     <ImageButton android:id="@+id/custom_prev"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_glass_button"
         android:contentDescription="上一集"
-        android:padding="10dp"
+        android:padding="12dp"
         android:src="@drawable/ic_skip_previous"/>
 
     <include layout="@layout/control_rewind_15" />
 
     <ImageButton android:id="@id/exo_play_pause"
-        style="@style/ExoStyledControls.Button.Center.PlayPause"/>
+        android:layout_width="60dp"
+        android:layout_height="60dp"
+        android:layout_marginHorizontal="8dp"
+        android:background="@drawable/bg_play_button"
+        android:contentDescription="播放/暂停"
+        android:padding="16dp"
+        android:scaleType="center" />
 
     <include layout="@layout/control_forward_15" />
 
     <ImageButton android:id="@+id/custom_next"
-        android:layout_width="56dp"
-        android:layout_height="56dp"
-        android:background="?android:attr/selectableItemBackgroundBorderless"
+        android:layout_width="46dp"
+        android:layout_height="46dp"
+        android:background="@drawable/bg_glass_button"
         android:contentDescription="下一集"
-        android:padding="10dp"
+        android:padding="12dp"
         android:src="@drawable/ic_skip_next"/>
 
   </LinearLayout>

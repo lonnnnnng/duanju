@@ -238,7 +238,7 @@ class LibraryFragment : Fragment() {
                         isClickable = true
                         isFocusable = true
                         setPadding(dp(6), dp(9), dp(6), dp(9))
-                        setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
+                        setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_fopt)
                         setTextColor(if (selected) 0xFFFFFFFF.toInt() else resolveChipColor())
                         setOnClickListener {
                             sheet.dismiss()
@@ -265,7 +265,11 @@ class LibraryFragment : Fragment() {
                 val tab = groupBox.getChildAt(i) as TextView
                 val active = i == index
                 tab.setTextColor(if (active) 0xFFFFFFFF.toInt() else resolveChipColor())
-                tab.setBackgroundColor(if (active) ContextCompat.getColor(requireContext(), R.color.accent) else android.graphics.Color.TRANSPARENT)
+                tab.background = if (active) {
+                    ContextCompat.getDrawable(requireContext(), R.drawable.bg_filter_group_active)?.mutate()
+                } else {
+                    null
+                }
                 tab.setTypeface(null, if (active) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             }
             renderItems(groups[index])
@@ -343,16 +347,8 @@ class LibraryFragment : Fragment() {
         chip.setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
     }
 
-    private fun resolveChipColor(): Int {
-        val attr = android.R.attr.textColorSecondary
-        val typed = requireContext().theme.obtainStyledAttributes(intArrayOf(attr))
-        val color = try {
-            typed.getColor(0, 0xFF606064.toInt())
-        } finally {
-            typed.recycle()
-        }
-        return color
-    }
+    private fun resolveChipColor(): Int =
+        androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_on_surface_variant)
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

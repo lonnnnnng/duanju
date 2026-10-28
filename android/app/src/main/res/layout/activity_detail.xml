@@ -11,8 +11,9 @@
     <com.duanju.player.TopBar
         android:id="@+id/detail_top_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="4dp" />
+        android:layout_height="50dp"
+        android:background="@color/app_bg_elevated"
+        android:paddingHorizontal="6dp" />
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -31,18 +32,21 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
-                <!-- 头部：封面 + 信息 -->
+                <!-- 头部：海报 + 信息 -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="horizontal"
-                    android:paddingHorizontal="16dp">
+                    android:paddingHorizontal="16dp"
+                    android:paddingTop="12dp">
 
                     <com.duanju.player.FixedAspectImageView
                         android:id="@+id/detail_cover"
-                        android:layout_width="110dp"
-                        android:layout_height="147dp"
-                        android:background="@color/cover_placeholder"
+                        android:layout_width="112dp"
+                        android:layout_height="149dp"
+                        android:background="@drawable/bg_cover_rounded"
+                        android:clipToOutline="true"
+                        android:elevation="2dp"
                         android:scaleType="centerCrop" />
 
                     <LinearLayout
@@ -60,7 +64,7 @@
                             android:fontFamily="sans-serif-medium"
                             android:maxLines="2"
                             android:textColor="?android:attr/textColorPrimary"
-                            android:textSize="15sp" />
+                            android:textSize="17sp" />
 
                         <LinearLayout
                             android:id="@+id/detail_subtitles"
@@ -73,24 +77,26 @@
                             android:id="@+id/detail_meta"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:layout_marginTop="8dp"
-                            android:textColor="?android:attr/textColorSecondary"
-                            android:textSize="12sp" />
+                            android:layout_marginTop="10dp"
+                            android:textColor="@color/app_on_surface_variant"
+                            android:textSize="11sp" />
 
                         <Button
                             android:id="@+id/detail_play"
                             android:layout_width="wrap_content"
-                            android:layout_height="40dp"
-                            android:layout_marginTop="12dp"
-                            android:backgroundTint="@color/accent"
+                            android:layout_height="38dp"
+                            android:layout_marginTop="14dp"
+                            android:background="@drawable/bg_play_button"
+                            android:backgroundTint="@null"
+                            android:fontFamily="sans-serif-medium"
                             android:insetTop="0dp"
                             android:insetBottom="0dp"
                             android:minWidth="0dp"
-                            android:paddingHorizontal="16dp"
+                            android:paddingHorizontal="22dp"
+                            android:stateListAnimator="@null"
                             android:text="播放第 1 集"
                             android:textColor="#FFFFFFFF"
-                            android:textSize="13sp"
-                            app:cornerRadius="20dp" />
+                            android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -100,12 +106,12 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
-                    android:layout_marginTop="16dp"
+                    android:layout_marginTop="14dp"
                     android:ellipsize="end"
-                    android:lineSpacingExtra="4dp"
-                    android:maxLines="8"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="13sp"
+                    android:lineSpacingExtra="3dp"
+                    android:maxLines="3"
+                    android:textColor="@color/app_on_surface_variant"
+                    android:textSize="12.5sp"
                     android:visibility="gone" />
 
                 <TextView
@@ -113,11 +119,13 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
-                    android:layout_marginTop="4dp"
+                    android:layout_marginTop="2dp"
                     android:background="?attr/selectableItemBackground"
-                    android:paddingVertical="2dp"
+                    android:paddingHorizontal="4dp"
+                    android:paddingVertical="3dp"
+                    android:layout_marginStart="12dp"
                     android:text="展开"
-                    android:textColor="@color/accent"
+                    android:textColor="@color/accent_warm"
                     android:textSize="12sp"
                     android:visibility="gone" />
 
@@ -126,28 +134,44 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginHorizontal="16dp"
-                    android:layout_marginTop="20dp"
+                    android:layout_marginTop="18dp"
                     android:gravity="center_vertical"
                     android:orientation="horizontal">
 
-                    <TextView
-                        android:id="@+id/detail_tab_episodes"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:fontFamily="sans-serif-medium"
-                        android:paddingVertical="2dp"
-                        android:text="选集"
-                        android:textColor="@color/accent"
-                        android:textSize="15sp" />
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/detail_tab_episodes"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="sans-serif-medium"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="3dp"
+                            android:text="选集"
+                            android:textColor="#FFFFFFFF"
+                            android:textSize="15sp" />
+
+                        <View
+                            android:id="@+id/detail_tab_episodes_indicator"
+                            android:layout_width="20dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="2dp"
+                            android:background="@drawable/bg_tab_indicator" />
+                    </LinearLayout>
 
                     <TextView
                         android:id="@+id/detail_tab_related"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="18dp"
-                        android:paddingVertical="2dp"
+                        android:layout_marginStart="22dp"
+                        android:paddingHorizontal="2dp"
+                        android:paddingVertical="3dp"
                         android:text="相关"
-                        android:textColor="?android:attr/textColorSecondary"
+                        android:textColor="@color/app_on_surface_variant"
                         android:textSize="15sp" />
                 </LinearLayout>
 
@@ -155,7 +179,7 @@
                     android:id="@+id/detail_group_scroll"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="10dp"
+                    android:layout_marginTop="12dp"
                     android:paddingHorizontal="16dp"
                     android:scrollbars="none">
 
@@ -190,7 +214,7 @@
                     android:paddingHorizontal="16dp"
                     android:paddingVertical="14dp"
                     android:text="加载中…"
-                    android:textColor="?android:attr/textColorSecondary"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="13sp"
                     android:visibility="gone" />
             </LinearLayout>
@@ -198,8 +222,8 @@
 
         <ProgressBar
             android:id="@+id/detail_loading"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_gravity="center"
             android:indeterminateTint="@color/accent"
             android:visibility="gone" />
@@ -217,8 +241,8 @@
                 android:id="@+id/detail_error_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="14sp" />
+                android:textColor="@color/app_on_surface_variant"
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/detail_retry"

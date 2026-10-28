@@ -2,9 +2,10 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginBottom="8dp"
+    android:layout_marginBottom="10dp"
     android:background="@drawable/bg_card"
     android:clipToOutline="true"
+    android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="10dp">
 
@@ -16,7 +17,8 @@
             android:id="@+id/cover"
             android:layout_width="84dp"
             android:layout_height="112dp"
-            android:background="@color/cover_placeholder"
+            android:background="@drawable/bg_cover_rounded"
+            android:clipToOutline="true"
             android:contentDescription="@null"
             android:scaleType="centerCrop" />
 
@@ -30,15 +32,17 @@
             android:paddingHorizontal="5dp"
             android:paddingVertical="1dp"
             android:textColor="#FFFFFFFF"
-            android:textSize="10sp"
+            android:textSize="9sp"
             android:visibility="gone" />
     </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
-        android:layout_height="112dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:layout_weight="1"
+        android:minHeight="112dp"
+        android:gravity="center_vertical"
         android:orientation="vertical">
 
         <TextView
@@ -49,7 +53,7 @@
             android:fontFamily="sans-serif-medium"
             android:maxLines="2"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -62,6 +66,7 @@
                 android:id="@+id/tag"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:background="@drawable/bg_tag_badge"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="1dp"
                 android:textColor="#FFFFFFFF"
@@ -75,7 +80,7 @@
                 android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/accent"
+                android:textColor="@color/accent_warm"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -85,7 +90,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:textColor="@color/accent"
+                android:textColor="@color/nav_icon_inactive"
                 android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
@@ -97,21 +102,24 @@
             android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="12sp" />
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
 
         <TextView
             android:id="@+id/plays"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/nav_icon_inactive"
             android:textSize="11sp" />
     </LinearLayout>
+
+    <ImageView
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginStart="4dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_chevron_right" />
 </LinearLayout>

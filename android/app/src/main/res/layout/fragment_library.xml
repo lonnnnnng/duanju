@@ -6,36 +6,50 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- 顶部搜索框（点击进入搜索页） -->
+    <!-- 顶栏：logo + 搜索胶囊（点击进入搜索页） -->
     <LinearLayout
-        android:id="@+id/search_pill"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_marginHorizontal="12dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginBottom="8dp"
-        android:background="@drawable/bg_pill"
-        android:clickable="true"
-        android:focusable="true"
+        android:layout_height="50dp"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingHorizontal="14dp"
-        android:paddingVertical="10dp">
-
-        <ImageView
-            android:layout_width="18dp"
-            android:layout_height="18dp"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_search"
-            app:tint="?android:attr/textColorSecondary" />
+        android:paddingHorizontal="14dp">
 
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginStart="8dp"
-            android:text="搜索短剧、漫剧、演员"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp" />
+            android:layout_width="30dp"
+            android:layout_height="30dp"
+            android:background="@drawable/bg_nav_logo"
+            android:gravity="center"
+            android:includeFontPadding="false"
+            android:text="🎬"
+            android:textSize="13sp" />
+
+        <LinearLayout
+            android:id="@+id/search_pill"
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="10dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_pill"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingHorizontal="14dp">
+
+            <ImageView
+                android:layout_width="17dp"
+                android:layout_height="17dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_search" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:text="搜索短剧、漫剧、演员"
+                android:textColor="@color/app_on_surface_variant"
+                android:textSize="13sp" />
+        </LinearLayout>
     </LinearLayout>
 
     <!-- 快捷筛选 -->
@@ -52,7 +66,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="14dp"
             android:paddingVertical="4dp" />
     </HorizontalScrollView>
 
@@ -78,8 +92,8 @@
 
         <ProgressBar
             android:id="@+id/home_loading"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
             android:layout_gravity="center"
             android:indeterminateTint="@color/accent"
             android:visibility="gone" />
@@ -97,8 +111,8 @@
                 android:id="@+id/home_error_text"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="14sp" />
+                android:textColor="@color/app_on_surface_variant"
+                android:textSize="13sp" />
 
             <Button
                 android:id="@+id/home_retry"
@@ -115,9 +129,10 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center"
-            android:text="暂无内容"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="14sp"
+            android:gravity="center"
+            android:text="这里空空如也\n换个分类看看吧"
+            android:textColor="@color/app_on_surface_variant"
+            android:textSize="13sp"
             android:visibility="gone" />
     </FrameLayout>
 </LinearLayout>

@@ -1,12 +1,30 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="accent">#FF4D4F</color>
-    <color name="accent_dark">#E53935</color>
-    <color name="app_bg">#FFFAFAFA</color>
-    <color name="app_surface">#FFFFFFFF</color>
-    <color name="app_surface_variant">#FFF0F0F2</color>
-    <color name="app_on_bg">#FF1A1A1A</color>
-    <color name="app_on_surface_variant">#FF606064</color>
-    <color name="app_outline">#FFD0D0D4</color>
-    <color name="cover_placeholder">#22000000</color>
+    <!-- Cinema Noir (style1-cinema-dark) -->
+    <color name="accent">#FFFF3B5C</color>
+    <color name="accent_warm">#FFFF7A45</color>
+    <color name="accent_dark">#FFD92B49</color>
+    <color name="app_bg">#FF050508</color>
+    <color name="app_bg_elevated">#FF0A0A0E</color>
+    <color name="app_surface">#FF12121A</color>
+    <color name="app_surface_variant">#FF16161F</color>
+    <color name="app_surface_strong">#FF1A1A25</color>
+    <color name="app_surface_disabled">#FF2A2A38</color>
+    <color name="app_on_bg">#FFEAEAF0</color>
+    <color name="app_on_surface_variant">#FF8A8A9A</color>
+    <color name="app_text_tertiary">#FF5A5A6C</color>
+    <color name="app_text_hint">#FF4A4A5E</color>
+    <color name="app_outline">#FF2A2A38</color>
+    <color name="app_stroke">#FF23232F</color>
+    <color name="app_stroke_soft">#FF1F1F2B</color>
+    <color name="app_stroke_nav">#FF262633</color>
+    <color name="divider">#FF1B1B26</color>
+    <color name="nav_icon_active">#FFFF3B5C</color>
+    <color name="nav_icon_inactive">#FF77778A</color>
+    <color name="nav_pill_bg">#E016161F</color>
+    <color name="glass_button">#24FFFFFF</color>
+    <color name="badge_dark">#9E000000</color>
+    <color name="tag_badge">#E6FF3B5C</color>
+    <color name="toast_bg">#F01E1E2A</color>
+    <color name="cover_placeholder">#FF14141C</color>
 </resources>
