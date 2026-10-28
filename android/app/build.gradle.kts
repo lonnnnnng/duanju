@@ -21,12 +21,20 @@ android {
         applicationId = "com.duanju.player"
         minSdk = 24
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.1.21"
+        versionCode = 8
+        versionName = "0.1.22"
     }
 
     buildFeatures {
         buildConfig = true
+    }
+
+    // long: ffmpeg 的 .so 占了包体大头。默认不压缩存储（安装快），但直连分发时
+    // 压缩能省约 10MB（23MB -> 13MB）；代价是安装时解压到应用目录。
+    packaging {
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     signingConfigs {
@@ -70,7 +78,6 @@ dependencies {
     implementation("androidx.swiperefreshlayout:swiperefreshlayout:1.1.0")
     implementation("androidx.media3:media3-exoplayer:1.4.1")
     implementation("androidx.media3:media3-ui:1.4.1")
-    implementation("androidx.media3:media3-exoplayer-hls:1.4.1")
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     implementation("com.arthenica:ffmpeg-kit-next:9.0.2")

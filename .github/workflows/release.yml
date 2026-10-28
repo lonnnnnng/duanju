@@ -14,6 +14,11 @@ on:
         required: false
         default: ''
         type: string
+      android_only:
+        description: 仅重建安卓 APK（Go/Web 代码未改动时复用上一版本的五个平台程序）
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -47,6 +52,7 @@ jobs:
       - name: 检查版本与已有发布
         env:
           GH_TOKEN: ${{ github.token }}
+          ANDROID_ONLY: ${{ inputs.android_only }}
         run: |
           python3 - <<'PY'
           import json
@@ -77,15 +83,34 @@ jobs:
           if any(ref['ref'] == 'refs/tags/' + version for ref in refs):
               raise SystemExit('版本标签已存在，请使用新的版本号')
           print('版本检查通过：' + version)
+
+          # long: android_only 复用上一版本的五个平台程序，必须先证明除安卓/文档/CI 外
+          # 没有任何改动，否则会把旧的 Web 程序配上新的版本号发出去。
+          if os.environ.get('ANDROID_ONLY') == 'true':
+              latest = json.loads(subprocess.check_output([
+                  'gh', 'release', 'view', '--json', 'tagName']))['tagName']
+              compare = json.loads(subprocess.check_output([
+                  'gh', 'api', 'repos/' + os.environ['GH_REPO'] + '/compare/' +
+                  latest + '...' + os.environ['GITHUB_SHA']]))
+              allowed = ('android/', 'docs/', '.github/')
+              changed = [item['filename'] for item in compare.get('files', [])
+                         if not item['filename'].startswith(allowed)]
+              if changed:
+                  raise SystemExit('以下非安卓文件有改动，必须完整构建：' + ', '.join(changed))
+              print('仅安卓改动，复用 ' + latest + ' 的五个平台程序')
+              with open(os.environ['GITHUB_ENV'], 'a') as env_file:
+                  env_file.write('PREV_TAG=' + latest + '\n')
           PY
 
       - name: 安装 Go 稳定版
+        if: ${{ !inputs.android_only }}
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version: stable
           cache: false
 
       - name: 安装媒体及反向代理测试依赖
+        if: ${{ !inputs.android_only }}
         run: |
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends ffmpeg nginx libdigest-sha-perl
@@ -93,13 +118,33 @@ jobs:
           go version
 
       - name: 测试与静态检查
+        if: ${{ !inputs.android_only }}
         run: |
           go test ./... -count=1 -timeout=15m
           go vet ./...
           git diff --exit-code
 
       - name: 构建五个平台程序与校验清单
+        if: ${{ !inputs.android_only }}
         run: bash scripts/build.sh
+
+      - name: 复用上一版本的五个平台程序
+        if: ${{ inputs.android_only }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          gh release download "$PREV_TAG" --dir dist \
+            --pattern "duanju-${PREV_TAG}-darwin-arm64" \
+            --pattern "duanju-${PREV_TAG}-darwin-amd64" \
+            --pattern "duanju-${PREV_TAG}-linux-amd64" \
+            --pattern "duanju-${PREV_TAG}-linux-arm64" \
+            --pattern "duanju-${PREV_TAG}-windows-amd64.exe"
+          for platform in darwin-arm64 darwin-amd64 linux-amd64 linux-arm64 windows-amd64.exe; do
+            mv "dist/duanju-${PREV_TAG}-${platform}" "dist/duanju-${VERSION}-${platform}"
+          done
+          ls -l dist
 
       - name: 安装 JDK 17
         uses: actions/setup-java@v5
@@ -129,7 +174,14 @@ jobs:
         run: |
           cp android/app/build/outputs/apk/release/app-release.apk "dist/duanju-${VERSION}-android.apk"
           cd dist
-          shasum -a 256 "duanju-${VERSION}-android.apk" >> SHA256SUMS
+          # long: 完整重建清单，完整构建与 android_only 复用两条路径都只有这 6 个产物。
+          shasum -a 256 \
+            "duanju-${VERSION}-darwin-arm64" \
+            "duanju-${VERSION}-darwin-amd64" \
+            "duanju-${VERSION}-linux-amd64" \
+            "duanju-${VERSION}-linux-arm64" \
+            "duanju-${VERSION}-windows-amd64.exe" \
+            "duanju-${VERSION}-android.apk" > SHA256SUMS
           shasum -a 256 -c SHA256SUMS
 
       - name: 上传到草稿并核对全部资产
