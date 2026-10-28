@@ -13,4 +13,12 @@ object AppSettings {
 
     fun prefetchNext(context: Context): Boolean = prefs(context).getBoolean("prefetch_next", true)
     fun setPrefetchNext(context: Context, value: Boolean) = prefs(context).edit().putBoolean("prefetch_next", value).apply()
+
+    /** 播放缓存上限（MB），默认 2 GB。 */
+    fun cacheLimitMb(context: Context): Int = prefs(context).getInt("cache_limit_mb", DEFAULT_CACHE_LIMIT_MB)
+    fun setCacheLimitMb(context: Context, value: Int) =
+        prefs(context).edit().putInt("cache_limit_mb", value).apply()
+
+    const val DEFAULT_CACHE_LIMIT_MB = 2048
+    const val MIN_CACHE_LIMIT_MB = 128
 }

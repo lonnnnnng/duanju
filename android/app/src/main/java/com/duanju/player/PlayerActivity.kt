@@ -79,6 +79,8 @@ class PlayerActivity : AppCompatActivity() {
     @Volatile private var prefetchTarget = -1
     @Volatile private var prefetchSessionId = 0L
     private var prefetchFuture: Future<*>? = null
+    /** 当前播放器正在读取的缓存文件，LRU 清理时需跳过。 */
+    @Volatile private var playingFile: File? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -432,7 +434,20 @@ statusView = findViewById(R.id.status)
             android.util.Log.d("PlayerActivity", "第${episode}集命中缓存 ${outFile.length()}B，跳过下载")
         }
         val dlMs = System.currentTimeMillis() - dlStart
+        // 播放缓存按 LRU 限制总量；正在播放的上一集与当前集不能删，否则解码会读不到文件。
+        val keep = buildSet {
+            add(outFile.name)
+            playingFile?.let { add(it.name) }
+        }
+        val freed = com.duanju.player.core.VideoCache.trim(
+            cacheDir, com.duanju.player.core.VideoCache.mbToBytes(AppSettings.cacheLimitMb(this)), keep
+        )
+        if (freed > 0L) {
+            android.util.Log.d("PlayerActivity", "缓存超限，清理 ${com.duanju.player.core.VideoCache.format(freed)}")
+        }
+        com.duanju.player.core.VideoCache.touch(outFile)
         main.post {
+            playingFile = outFile
             loading.visibility = View.GONE
             status("第${selectedEpisode}集 ${media.quality}p · 解析${resolveMs}ms 下载${dlMs}ms")
             val source = androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(
@@ -468,6 +483,13 @@ statusView = findViewById(R.id.status)
                 val media = DirectClient.media(chapters[next - 1], deviceId, installId)
                 if (prefetchTarget != next) return@submit
                 DirectClient.decryptTo(media.url, media.keyHex, outFile) { id -> prefetchSessionId = id }
+                val keep = buildSet {
+                    add(outFile.name)
+                    playingFile?.let { add(it.name) }
+                }
+                com.duanju.player.core.VideoCache.trim(
+                    dir, com.duanju.player.core.VideoCache.mbToBytes(AppSettings.cacheLimitMb(context)), keep
+                )
                 android.util.Log.d("PlayerActivity", "预取第${next}集完成")
             } catch (e: Exception) {
                 android.util.Log.d("PlayerActivity", "预取第${next}集结束: ${e.message}")
