@@ -8,35 +8,11 @@
     android:orientation="vertical">
 
     <!-- 顶栏 -->
-    <LinearLayout
+    <com.duanju.player.TopBar
+        android:id="@+id/detail_top_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:gravity="center_vertical"
-        android:orientation="horizontal"
-        android:padding="4dp">
-
-        <ImageButton
-            android:id="@+id/detail_back"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="返回"
-            android:padding="12dp"
-            android:src="@drawable/ic_back"
-            app:tint="?android:attr/textColorPrimary" />
-
-        <TextView
-            android:id="@+id/detail_bar_title"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="1"
-            android:text="剧集详情"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp" />
-    </LinearLayout>
+        android:paddingHorizontal="4dp" />
 
     <FrameLayout
         android:layout_width="match_parent"

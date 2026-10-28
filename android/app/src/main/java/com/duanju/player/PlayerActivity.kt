@@ -27,6 +27,7 @@ import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.duanju.player.core.DirectClient
+import com.duanju.player.core.VideoCache
 import java.io.File
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -53,6 +54,7 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var root: View
     private lateinit var fullscreenTopBar: View
     private lateinit var fullscreenTitle: TextView
+    private lateinit var topBar: TopBar
 
     private var dramaId = ""
     private var title = ""
@@ -79,6 +81,35 @@ class PlayerActivity : AppCompatActivity() {
     private var prefetchFuture: Future<*>? = null
     /** 当前播放器正在读取的缓存文件，LRU 清理时需跳过。 */
     @Volatile private var playingFile: File? = null
+
+    // 状态行展示用的播放信息（集数进度之后的附加文案）。
+    @Volatile private var mediaQuality = 0
+    @Volatile private var playingBytes = 0L
+    @Volatile private var prefetchTmp: File? = null
+    @Volatile private var prefetchTotalBytes = 0L
+    @Volatile private var prefetchDoneBytes = 0L
+    @Volatile private var prefetchPercent = -1
+    @Volatile private var prefetchReadyEpisode = -1
+    @Volatile private var prefetchReadyBytes = 0L
+    @Volatile private var prefetchQuality = 0
+    @Volatile private var prefetchElapsedMs = 0L
+    @Volatile private var prefetchFailedEpisode = -1
+
+    /** 预取进度轮询：ffmpeg 写 .tmp 期间定期读文件大小算百分比。 */
+    private val prefetchTicker = object : Runnable {
+        override fun run() {
+            if (prefetchTarget <= 0) return
+            val tmp = prefetchTmp
+            if (tmp != null && tmp.exists()) {
+                prefetchDoneBytes = tmp.length()
+                if (prefetchTotalBytes > 0L) {
+                    prefetchPercent = (prefetchDoneBytes * 100 / prefetchTotalBytes).toInt().coerceIn(0, 99)
+                }
+            }
+            renderStatus()
+            main.postDelayed(this, 500)
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -131,7 +162,6 @@ class PlayerActivity : AppCompatActivity() {
             }
         })
 
-        findViewById<TextView>(R.id.title).text = title
         playerView = findViewById(R.id.player_view)
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
         playerView.player = player
@@ -144,6 +174,10 @@ class PlayerActivity : AppCompatActivity() {
         root = findViewById(R.id.root)
         fullscreenTopBar = findViewById(R.id.fullscreen_top_bar)
         fullscreenTitle = findViewById(R.id.fullscreen_title)
+        topBar = findViewById<TopBar>(R.id.player_top_bar).apply {
+            setTitle(title)
+            setOnBackClickListener { finish() }
+        }
         updateFullscreenEpisode()
         findViewById<View>(R.id.fullscreen_back).setOnClickListener { toggleFullscreen() }
         playerView.setControllerVisibilityListener(object : PlayerControlView.VisibilityListener {
@@ -326,6 +360,7 @@ statusView = findViewById(R.id.status)
     private fun toggleFullscreen() {
         fullscreen = !fullscreen
         playerView.resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
+        topBar.visibility = if (fullscreen) View.GONE else View.VISIBLE
         header.visibility = if (fullscreen) View.GONE else View.VISIBLE
         episodePanel.visibility = if (fullscreen) View.GONE else View.VISIBLE
         if (fullscreen) {
@@ -394,6 +429,12 @@ statusView = findViewById(R.id.status)
         updateEpisodeButtons()
         pendingSeekMs = startMs
         loading.visibility = View.VISIBLE
+        mediaQuality = 0
+        playingBytes = 0L
+        prefetchPercent = -1
+        prefetchDoneBytes = 0L
+        prefetchReadyEpisode = -1
+        prefetchFailedEpisode = -1
         status("准备播放…")
         executor.execute {
             // 预取写的是 .tmp，完成才 rename；这里等它落盘后直接命中缓存。
@@ -432,6 +473,7 @@ statusView = findViewById(R.id.status)
             android.util.Log.d("PlayerActivity", "第${episode}集命中缓存 ${outFile.length()}B，跳过下载")
         }
         val dlMs = System.currentTimeMillis() - dlStart
+        android.util.Log.d("PlayerActivity", "第${episode}集解析${resolveMs}ms 下载${dlMs}ms")
         // 播放缓存按 LRU 限制总量；正在播放的上一集与当前集不能删，否则解码会读不到文件。
         val keep = buildSet {
             add(outFile.name)
@@ -444,10 +486,13 @@ statusView = findViewById(R.id.status)
             android.util.Log.d("PlayerActivity", "缓存超限，清理 ${com.duanju.player.core.VideoCache.format(freed)}")
         }
         com.duanju.player.core.VideoCache.touch(outFile)
+        val sizeBytes = outFile.length()
         main.post {
             playingFile = outFile
+            mediaQuality = media.quality
+            playingBytes = sizeBytes
             loading.visibility = View.GONE
-            status("第${selectedEpisode}集 ${media.quality}p · 解析${resolveMs}ms 下载${dlMs}ms")
+            renderStatus()
             val source = androidx.media3.exoplayer.source.ProgressiveMediaSource.Factory(
                 androidx.media3.datasource.DefaultDataSource.Factory(this)
             ).createMediaSource(androidx.media3.common.MediaItem.fromUri(android.net.Uri.fromFile(outFile)))
@@ -470,16 +515,36 @@ statusView = findViewById(R.id.status)
         val seriesId = dramaId.substringAfter(':')
         val context = applicationContext
         prefetchTarget = next
+        prefetchReadyEpisode = -1
+        prefetchFailedEpisode = -1
+        prefetchPercent = -1
+        prefetchDoneBytes = 0L
+        prefetchTotalBytes = 0L
+        prefetchQuality = 0
+        prefetchElapsedMs = 0L
         prefetchFuture = prefetchExecutor.submit {
+            val startedAt = System.currentTimeMillis()
             try {
                 val dir = File(cacheDir, "direct").apply { mkdirs() }
                 val outFile = File(dir, "${seriesId}_$next.mp4")
-                if (outFile.exists() && outFile.length() > 0L) return@submit
+                if (outFile.exists() && outFile.length() > 0L) {
+                    prefetchReadyEpisode = next
+                    prefetchReadyBytes = outFile.length()
+                    prefetchElapsedMs = 0L
+                    prefetchTarget = -1
+                    main.post { renderStatus() }
+                    return@submit
+                }
                 val (deviceId, installId) = DirectClient.identity(context)
                 val chapters = DirectClient.chapters(seriesId, deviceId, installId)
                 if (prefetchTarget != next || next > chapters.size) return@submit
                 val media = DirectClient.media(chapters[next - 1], deviceId, installId)
+                prefetchQuality = media.quality
                 if (prefetchTarget != next) return@submit
+                // 进度 = 已写入的 .tmp 大小 / 源文件 Content-Length；拿不到总长时只显示"下载中"。
+                prefetchTotalBytes = DirectClient.contentLength(media.url) ?: 0L
+                prefetchTmp = File(dir, "${seriesId}_$next.mp4.tmp")
+                main.post { prefetchTicker.run() }
                 DirectClient.decryptTo(media.url, media.keyHex, outFile) { id -> prefetchSessionId = id }
                 val keep = buildSet {
                     add(outFile.name)
@@ -488,9 +553,22 @@ statusView = findViewById(R.id.status)
                 com.duanju.player.core.VideoCache.trim(
                     dir, com.duanju.player.core.VideoCache.mbToBytes(AppSettings.cacheLimitMb(context)), keep
                 )
+                if (prefetchTarget == next) {
+                    prefetchReadyEpisode = next
+                    prefetchReadyBytes = outFile.length()
+                    prefetchElapsedMs = System.currentTimeMillis() - startedAt
+                    prefetchTarget = -1
+                    prefetchTmp = null
+                }
                 android.util.Log.d("PlayerActivity", "预取第${next}集完成")
             } catch (e: Exception) {
+                if (prefetchTarget == next) {
+                    prefetchFailedEpisode = next
+                    prefetchTarget = -1
+                }
                 android.util.Log.d("PlayerActivity", "预取第${next}集结束: ${e.message}")
+            } finally {
+                main.post { renderStatus() }
             }
         }
     }
@@ -500,6 +578,8 @@ statusView = findViewById(R.id.status)
         if (id != 0L) runCatching { com.arthenica.ffmpegkit.FFmpegKit.cancel(id) }
         prefetchSessionId = 0L
         prefetchTarget = -1
+        prefetchTmp = null
+        prefetchPercent = -1
         prefetchFuture?.cancel(false)
         prefetchFuture = null
     }
@@ -537,12 +617,45 @@ statusView = findViewById(R.id.status)
         statusView.text = message
     }
 
+    private fun qualitySuffix(): String = if (prefetchQuality > 0) " · ${prefetchQuality}p" else ""
+
+    /** 预取耗时：不足 1 秒显示毫秒，其余保留一位小数秒。 */
+    private fun formatElapsed(ms: Long): String = when {
+        ms <= 0L -> "-"
+        ms < 1000L -> "${ms}ms"
+        else -> String.format(java.util.Locale.US, "%.1fs", ms / 1000.0)
+    }
+
+    /**
+     * 状态行两行：第一行当前集进度/清晰度/大小，第二行下一集预取状态。
+     * 预取信息只在开启预加载且存在下一集时出现。
+     */
+    private fun renderStatus() {
+        val position = if (::player.isInitialized) player.currentPosition / 1000 else 0
+        val duration = if (::player.isInitialized && player.duration > 0) player.duration / 1000 else 0
+        // 第一行：当前集进度 + 清晰度 + 已下载大小。
+        val text = StringBuilder("第${selectedEpisode}集 ${position}s / ${duration}s")
+        if (mediaQuality > 0) text.append(" · ${mediaQuality}p")
+        if (playingBytes > 0L) text.append(" · ${VideoCache.formatSize(playingBytes)}")
+        // 第二行：下一集预取状态（进行中显示百分比，完成后显示清晰度/大小/耗时）。
+        val prefetch = when {
+            prefetchTarget > 0 && prefetchPercent >= 0 ->
+                "下一集预取中" + qualitySuffix() + " · ${prefetchPercent}%"
+            prefetchTarget > 0 -> "下一集预取中" + qualitySuffix() + "…"
+            prefetchReadyEpisode > 0 ->
+                "下一集已预载" + qualitySuffix() +
+                    " · ${VideoCache.formatSize(prefetchReadyBytes)} · 耗时${formatElapsed(prefetchElapsedMs)}"
+            prefetchFailedEpisode > 0 -> "第${prefetchFailedEpisode}集预取失败"
+            else -> null
+        }
+        if (prefetch != null) text.append("\n").append(prefetch)
+        statusView.text = text.toString()
+    }
+
     private val ticker = object : Runnable {
         override fun run() {
             if (::player.isInitialized && player.isPlaying) {
-                val position = player.currentPosition / 1000
-                val duration = if (player.duration > 0) player.duration / 1000 else 0
-                status("第${selectedEpisode}集 ${position}s / ${duration}s")
+                renderStatus()
                 saveProgress()
             }
             main.postDelayed(this, 1000)

@@ -7,6 +7,13 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
+    <!-- 顶栏：返回 + 剧名（全屏时隐藏，改用播放器内的悬浮返回栏） -->
+    <com.duanju.player.TopBar
+        android:id="@+id/player_top_bar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingHorizontal="4dp" />
+
     <FrameLayout
         android:id="@+id/video_container"
         android:layout_width="match_parent"
@@ -71,28 +78,20 @@
         android:paddingHorizontal="14dp"
         android:paddingTop="12dp">
 
-        <TextView
-            android:id="@+id/title"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:ellipsize="end"
-            android:fontFamily="sans-serif-medium"
-            android:maxLines="1"
-            android:textColor="?android:attr/textColorPrimary"
-            android:textSize="16sp" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
             android:gravity="center_vertical"
             android:orientation="horizontal">
 
+            <!-- 集数进度 + 清晰度/文件大小 + 下一集预取状态 -->
             <TextView
                 android:id="@+id/status"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:lineSpacingExtra="2dp"
+                android:maxLines="2"
                 android:text="准备播放"
                 android:textColor="?android:attr/textColorSecondary"
                 android:textSize="12sp" />

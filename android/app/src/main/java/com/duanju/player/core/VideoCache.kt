@@ -64,6 +64,14 @@ object VideoCache {
     private fun cachedFiles(dir: File): List<File> =
         dir.listFiles()?.filter { it.isFile && it.name.endsWith(".mp4") } ?: emptyList()
 
+    /** 单个文件大小展示（保留一位小数，例如 `8.1 MB`）。 */
+    fun formatSize(bytes: Long): String = when {
+        bytes >= GB -> String.format(Locale.US, "%.2f GB", bytes.toDouble() / GB)
+        bytes >= MB -> String.format(Locale.US, "%.1f MB", bytes.toDouble() / MB)
+        bytes >= 1024 -> String.format(Locale.US, "%.0f KB", bytes.toDouble() / 1024)
+        else -> "$bytes B"
+    }
+
     fun format(bytes: Long): String = when {
         bytes >= GB -> String.format(Locale.US, "%.1f GB", bytes.toDouble() / GB)
         bytes >= MB -> String.format(Locale.US, "%.0f MB", bytes.toDouble() / MB)

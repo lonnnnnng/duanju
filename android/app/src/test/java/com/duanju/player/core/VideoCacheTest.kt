@@ -69,6 +69,14 @@ class VideoCacheTest {
     }
 
     @Test
+    fun formatsFileSizes() {
+        assertEquals("512 B", VideoCache.formatSize(512))
+        assertEquals("8 KB", VideoCache.formatSize(8192))
+        assertEquals("7.7 MB", VideoCache.formatSize(8_073_677))
+        assertEquals("1.50 GB", VideoCache.formatSize(1_610_612_736))
+    }
+
+    @Test
     fun formatsSizes() {
         assertEquals("512 KB", VideoCache.format(512L * 1024))
         assertEquals("2.0 GB", VideoCache.format(2L * 1024 * 1024 * 1024))

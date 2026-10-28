@@ -6,7 +6,6 @@ import android.os.Handler
 import android.os.Looper
 import android.view.View
 import android.widget.Button
-import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ProgressBar
@@ -38,6 +37,7 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var errorBox: LinearLayout
     private lateinit var errorText: TextView
     private lateinit var scroll: View
+    private lateinit var topBar: TopBar
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -68,8 +68,9 @@ class DetailActivity : AppCompatActivity() {
         errorText = findViewById(R.id.detail_error_text)
         scroll = findViewById(R.id.detail_scroll)
 
-        findViewById<ImageView>(R.id.detail_cover)
-        findViewById<ImageButton>(R.id.detail_back).setOnClickListener { finish() }
+        topBar = findViewById<TopBar>(R.id.detail_top_bar).apply {
+            setOnBackClickListener { finish() }
+        }
         findViewById<Button>(R.id.detail_retry).setOnClickListener { load() }
 
         groupScroll = findViewById(R.id.detail_group_scroll)
@@ -80,7 +81,7 @@ class DetailActivity : AppCompatActivity() {
         episodeView.adapter = episodeAdapter
 
         if (seriesTitle.isNotEmpty()) {
-            findViewById<TextView>(R.id.detail_bar_title).text = seriesTitle
+            topBar.setTitle(seriesTitle)
             title.text = seriesTitle
         }
         playButton.setOnClickListener {
@@ -114,7 +115,7 @@ class DetailActivity : AppCompatActivity() {
         loading.visibility = View.GONE
         scroll.visibility = View.VISIBLE
         title.text = data.title
-        findViewById<TextView>(R.id.detail_bar_title).text = data.title
+        topBar.setTitle(data.title)
 
         data.cover?.takeIf { it.isNotBlank() }?.let { BitmapLoader.load(it, cover) }
 

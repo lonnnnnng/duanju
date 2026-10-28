@@ -699,6 +699,30 @@ object DirectClient {
         return out
     }
 
+    /**
+     * 取源文件总大小（Content-Length），用于展示预取进度；失败返回 null，
+     * 调用方退化为只显示"下载中"。HEAD 很轻，且 CDN 支持。
+     */
+    fun contentLength(url: String): Long? {
+        val conn = try {
+            (URL(url).openConnection() as HttpURLConnection).apply {
+                requestMethod = "HEAD"
+                connectTimeout = 8000
+                readTimeout = 8000
+            }
+        } catch (e: Exception) {
+            return null
+        }
+        return try {
+            if (conn.responseCode !in 200..299) return null
+            conn.contentLengthLong.takeIf { it > 0L }
+        } catch (e: Exception) {
+            null
+        } finally {
+            conn.disconnect()
+        }
+    }
+
     /** 无签名开放接口：偶发 200+空正文，重试 3 次。 */
     private fun httpGetOpenRetry(url: String): String {
         var last: Exception? = null
