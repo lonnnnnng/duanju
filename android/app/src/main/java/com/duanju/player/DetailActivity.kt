@@ -117,9 +117,13 @@ class DetailActivity : AppCompatActivity() {
             try {
                 val (deviceId, installId) = DirectClient.identity(this)
                 val data = DirectClient.seriesDetail(seriesId, deviceId, installId)
-                main.post { render(data) }
+                main.post {
+                    if (isFinishing || isDestroyed) return@post
+                    render(data)
+                }
             } catch (e: Exception) {
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     loading.visibility = View.GONE
                     errorText.text = e.message ?: "加载失败"
                     errorBox.visibility = View.VISIBLE

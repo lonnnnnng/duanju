@@ -16,7 +16,8 @@ object SearchHistoryStore {
     }
 
     fun add(context: Context, keyword: String) {
-        val word = keyword.trim()
+        // 分隔符本身出现时截断，避免 load 时把一条记录拆成多条
+        val word = keyword.trim().replace("\u0001", "")
         if (word.isEmpty()) return
         val list = ArrayList(load(context))
         list.removeAll { it == word }

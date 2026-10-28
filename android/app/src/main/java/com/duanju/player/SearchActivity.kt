@@ -132,6 +132,7 @@ class SearchActivity : AppCompatActivity() {
                 val (deviceId, installId) = DirectClient.identity(this)
                 val items = DirectClient.searchHomeItems(keyword, deviceId, installId)
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     adapter.submit(items)
@@ -146,6 +147,7 @@ class SearchActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     resultList.visibility = View.GONE

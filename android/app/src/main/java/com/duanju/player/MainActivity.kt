@@ -33,6 +33,12 @@ class MainActivity : AppCompatActivity() {
                 .commit()
         } else {
             currentTag = savedInstanceState.getString("tab", "library")
+            // FragmentManager 恢复后所有曾添加的 fragment 都处于可见态，重新隐藏非当前页
+            supportFragmentManager.fragments.forEach { fragment ->
+                if (fragment.tag != currentTag && !fragment.isHidden) {
+                    supportFragmentManager.beginTransaction().hide(fragment).commit()
+                }
+            }
         }
         renderNav(currentTag)
     }

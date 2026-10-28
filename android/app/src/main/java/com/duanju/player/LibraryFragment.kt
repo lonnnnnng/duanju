@@ -44,6 +44,8 @@ class LibraryFragment : Fragment() {
     private var selectedFilter: String? = null
     private var filterGroups: List<DirectClient.HomeFilterGroup> = emptyList()
     private var selectedFilterName: String? = null
+    /** 加载期间又发起了 reset 请求（如切筛选）时置位，在途回复结束后补发。 */
+    private var pendingReset = false
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -106,7 +108,10 @@ class LibraryFragment : Fragment() {
     }
 
     private fun load(reset: Boolean) {
-        if (loading) return
+        if (loading) {
+            if (reset) pendingReset = true
+            return
+        }
         loading = true
         if (reset) {
             offset = 0
@@ -127,6 +132,12 @@ class LibraryFragment : Fragment() {
                     loading = false
                     swipe.isRefreshing = false
                     showLoading(false)
+                    if (pendingReset) {
+                        // 在途回复已过时（期间切了筛选/下拉刷新），直接补发新请求
+                        pendingReset = false
+                        load(reset = true)
+                        return@postUi
+                    }
                     offset = page.nextOffset
                     sessionId = page.sessionId
                     hasMore = page.hasMore
@@ -145,6 +156,11 @@ class LibraryFragment : Fragment() {
                     loading = false
                     swipe.isRefreshing = false
                     showLoading(false)
+                    if (pendingReset) {
+                        pendingReset = false
+                        load(reset = true)
+                        return@postUi
+                    }
                     adapter.setFooter(false, false)
                     if (adapter.size() == 0) {
                         errorText.text = e.message ?: "加载失败"
