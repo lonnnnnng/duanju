@@ -10,4 +10,7 @@ object AppSettings {
 
     fun speed(context: Context): Float = prefs(context).getFloat("speed", 1f)
     fun setSpeed(context: Context, value: Float) = prefs(context).edit().putFloat("speed", value).apply()
+
+    fun prefetchNext(context: Context): Boolean = prefs(context).getBoolean("prefetch_next", true)
+    fun setPrefetchNext(context: Context, value: Boolean) = prefs(context).edit().putBoolean("prefetch_next", value).apply()
 }

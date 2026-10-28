@@ -11,6 +11,7 @@ import java.net.URLEncoder
 import java.security.SecureRandom
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
+import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
@@ -196,15 +197,23 @@ object DirectClient {
     /** 本地 ffmpeg 解密下载：CDN 直链 → -c copy -decryption_key → 清晰 MP4。
      *  写临时文件，成功后原子重命名，避免进程被杀留下无 moov 的坏文件。 */
     fun decryptTo(sourceUrl: String, keyHex: String, outFile: File) {
-        // 优先 ffmpeg 直接拉流（网络好时一步到位且不落加密原片）；
-        // 设备代理/VPN 等导致 ffmpeg 网络 I/O 失败时，自动回退 Java 下载 + 本地解密。
-        decryptViaFfmpeg(sourceUrl, keyHex, outFile, exportSystemCa(File(outFile.parentFile, "system-ca.pem")))
+        decryptTo(sourceUrl, keyHex, outFile, null)
+    }
+
+    /**
+     * 可通知会话 ID 的解密，用于预加载：调用方可通过 FFmpegKit.cancel(sessionId) 中止。
+     */
+    fun decryptTo(sourceUrl: String, keyHex: String, outFile: File, onSession: ((Long) -> Unit)?) {
+        // 优先 ffmpeg 直接拉流（网络好时一步到位且不落加密原片）。
+        decryptViaFfmpeg(sourceUrl, keyHex, outFile, exportSystemCa(File(outFile.parentFile, "system-ca.pem")), onSession)
     }
 
     /** ffmpeg 直接拉流并解密（源是 http/https）。
      *  ffmpeg 的 openssl 不带 Android 系统CA，证书验证会失败；
      *  这里把系统 cacerts 合并导出为 PEM，经 -cafile 交给 ffmpeg，正常完成校验。 */
-    private fun decryptViaFfmpeg(sourceUrl: String, keyHex: String, outFile: File, caFile: File?) {
+    private fun decryptViaFfmpeg(
+        sourceUrl: String, keyHex: String, outFile: File, caFile: File?, onSession: ((Long) -> Unit)?
+    ) {
         val tlsArgs = if (caFile != null) arrayOf("-tls_verify", "1", "-cafile", caFile.absolutePath) else emptyArray()
         val args = arrayOf(
             "-y", "-hide_banner", "-loglevel", "verbose", "-nostdin",
@@ -219,12 +228,20 @@ object DirectClient {
             "-movflags", "+faststart",
             "-f", "mp4", File(outFile.parentFile, outFile.name + ".tmp").absolutePath
         )
-        finishFfmpeg(args, File(outFile.parentFile, outFile.name + ".tmp"), outFile)
+        finishFfmpeg(args, File(outFile.parentFile, outFile.name + ".tmp"), outFile, onSession)
     }
 
-    private fun finishFfmpeg(args: Array<String>, tmp: File, outFile: File) {
-        val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArguments(args)
-        val rc = session.getReturnCode()
+    private fun finishFfmpeg(args: Array<String>, tmp: File, outFile: File, onSession: ((Long) -> Unit)?) {
+        val latch = CountDownLatch(1)
+        var rc: com.arthenica.ffmpegkit.ReturnCode? = null
+        val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(
+            args,
+            { completed -> rc = completed.getReturnCode(); latch.countDown() },
+            null,
+            null
+        )
+        onSession?.invoke(session.getSessionId())
+        if (!latch.await(10, TimeUnit.MINUTES)) throw DirectException("解密超时")
         if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(rc) || !tmp.exists() || tmp.length() == 0L) {
             tmp.delete()
             android.util.Log.d("DirectClient", "ffmpeg失败日志=" + session.getAllLogsAsString(2000))

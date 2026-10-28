@@ -24,6 +24,12 @@ class SettingsFragment : Fragment() {
             AppSettings.setAutoNext(requireContext(), checked)
         }
 
+        val prefetch = view.findViewById<Switch>(R.id.prefetch_next)
+        prefetch.isChecked = AppSettings.prefetchNext(requireContext())
+        prefetch.setOnCheckedChangeListener { _, checked ->
+            AppSettings.setPrefetchNext(requireContext(), checked)
+        }
+
         val speedValue = view.findViewById<TextView>(R.id.speed_value)
         renderSpeed(speedValue)
         view.findViewById<View>(R.id.row_speed).setOnClickListener {

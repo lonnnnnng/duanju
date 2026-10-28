@@ -28,8 +28,11 @@ import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import com.duanju.player.core.DirectClient
 import java.io.File
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
+import java.util.concurrent.TimeUnit
 
 @UnstableApi
 class PlayerActivity : AppCompatActivity() {
@@ -71,7 +74,11 @@ class PlayerActivity : AppCompatActivity() {
     private val speeds = listOf(1f, 1.25f, 1.5f, 1.75f, 2f, 3f, 4f)
 
     private val executor = Executors.newSingleThreadExecutor()
+    private val prefetchExecutor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+    @Volatile private var prefetchTarget = -1
+    @Volatile private var prefetchSessionId = 0L
+    private var prefetchFuture: Future<*>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -190,6 +197,8 @@ statusView = findViewById(R.id.status)
     override fun onDestroy() {
         super.onDestroy()
         saveProgress()
+        cancelPrefetch()
+        prefetchExecutor.shutdownNow()
         player.release()
     }
 
@@ -376,6 +385,9 @@ statusView = findViewById(R.id.status)
     private fun play(episode: Int, startMs: Long) {
         selectedEpisode = episode
         playerView.hideController()
+        // 要切的正是预取中的那一集：保留任务并等它完成；否则取消无用的预取。
+        val waiting = if (prefetchTarget == episode) prefetchFuture else null
+        if (prefetchTarget != -1 && prefetchTarget != episode) cancelPrefetch()
         updateFullscreenEpisode()
         episodeAdapter.setSelected(episode)
         syncGroup(episode)
@@ -384,6 +396,8 @@ statusView = findViewById(R.id.status)
         loading.visibility = View.VISIBLE
         status("准备播放…")
         executor.execute {
+            // 预取写的是 .tmp，完成才 rename；这里等它落盘后直接命中缓存。
+            if (waiting != null) runCatching { waiting.get(60, TimeUnit.SECONDS) }
             try {
                 playDirect(episode, startMs)
             } catch (e: Exception) {
@@ -413,6 +427,9 @@ statusView = findViewById(R.id.status)
         val dlStart = System.currentTimeMillis()
         if (!outFile.exists() || outFile.length() == 0L) {
             com.duanju.player.core.DirectClient.decryptTo(media.url, media.keyHex, outFile)
+            android.util.Log.d("PlayerActivity", "第${episode}集下载完成 ${System.currentTimeMillis() - dlStart}ms")
+        } else {
+            android.util.Log.d("PlayerActivity", "第${episode}集命中缓存 ${outFile.length()}B，跳过下载")
         }
         val dlMs = System.currentTimeMillis() - dlStart
         main.post {
@@ -426,7 +443,45 @@ statusView = findViewById(R.id.status)
             player.prepare()
             player.playWhenReady = true
             player.setPlaybackSpeed(currentSpeed)
+            startPrefetch(episode)
         }
+    }
+
+    /** 后台预取下一集到播放缓存，切集时可直接命中，减少等待。 */
+    private fun startPrefetch(episode: Int) {
+        if (!AppSettings.prefetchNext(this)) return
+        val next = episode + 1
+        if (next > episodes) return
+        if (prefetchTarget == next) return
+        cancelPrefetch()
+        val seriesId = dramaId.substringAfter(':')
+        val context = applicationContext
+        prefetchTarget = next
+        prefetchFuture = prefetchExecutor.submit {
+            try {
+                val dir = File(cacheDir, "direct").apply { mkdirs() }
+                val outFile = File(dir, "${seriesId}_$next.mp4")
+                if (outFile.exists() && outFile.length() > 0L) return@submit
+                val (deviceId, installId) = DirectClient.identity(context)
+                val chapters = DirectClient.chapters(seriesId, deviceId, installId)
+                if (prefetchTarget != next || next > chapters.size) return@submit
+                val media = DirectClient.media(chapters[next - 1], deviceId, installId)
+                if (prefetchTarget != next) return@submit
+                DirectClient.decryptTo(media.url, media.keyHex, outFile) { id -> prefetchSessionId = id }
+                android.util.Log.d("PlayerActivity", "预取第${next}集完成")
+            } catch (e: Exception) {
+                android.util.Log.d("PlayerActivity", "预取第${next}集结束: ${e.message}")
+            }
+        }
+    }
+
+    private fun cancelPrefetch() {
+        val id = prefetchSessionId
+        if (id != 0L) runCatching { com.arthenica.ffmpegkit.FFmpegKit.cancel(id) }
+        prefetchSessionId = 0L
+        prefetchTarget = -1
+        prefetchFuture?.cancel(false)
+        prefetchFuture = null
     }
 
     private fun onEpisodeEnded() {
