@@ -54,10 +54,11 @@
                 android:layout_width="38dp"
                 android:layout_height="38dp"
                 android:layout_marginStart="6dp"
-                android:background="@drawable/bg_glass_button"
+                android:background="@drawable/bg_player_glass"
                 android:contentDescription="返回"
                 android:padding="9dp"
-                android:src="@drawable/ic_back" />
+                android:src="@drawable/ic_back"
+                app:tint="@color/player_icon" />
 
             <TextView
                 android:id="@+id/fullscreen_title"

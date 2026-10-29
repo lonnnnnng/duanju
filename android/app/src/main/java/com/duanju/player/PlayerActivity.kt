@@ -7,11 +7,13 @@ import android.os.Looper
 import android.view.View
 import android.view.ViewGroup
 import android.view.WindowManager
-import android.widget.Button
+import android.widget.ImageButton
+import androidx.appcompat.widget.AppCompatButton
 import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.OneShotPreDrawListener
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -46,9 +48,9 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var groupScroll: View
     private lateinit var groupLabel: TextView
     private var activeGroup: IntRange? = null
-    private lateinit var speedButton: Button
-    private lateinit var muteButton: Button
-    private lateinit var fullscreenButton: Button
+    private lateinit var speedButton: AppCompatButton
+    private lateinit var muteButton: ImageButton
+    private lateinit var fullscreenButton: ImageButton
     private lateinit var header: View
     private lateinit var episodePanel: View
     private lateinit var root: View
@@ -220,7 +222,7 @@ statusView = findViewById(R.id.status)
         muteButton.setOnClickListener {
             muted = !muted
             player.volume = if (muted) 0f else 1f
-            muteButton.text = if (muted) "已静音" else "静音"
+            muteButton.setImageResource(if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
         }
         fullscreenButton.setOnClickListener { toggleFullscreen() }
 
@@ -416,9 +418,14 @@ statusView = findViewById(R.id.status)
             requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
             WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         }
-        fullscreenButton.text = if (fullscreen) "退出全屏" else "全屏"
+        fullscreenButton.setImageResource(if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen_enter)
         applyVideoAspect()
-        if (!fullscreen) root.post { applyVideoAspect() }
+        if (!fullscreen) {
+            // 退出全屏后 root 尺寸和 insets 会重新布局，等新尺寸生效后再按半屏重算，
+            // 否则会用全屏时的旧 root.height 计算导致播放器区域异常，
+            // 控制器也可能被裁剪出界（右下角按钮消失）。
+            OneShotPreDrawListener.add(root) { applyVideoAspect() }
+        }
     }
 
     private fun isLandscapeVideo(): Boolean {

@@ -1,11 +1,29 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="NavText.Active" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textSize">11sp</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
+    <!-- 覆写 Media3 控制器时间文字颜色：跟随主题（app_on_bg），浅色模式不再白字不可见。 -->
+    <style name="ExoStyledControls.TimeText.Position">
+        <item name="android:textColor">@color/player_icon</item>
+        <item name="android:text">@string/exo_controls_time_placeholder</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:paddingLeft">4dp</item>
+        <item name="android:paddingRight">4dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:gravity">center</item>
     </style>
 
-    <style name="NavText.Inactive" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textSize">10sp</item>
+    <style name="ExoStyledControls.TimeText.Separator">
+        <item name="android:textColor">@color/player_icon</item>
+        <item name="android:text">·</item>
+        <item name="android:layout_width">wrap_content</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_gravity">center_vertical</item>
+        <item name="android:paddingLeft">4dp</item>
+        <item name="android:paddingRight">4dp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:gravity">center</item>
     </style>
 </resources>
