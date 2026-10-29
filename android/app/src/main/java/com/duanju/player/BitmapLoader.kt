@@ -13,15 +13,15 @@ object BitmapLoader {
         override fun sizeOf(key: String, value: Bitmap): Int = value.byteCount / 1024
     }
     private val executor = Executors.newFixedThreadPool(3)
-    private val placeholderUrls = java.util.Collections.newSetFromMap(java.util.concurrent.ConcurrentHashMap<String, Boolean>())
 
     fun load(url: String, view: ImageView) {
+        // 绑定请求：同一 view 复用到新条目后，旧回调的 tag 校验不再匹配，避免图片串位
+        view.setTag(R.id.cover, url)
         cache.get(url)?.let {
             view.setImageBitmap(it)
             return
         }
         view.setImageBitmap(null)
-        if (!placeholderUrls.add(url)) return
         executor.execute {
             try {
                 val connection = (URL(url).openConnection() as HttpURLConnection).apply {
@@ -30,13 +30,13 @@ object BitmapLoader {
                 }
                 val bitmap = BitmapFactory.decodeStream(connection.inputStream)
                 connection.disconnect()
-                if (bitmap != null) {
-                    cache.put(url, bitmap)
-                    view.post { view.setImageBitmap(bitmap) }
+                if (bitmap != null) cache.put(url, bitmap)
+                view.post {
+                    if (view.getTag(R.id.cover) == url && bitmap != null) {
+                        view.setImageBitmap(bitmap)
+                    }
                 }
             } catch (_: Exception) {
-            } finally {
-                placeholderUrls.remove(url)
             }
         }
     }

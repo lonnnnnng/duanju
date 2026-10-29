@@ -1,31 +1,57 @@
 package com.duanju.player
 
 import android.os.Bundle
+import android.widget.ImageView
+import android.widget.LinearLayout
+import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
-import com.google.android.material.bottomnavigation.BottomNavigationView
 
 class MainActivity : AppCompatActivity() {
 
     private var currentTag = "library"
 
+    private data class NavEntry(val row: LinearLayout, val iconId: Int, val labelId: Int)
+
+    private lateinit var navItems: Map<String, NavEntry>
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        navItems = mapOf(
+            "library" to NavEntry(findViewById(R.id.nav_item_home), R.id.nav_icon_home, R.id.nav_label_home),
+            "history" to NavEntry(findViewById(R.id.nav_item_history), R.id.nav_icon_history, R.id.nav_label_history),
+            "settings" to NavEntry(findViewById(R.id.nav_item_settings), R.id.nav_icon_settings, R.id.nav_label_settings)
+        )
+        navItems.forEach { (tag, entry) ->
+            entry.row.setOnClickListener { switchTo(tag) }
+        }
         if (savedInstanceState == null) {
             supportFragmentManager.beginTransaction()
                 .add(R.id.container, LibraryFragment(), "library")
                 .commit()
         } else {
             currentTag = savedInstanceState.getString("tab", "library")
-        }
-        findViewById<BottomNavigationView>(R.id.bottom_nav).setOnItemSelectedListener { item ->
-            when (item.itemId) {
-                R.id.nav_library -> switchTo("library")
-                R.id.nav_history -> switchTo("history")
-                R.id.nav_settings -> switchTo("settings")
+            // FragmentManager 恢复后所有曾添加的 fragment 都处于可见态，重新隐藏非当前页
+            supportFragmentManager.fragments.forEach { fragment ->
+                if (fragment.tag != currentTag && !fragment.isHidden) {
+                    supportFragmentManager.beginTransaction().hide(fragment).commit()
+                }
             }
-            true
+        }
+        renderNav(currentTag)
+    }
+
+    private fun renderNav(activeTag: String) {
+        navItems.forEach { (tag, entry) ->
+            val active = tag == activeTag
+            entry.row.findViewById<ImageView>(entry.iconId)
+                .setColorFilter(ContextCompat.getColor(this, if (active) R.color.nav_icon_active else R.color.nav_icon_inactive))
+            entry.row.findViewById<TextView>(entry.labelId).apply {
+                setTextColor(ContextCompat.getColor(context, if (active) R.color.app_on_bg else R.color.nav_icon_inactive))
+                paint.isFakeBoldText = active
+            }
         }
     }
 
@@ -48,6 +74,7 @@ class MainActivity : AppCompatActivity() {
         }
         transaction.commit()
         currentTag = tag
+        renderNav(tag)
     }
 
     private fun create(tag: String): Fragment = when (tag) {

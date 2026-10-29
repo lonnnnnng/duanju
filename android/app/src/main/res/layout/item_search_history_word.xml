@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 搜索历史词云 chip：与首页筛选 chips 同样式（bg_chip_normal 胶囊）。 -->
+<TextView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/word"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:background="@drawable/bg_chip_normal"
+    android:paddingHorizontal="13dp"
+    android:paddingVertical="7dp"
+    android:textColor="@color/app_on_surface_variant"
+    android:textSize="13sp" />

@@ -21,8 +21,8 @@ android {
         applicationId = "com.duanju.player"
         minSdk = 24
         targetSdk = 34
-        versionCode = 9
-        versionName = "0.1.23"
+        versionCode = 10
+        versionName = "0.1.24"
     }
 
     buildFeatures {
@@ -81,4 +81,5 @@ dependencies {
     testImplementation("junit:junit:4.13.2")
     testImplementation("org.json:json:20240303")
     implementation("com.arthenica:ffmpeg-kit-next:9.0.2")
+    implementation("com.google.android.flexbox:flexbox:3.0.0")
 }

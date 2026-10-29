@@ -34,8 +34,9 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var emptyView: TextView
     private lateinit var resultList: RecyclerView
     private lateinit var suggest: View
-    private lateinit var historyBox: LinearLayout
+    private lateinit var historyBox: com.google.android.flexbox.FlexboxLayout
     private lateinit var historyClear: TextView
+    private lateinit var historyEmpty: TextView
     private lateinit var adapter: SearchResultAdapter
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -54,6 +55,7 @@ class SearchActivity : AppCompatActivity() {
         suggest = findViewById(R.id.search_suggest)
         historyBox = findViewById(R.id.history_words)
         historyClear = findViewById(R.id.history_clear)
+        historyEmpty = findViewById(R.id.history_empty)
 
         adapter = SearchResultAdapter { openDetail(it) }
         resultList.layoutManager = LinearLayoutManager(this)
@@ -103,12 +105,15 @@ class SearchActivity : AppCompatActivity() {
         val history = SearchHistoryStore.load(this)
         historyBox.removeAllViews()
         historyClear.visibility = if (history.isEmpty()) View.GONE else View.VISIBLE
+        historyEmpty.visibility = if (history.isEmpty()) View.VISIBLE else View.GONE
         history.take(10).forEach { word -> historyBox.addView(wordRow(word)) }
     }
 
-    private fun wordRow(word: String): TextView {
-        val view = LayoutInflater.from(this).inflate(R.layout.item_word_row, historyBox, false) as TextView
-        view.text = word
+    private fun wordRow(word: String): View {
+        val view = LayoutInflater.from(this).inflate(R.layout.item_search_history_word, historyBox, false)
+        (view.layoutParams as? com.google.android.flexbox.FlexboxLayout.LayoutParams)
+            ?.setMargins(0, 0, dp(9), dp(9))
+        view.findViewById<TextView>(R.id.word).text = word
         view.setOnClickListener {
             input.setText(word)
             input.setSelection(word.length)
@@ -132,6 +137,7 @@ class SearchActivity : AppCompatActivity() {
                 val (deviceId, installId) = DirectClient.identity(this)
                 val items = DirectClient.searchHomeItems(keyword, deviceId, installId)
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     adapter.submit(items)
@@ -146,6 +152,7 @@ class SearchActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     resultList.visibility = View.GONE
@@ -155,6 +162,8 @@ class SearchActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
     private fun openDetail(drama: DirectClient.HomeDrama) {
         startActivity(

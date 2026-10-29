@@ -17,9 +17,9 @@ object SectionTabs {
         tab.setTextColor(
             ContextCompat.getColor(
                 context,
-                if (active) R.color.accent else R.color.app_on_surface_variant
+                if (active) android.R.color.white else R.color.app_on_surface_variant
             )
         )
-        tab.typeface = Typeface.create(if (active) "sans-serif-medium" else "sans-serif", Typeface.NORMAL)
+        tab.typeface = Typeface.create(if (active) "sans-serif-medium" else "sans-serif", if (active) Typeface.BOLD else Typeface.NORMAL)
     }
 }

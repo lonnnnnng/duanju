@@ -1,15 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:id="@+id/custom_rewind"
-    android:layout_width="56dp"
-    android:layout_height="56dp"
-    android:background="?android:attr/selectableItemBackgroundBorderless"
+    android:layout_width="46dp"
+    android:layout_height="46dp"
+    android:background="@drawable/bg_glass_button"
     android:clickable="true"
     android:focusable="true">
 
     <ImageView
-        android:layout_width="36dp"
-        android:layout_height="36dp"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
         android:layout_gravity="center"
         android:contentDescription="@null"
         android:src="@drawable/ic_replay_arrow" />
@@ -20,7 +20,7 @@
         android:layout_gravity="center"
         android:layout_marginTop="2dp"
         android:text="15"
-        android:textColor="#FFFFFFFF"
-        android:textSize="10sp"
+        android:textColor="@color/app_on_bg"
+        android:textSize="9sp"
         android:textStyle="bold" />
 </FrameLayout>

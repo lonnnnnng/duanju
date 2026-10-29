@@ -2,40 +2,44 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:layout_marginTop="8dp"
+    android:layout_marginBottom="10dp"
     android:background="@drawable/bg_card"
+    android:gravity="center_vertical"
     android:orientation="horizontal"
     android:padding="10dp">
 
     <FrameLayout
-        android:layout_width="76dp"
+        android:layout_width="56dp"
         android:layout_height="wrap_content">
 
         <com.duanju.player.FixedAspectImageView
             android:id="@+id/cover"
-            android:layout_width="76dp"
-            android:layout_height="101dp"
-            android:background="@color/cover_placeholder"
+            android:layout_width="56dp"
+            android:layout_height="75dp"
+            android:background="@drawable/bg_cover_rounded"
+            android:clipToOutline="true"
             android:scaleType="centerCrop" />
 
         <TextView
             android:id="@+id/badge"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_gravity="bottom|end"
-            android:layout_margin="4dp"
-            android:background="@drawable/bg_badge_dark"
+            android:layout_gravity="bottom|start"
+            android:layout_margin="3dp"
+            android:background="@drawable/bg_badge_rank"
             android:paddingHorizontal="5dp"
             android:paddingVertical="1dp"
-            android:textColor="#FFFFFFFF"
-            android:textSize="10sp" />
+            android:textColor="@color/on_cover_badge"
+            android:textSize="9sp" />
     </FrameLayout>
 
     <LinearLayout
         android:layout_width="0dp"
-        android:layout_height="101dp"
+        android:layout_height="wrap_content"
         android:layout_marginStart="12dp"
         android:layout_weight="1"
+        android:minHeight="75dp"
+        android:gravity="center_vertical"
         android:orientation="vertical">
 
         <TextView
@@ -46,28 +50,39 @@
             android:fontFamily="sans-serif-medium"
             android:maxLines="2"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="15sp" />
+            android:textSize="14sp" />
 
         <TextView
             android:id="@+id/subtitle"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="5dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="12sp" />
+            android:textColor="@color/app_on_surface_variant"
+            android:textSize="11.5sp" />
 
-        <View
+        <!-- 播放进度条：底槽 divider + 渐变前景（宽度代码里按百分比设置） -->
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1" />
+            android:layout_height="3dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="6dp"
+            android:background="@drawable/bg_history_bar">
+
+            <View
+                android:id="@+id/progress"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_tab_indicator" />
+        </FrameLayout>
 
         <TextView
             android:id="@+id/updated"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="?android:attr/textColorSecondary"
-            android:textSize="11sp" />
+            android:layout_marginTop="5dp"
+            android:textColor="@color/app_text_tertiary"
+            android:textSize="10sp" />
     </LinearLayout>
 </LinearLayout>

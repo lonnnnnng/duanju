@@ -6,6 +6,6 @@
     </style>
 
     <style name="NavText.Inactive" parent="TextAppearance.MaterialComponents.Caption">
-        <item name="android:textSize">11sp</item>
+        <item name="android:textSize">10sp</item>
     </style>
 </resources>

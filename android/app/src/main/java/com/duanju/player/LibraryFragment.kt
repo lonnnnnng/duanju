@@ -44,6 +44,8 @@ class LibraryFragment : Fragment() {
     private var selectedFilter: String? = null
     private var filterGroups: List<DirectClient.HomeFilterGroup> = emptyList()
     private var selectedFilterName: String? = null
+    /** 加载期间又发起了 reset 请求（如切筛选）时置位，在途回复结束后补发。 */
+    private var pendingReset = false
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
@@ -106,7 +108,10 @@ class LibraryFragment : Fragment() {
     }
 
     private fun load(reset: Boolean) {
-        if (loading) return
+        if (loading) {
+            if (reset) pendingReset = true
+            return
+        }
         loading = true
         if (reset) {
             offset = 0
@@ -127,6 +132,12 @@ class LibraryFragment : Fragment() {
                     loading = false
                     swipe.isRefreshing = false
                     showLoading(false)
+                    if (pendingReset) {
+                        // 在途回复已过时（期间切了筛选/下拉刷新），直接补发新请求
+                        pendingReset = false
+                        load(reset = true)
+                        return@postUi
+                    }
                     offset = page.nextOffset
                     sessionId = page.sessionId
                     hasMore = page.hasMore
@@ -145,6 +156,11 @@ class LibraryFragment : Fragment() {
                     loading = false
                     swipe.isRefreshing = false
                     showLoading(false)
+                    if (pendingReset) {
+                        pendingReset = false
+                        load(reset = true)
+                        return@postUi
+                    }
                     adapter.setFooter(false, false)
                     if (adapter.size() == 0) {
                         errorText.text = e.message ?: "加载失败"
@@ -238,7 +254,7 @@ class LibraryFragment : Fragment() {
                         isClickable = true
                         isFocusable = true
                         setPadding(dp(6), dp(9), dp(6), dp(9))
-                        setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
+                        setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_fopt)
                         setTextColor(if (selected) 0xFFFFFFFF.toInt() else resolveChipColor())
                         setOnClickListener {
                             sheet.dismiss()
@@ -265,7 +281,11 @@ class LibraryFragment : Fragment() {
                 val tab = groupBox.getChildAt(i) as TextView
                 val active = i == index
                 tab.setTextColor(if (active) 0xFFFFFFFF.toInt() else resolveChipColor())
-                tab.setBackgroundColor(if (active) ContextCompat.getColor(requireContext(), R.color.accent) else android.graphics.Color.TRANSPARENT)
+                tab.background = if (active) {
+                    ContextCompat.getDrawable(requireContext(), R.drawable.bg_filter_group_active)?.mutate()
+                } else {
+                    null
+                }
                 tab.setTypeface(null, if (active) android.graphics.Typeface.BOLD else android.graphics.Typeface.NORMAL)
             }
             renderItems(groups[index])
@@ -343,16 +363,8 @@ class LibraryFragment : Fragment() {
         chip.setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
     }
 
-    private fun resolveChipColor(): Int {
-        val attr = android.R.attr.textColorSecondary
-        val typed = requireContext().theme.obtainStyledAttributes(intArrayOf(attr))
-        val color = try {
-            typed.getColor(0, 0xFF606064.toInt())
-        } finally {
-            typed.recycle()
-        }
-        return color
-    }
+    private fun resolveChipColor(): Int =
+        androidx.core.content.ContextCompat.getColor(requireContext(), R.color.app_on_surface_variant)
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

@@ -33,6 +33,7 @@ class HistoryAdapter(
         }
         holder.badge.text = "第${entry.episode}集"
         holder.updated.text = relativeTime(entry.updatedAt)
+        renderProgress(holder, entry)
 
         holder.cover.setImageBitmap(null)
         if (entry.cover.isNotBlank()) {
@@ -42,6 +43,23 @@ class HistoryAdapter(
         holder.itemView.setOnLongClickListener {
             onDelete(entry)
             true
+        }
+    }
+
+    /** 单集播放进度条：有时长才展示（原型 hbar）。布局完成后再量宽度，否则 itemView.width 为 0。 */
+    private fun renderProgress(holder: Holder, entry: HistoryEntry) {
+        if (entry.positionMs > 0 && entry.durationMs > entry.positionMs) {
+            holder.progress.visibility = View.VISIBLE
+            holder.itemView.post {
+                if (holder.itemView.width > 0) {
+                    val params = holder.progress.layoutParams
+                    val fraction = entry.positionMs.toFloat() / entry.durationMs
+                    params.width = (holder.itemView.width * fraction).toInt()
+                    holder.progress.layoutParams = params
+                }
+            }
+        } else {
+            holder.progress.visibility = View.GONE
         }
     }
 
@@ -73,5 +91,6 @@ class HistoryAdapter(
         val title: TextView = view.findViewById(R.id.title)
         val subtitle: TextView = view.findViewById(R.id.subtitle)
         val updated: TextView = view.findViewById(R.id.updated)
+        val progress: View = view.findViewById(R.id.progress)
     }
 }

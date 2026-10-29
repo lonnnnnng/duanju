@@ -123,10 +123,14 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
         if (!tag.isNullOrBlank()) {
             holder.tag.visibility = View.VISIBLE
             holder.tag.text = tag
-            val color = runCatching { Color.parseColor(item.tagColor) }.getOrDefault(0xFFFF4D4F.toInt())
-            holder.tag.background = GradientDrawable().apply {
-                cornerRadius = dp(holder.itemView, 4f)
-                setColor(color)
+            val fallback = runCatching { Color.parseColor(item.tagColor) }.getOrNull()
+            holder.tag.background = if (fallback != null) {
+                GradientDrawable().apply {
+                    cornerRadius = dp(holder.itemView, 6f)
+                    setColor(fallback)
+                }
+            } else {
+                androidx.core.content.ContextCompat.getDrawable(holder.itemView.context, R.drawable.bg_tag_badge)?.mutate()
             }
         } else {
             holder.tag.visibility = View.GONE

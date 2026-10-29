@@ -74,6 +74,10 @@ class PlayerActivity : AppCompatActivity() {
     private var currentSpeed = 1f
     private var muted = false
     private var fullscreen = false
+    /** 播放代次：每次切集递增，旧集的异步回调据此丢弃。 */
+    private var playGeneration = 0L
+    /** 进度落库节流计数。 */
+    private var saveTick = 0
 
     private var videoWidth = 0
     private var videoHeight = 0
@@ -252,8 +256,11 @@ statusView = findViewById(R.id.status)
 
     override fun onDestroy() {
         super.onDestroy()
+        main.removeCallbacks(ticker)
+        main.removeCallbacks(prefetchTicker)
         saveProgress()
         cancelPrefetch()
+        executor.shutdownNow()
         prefetchExecutor.shutdownNow()
         player.release()
     }
@@ -290,11 +297,7 @@ statusView = findViewById(R.id.status)
             chip.setBackgroundResource(if (isSelected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
             chip.setTextColor(
                 if (isSelected) 0xFFFFFFFF.toInt()
-                else {
-                    val typed = theme.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
-                    val color = try { typed.getColor(0, 0xFF1A1A1A.toInt()) } finally { typed.recycle() }
-                    color
-                }
+                else androidx.core.content.ContextCompat.getColor(this, R.color.app_on_surface_variant)
             )
         }
         groupLabel.text = EpisodeGroups.label(range)
@@ -445,6 +448,7 @@ statusView = findViewById(R.id.status)
     
 
     private fun play(episode: Int, startMs: Long) {
+        val generation = ++playGeneration
         selectedEpisode = episode
         playerView.hideController()
         // 要切的正是预取中的那一集：保留任务并等它完成；否则取消无用的预取。
@@ -467,9 +471,10 @@ statusView = findViewById(R.id.status)
             // 预取写的是 .tmp，完成才 rename；这里等它落盘后直接命中缓存。
             if (waiting != null) runCatching { waiting.get(60, TimeUnit.SECONDS) }
             try {
-                playDirect(episode, startMs)
+                playDirect(episode, startMs, generation)
             } catch (e: Exception) {
                 main.post {
+                    if (playGeneration != generation) return@post
                     loading.visibility = View.GONE
                     status("失败：${e.message}")
                 }
@@ -479,7 +484,7 @@ statusView = findViewById(R.id.status)
 
 
     /** 直连播放：手机直接调官方接口 + 本地 ffmpeg 解密，全程不经服务器。 */
-    private fun playDirect(episode: Int, startMs: Long) {
+    private fun playDirect(episode: Int, startMs: Long, generation: Long) {
         val (deviceId, installId) = com.duanju.player.core.DirectClient.identity(this)
         val seriesId = dramaId.substringAfter(':')
         val start = System.currentTimeMillis()
@@ -489,7 +494,10 @@ statusView = findViewById(R.id.status)
         currentVideoId = videoId
         val media = com.duanju.player.core.DirectClient.media(videoId, deviceId, installId)
         val resolveMs = System.currentTimeMillis() - start
-        main.post { status("已解析(${resolveMs}ms) ${media.quality}p，本地解密中…") }
+        main.post {
+            if (playGeneration != generation) return@post
+            status("已解析(${resolveMs}ms) ${media.quality}p，本地解密中…")
+        }
         val cacheDir = File(cacheDir, "direct").apply { mkdirs() }
         com.duanju.player.core.DirectClient.cleanPartial(cacheDir)
         val outFile = File(cacheDir, "${seriesId}_$episode.mp4")
@@ -516,6 +524,7 @@ statusView = findViewById(R.id.status)
         com.duanju.player.core.VideoCache.touch(outFile)
         val sizeBytes = outFile.length()
         main.post {
+            if (playGeneration != generation) return@post
             playingFile = outFile
             mediaQuality = media.quality
             playingBytes = sizeBytes
@@ -636,7 +645,8 @@ statusView = findViewById(R.id.status)
                 episode = selectedEpisode,
                 positionMs = position,
                 updatedAt = System.currentTimeMillis(),
-                cover = cover
+                cover = cover,
+                durationMs = if (player.duration > 0) player.duration else 0L
             )
         )
     }
@@ -737,7 +747,8 @@ statusView = findViewById(R.id.status)
         override fun run() {
             if (::player.isInitialized && player.isPlaying) {
                 renderStatus()
-                saveProgress()
+                // 状态行每秒刷新，进度每 5 秒落库一次，避免每秒重写历史 JSON
+                if (++saveTick % 5 == 0) saveProgress()
             }
             main.postDelayed(this, 1000)
         }

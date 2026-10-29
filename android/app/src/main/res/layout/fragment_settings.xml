@@ -22,14 +22,14 @@
             android:paddingBottom="4dp"
             android:text="设置"
             android:textColor="?android:attr/textColorPrimary"
-            android:textSize="20sp" />
+            android:textSize="21sp" />
 
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:paddingHorizontal="20dp"
             android:text="播放偏好与应用信息"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="12sp" />
 
         <TextView
@@ -39,22 +39,22 @@
             android:paddingTop="20dp"
             android:paddingBottom="8dp"
             android:text="播放"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="12sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
-            android:background="@drawable/bg_card"
+            android:background="@drawable/bg_settings_card"
             android:orientation="vertical">
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -62,28 +62,29 @@
                     android:layout_weight="1"
                     android:text="自动连播下一集"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <Switch
                     android:id="@+id/auto_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minHeight="0dp" />
+                    android:minHeight="0dp"
+                    android:thumb="@drawable/switch_thumb"
+                    android:track="@drawable/switch_track" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/app_surface"
-                android:alpha="0.5" />
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -91,30 +92,31 @@
                     android:layout_weight="1"
                     android:text="预加载下一集"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <Switch
                     android:id="@+id/prefetch_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minHeight="0dp" />
+                    android:minHeight="0dp"
+                    android:thumb="@drawable/switch_thumb"
+                    android:track="@drawable/switch_track" />
             </LinearLayout>
 
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/app_surface"
-                android:alpha="0.5" />
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/row_speed"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -122,38 +124,36 @@
                     android:layout_weight="1"
                     android:text="默认播放倍速"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <TextView
                     android:id="@+id/speed_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="14sp" />
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
 
                 <ImageView
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:layout_marginStart="4dp"
                     android:contentDescription="@null"
-                    android:src="@drawable/ic_chevron_right"
-                    android:alpha="0.6" />
+                    android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/app_surface"
-                android:alpha="0.5" />
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/row_cache"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -161,20 +161,19 @@
                     android:layout_weight="1"
                     android:text="播放缓存"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <TextView
                     android:id="@+id/cache_size"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="14sp" />
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
 
                 <ImageView
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:layout_marginStart="4dp"
-                    android:alpha="0.6"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
@@ -182,18 +181,17 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/app_surface"
-                android:alpha="0.5" />
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
 
             <LinearLayout
                 android:id="@+id/row_cache_limit"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -201,20 +199,57 @@
                     android:layout_weight="1"
                     android:text="缓存上限"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <TextView
                     android:id="@+id/cache_limit_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="14sp" />
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
 
                 <ImageView
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:layout_marginStart="4dp"
-                    android:alpha="0.6"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_right" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
+
+            <LinearLayout
+                android:id="@+id/row_theme"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="主题模式"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="13.5sp" />
+
+                <TextView
+                    android:id="@+id/theme_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="4dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
@@ -227,24 +262,24 @@
             android:paddingTop="20dp"
             android:paddingBottom="8dp"
             android:text="关于"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="12sp" />
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginHorizontal="16dp"
-            android:background="@drawable/bg_card"
+            android:background="@drawable/bg_settings_card"
             android:orientation="vertical">
 
             <LinearLayout
                 android:id="@+id/row_version"
                 android:layout_width="match_parent"
-                android:layout_height="56dp"
+                android:layout_height="52dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
-                android:paddingHorizontal="16dp">
+                android:paddingHorizontal="14dp">
 
                 <TextView
                     android:layout_width="0dp"
@@ -252,20 +287,19 @@
                     android:layout_weight="1"
                     android:text="版本"
                     android:textColor="?android:attr/textColorPrimary"
-                    android:textSize="14sp" />
+                    android:textSize="13.5sp" />
 
                 <TextView
                     android:id="@+id/version"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="?android:attr/textColorSecondary"
-                    android:textSize="14sp" />
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
 
                 <ImageView
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:layout_marginStart="4dp"
-                    android:alpha="0.6"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
@@ -273,19 +307,18 @@
             <View
                 android:layout_width="match_parent"
                 android:layout_height="1dp"
-                android:layout_marginStart="16dp"
-                android:background="@color/app_surface"
-                android:alpha="0.5" />
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
 
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:lineSpacingExtra="4dp"
-                android:paddingHorizontal="16dp"
+                android:paddingHorizontal="14dp"
                 android:paddingVertical="14dp"
                 android:text="内容来自公开网络，仅供学习交流，请勿用于商业用途。"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
+                android:textColor="@color/app_text_tertiary"
+                android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>

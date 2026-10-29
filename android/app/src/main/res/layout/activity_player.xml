@@ -11,8 +11,9 @@
     <com.duanju.player.TopBar
         android:id="@+id/player_top_bar"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:paddingHorizontal="4dp" />
+        android:layout_height="50dp"
+        android:background="@color/app_bg_elevated"
+        android:paddingHorizontal="6dp" />
 
     <FrameLayout
         android:id="@+id/video_container"
@@ -40,43 +41,47 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="top"
-            android:background="#99000000"
+            android:background="@drawable/bg_bottom_scrim"
             android:gravity="center_vertical"
             android:orientation="horizontal"
             android:paddingTop="24dp"
-            android:paddingBottom="8dp"
+            android:paddingBottom="10dp"
+            android:paddingHorizontal="6dp"
             android:visibility="gone">
 
             <ImageButton
                 android:id="@+id/fullscreen_back"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:background="?android:attr/selectableItemBackgroundBorderless"
+                android:layout_width="38dp"
+                android:layout_height="38dp"
+                android:layout_marginStart="6dp"
+                android:background="@drawable/bg_glass_button"
                 android:contentDescription="返回"
-                android:padding="8dp"
-                android:src="@drawable/ic_back"
-                app:tint="#FFFFFFFF" />
+                android:padding="9dp"
+                android:src="@drawable/ic_back" />
 
             <TextView
                 android:id="@+id/fullscreen_title"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:layout_marginEnd="8dp"
+                android:layout_marginStart="10dp"
+                android:layout_marginEnd="12dp"
                 android:layout_weight="1"
                 android:ellipsize="end"
+                android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:textColor="#FFFFFFFF"
+                android:textColor="@color/app_on_bg"
                 android:textSize="15sp" />
         </LinearLayout>
     </FrameLayout>
 
+    <!-- 状态行：集数进度 + 自动连播开关（原型：11sp 暗灰 + 珊瑚开关） -->
     <LinearLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
         android:paddingHorizontal="14dp"
-        android:paddingTop="12dp">
+        android:paddingTop="10dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -93,8 +98,8 @@
                 android:lineSpacingExtra="2dp"
                 android:maxLines="2"
                 android:text="准备播放"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
+                android:textColor="@color/nav_icon_inactive"
+                android:textSize="11sp" />
 
             <Switch
                 android:id="@+id/auto_next"
@@ -103,8 +108,10 @@
                 android:checked="true"
                 android:minHeight="0dp"
                 android:text="自动连播"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
+                android:textColor="@color/nav_icon_inactive"
+                android:textSize="11sp"
+                android:thumb="@drawable/switch_thumb"
+                android:track="@drawable/switch_track" />
         </LinearLayout>
     </LinearLayout>
 
@@ -123,24 +130,40 @@
             android:orientation="horizontal"
             android:paddingHorizontal="14dp">
 
-            <TextView
-                android:id="@+id/tab_episodes"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:fontFamily="sans-serif-medium"
-                android:paddingVertical="2dp"
-                android:text="选集"
-                android:textColor="@color/accent"
-                android:textSize="15sp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tab_episodes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:paddingHorizontal="2dp"
+                    android:paddingVertical="3dp"
+                    android:text="选集"
+                    android:textColor="@color/app_on_bg"
+                    android:textSize="15sp" />
+
+                <View
+                    android:id="@+id/tab_episodes_indicator"
+                    android:layout_width="20dp"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_tab_indicator" />
+            </LinearLayout>
 
             <TextView
                 android:id="@+id/tab_related"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="18dp"
-                android:paddingVertical="2dp"
+                android:layout_marginStart="22dp"
+                android:paddingHorizontal="2dp"
+                android:paddingVertical="3dp"
                 android:text="相关"
-                android:textColor="?android:attr/textColorSecondary"
+                android:textColor="@color/app_on_surface_variant"
                 android:textSize="15sp" />
 
             <Space
@@ -152,8 +175,8 @@
                 android:id="@+id/episode_group_label"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:textColor="?android:attr/textColorSecondary"
-                android:textSize="12sp" />
+                android:textColor="@color/nav_icon_inactive"
+                android:textSize="11sp" />
         </LinearLayout>
 
         <HorizontalScrollView
@@ -199,7 +222,7 @@
             android:paddingHorizontal="14dp"
             android:paddingVertical="14dp"
             android:text="加载中…"
-            android:textColor="?android:attr/textColorSecondary"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="13sp"
             android:visibility="gone" />
     </LinearLayout>

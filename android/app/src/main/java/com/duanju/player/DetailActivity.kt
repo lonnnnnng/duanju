@@ -11,6 +11,7 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.duanju.player.core.DirectClient
@@ -116,9 +117,13 @@ class DetailActivity : AppCompatActivity() {
             try {
                 val (deviceId, installId) = DirectClient.identity(this)
                 val data = DirectClient.seriesDetail(seriesId, deviceId, installId)
-                main.post { render(data) }
+                main.post {
+                    if (isFinishing || isDestroyed) return@post
+                    render(data)
+                }
             } catch (e: Exception) {
                 main.post {
+                    if (isFinishing || isDestroyed) return@post
                     loading.visibility = View.GONE
                     errorText.text = e.message ?: "加载失败"
                     errorBox.visibility = View.VISIBLE
@@ -144,10 +149,10 @@ class DetailActivity : AppCompatActivity() {
         chips.forEach { text ->
             val chip = TextView(this).apply {
                 this.text = text
-                textSize = 11f
+                textSize = 10f
                 setTextColor(resolveSecondaryColor())
-                setBackgroundResource(R.drawable.bg_chip_normal)
-                setPadding(dp(6), dp(2), dp(6), dp(2))
+                setBackgroundResource(R.drawable.bg_chip_type)
+                setPadding(dp(8), dp(3), dp(8), dp(3))
             }
             val params = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -220,18 +225,9 @@ class DetailActivity : AppCompatActivity() {
             val label = chip.text.toString()
             val selected = label == EpisodeGroups.label(range)
             chip.setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
-            chip.setTextColor(if (selected) 0xFFFFFFFF.toInt() else resolvePrimaryColor())
+            chip.setTextColor(ContextCompat.getColor(this, if (selected) android.R.color.white else R.color.app_on_surface_variant))
         }
         episodeAdapter.submit(all.filter { it.index in range })
-    }
-
-    private fun resolvePrimaryColor(): Int {
-        val typed = theme.obtainStyledAttributes(intArrayOf(android.R.attr.textColorPrimary))
-        return try {
-            typed.getColor(0, 0xFF1A1A1A.toInt())
-        } finally {
-            typed.recycle()
-        }
     }
 
     private fun toggleIntro() {
@@ -315,14 +311,8 @@ class DetailActivity : AppCompatActivity() {
         )
     }
 
-    private fun resolveSecondaryColor(): Int {
-        val typed = theme.obtainStyledAttributes(intArrayOf(android.R.attr.textColorSecondary))
-        return try {
-            typed.getColor(0, 0xFF606064.toInt())
-        } finally {
-            typed.recycle()
-        }
-    }
+    private fun resolveSecondaryColor(): Int =
+        androidx.core.content.ContextCompat.getColor(this, R.color.app_on_surface_variant)
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
