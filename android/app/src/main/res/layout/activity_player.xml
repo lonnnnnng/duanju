@@ -75,7 +75,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- 状态行：集数进度 + 自动连播开关（原型：11sp 暗灰 + 珊瑚开关） -->
+    <!-- 状态行：本集清晰度/大小/进度 + 下一集状态（11sp 暗灰，自动连播开关已移到 tab 行） -->
     <LinearLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
@@ -105,18 +105,6 @@
                 android:text="准备播放"
                 android:textColor="@color/nav_icon_inactive"
                 android:textSize="11sp" />
-
-            <Switch
-                android:id="@+id/auto_next"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:minHeight="0dp"
-                android:text="自动连播"
-                android:textColor="@color/nav_icon_inactive"
-                android:textSize="11sp"
-                android:thumb="@drawable/switch_thumb"
-                android:track="@drawable/switch_track" />
         </LinearLayout>
     </LinearLayout>
 
@@ -185,6 +173,24 @@
                     android:background="@drawable/bg_tab_indicator"
                     android:visibility="gone" />
             </LinearLayout>
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="1dp"
+                android:layout_weight="1" />
+
+            <!-- 自动连播开关放到 tab 行最右侧，状态行只留文案。 -->
+            <Switch
+                android:id="@+id/auto_next"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:minHeight="0dp"
+                android:text="自动连播"
+                android:textColor="@color/nav_icon_inactive"
+                android:textSize="11sp"
+                android:thumb="@drawable/switch_thumb"
+                android:track="@drawable/switch_track" />
 
         </LinearLayout>
 
