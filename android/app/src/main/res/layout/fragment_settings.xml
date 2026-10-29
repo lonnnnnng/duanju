@@ -214,6 +214,14 @@
                     android:layout_marginStart="4dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right" />
+            </LinearLayout>
+
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginStart="14dp"
+                android:background="@color/divider" />
+
             <LinearLayout
                 android:id="@+id/row_theme"
                 android:layout_width="match_parent"
@@ -246,9 +254,6 @@
                     android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
         </LinearLayout>
-    </LinearLayout>
-
-
 
         <TextView
             android:layout_width="wrap_content"
