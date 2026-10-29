@@ -47,39 +47,39 @@
           android:layout_height="34dp"
           android:layout_gravity="center_vertical"
           android:layout_marginEnd="6dp"
-          android:background="@drawable/bg_glass_button"
+          android:background="@drawable/bg_player_glass"
           android:insetTop="0dp"
           android:insetBottom="0dp"
           android:minWidth="0dp"
           android:text="1.0×"
-          android:textColor="@color/app_on_bg"
+          android:textColor="@color/player_icon"
           android:textSize="11sp"/>
 
-      <androidx.appcompat.widget.AppCompatButton android:id="@+id/custom_mute"
+      <androidx.appcompat.widget.AppCompatImageButton android:id="@+id/custom_mute"
           android:layout_width="44dp"
           android:layout_height="34dp"
           android:layout_gravity="center_vertical"
           android:layout_marginEnd="6dp"
-          android:background="@drawable/bg_glass_button"
+          android:background="@drawable/bg_player_glass"
+          android:contentDescription="静音"
           android:insetTop="0dp"
           android:insetBottom="0dp"
-          android:minWidth="0dp"
-          android:text="静音"
-          android:textColor="@color/app_on_bg"
-          android:textSize="11sp"/>
+          android:padding="7dp"
+          android:scaleType="fitCenter"
+          android:src="@drawable/ic_volume_on"/>
 
-      <androidx.appcompat.widget.AppCompatButton android:id="@+id/custom_fullscreen"
+      <androidx.appcompat.widget.AppCompatImageButton android:id="@+id/custom_fullscreen"
           android:layout_width="44dp"
           android:layout_height="34dp"
           android:layout_gravity="center_vertical"
           android:layout_marginEnd="10dp"
-          android:background="@drawable/bg_glass_button"
+          android:background="@drawable/bg_player_glass"
+          android:contentDescription="全屏"
           android:insetTop="0dp"
           android:insetBottom="0dp"
-          android:minWidth="0dp"
-          android:text="全屏"
-          android:textColor="@color/app_on_bg"
-          android:textSize="11sp"/>
+          android:padding="7dp"
+          android:scaleType="fitCenter"
+          android:src="@drawable/ic_fullscreen_enter"/>
 
     </LinearLayout>
 
@@ -105,7 +105,7 @@
     <ImageButton android:id="@+id/custom_prev"
         android:layout_width="46dp"
         android:layout_height="46dp"
-        android:background="@drawable/bg_glass_button"
+        android:background="@drawable/bg_player_glass"
         android:contentDescription="上一集"
         android:padding="12dp"
         android:src="@drawable/ic_skip_previous"/>
@@ -116,7 +116,7 @@
         android:layout_width="60dp"
         android:layout_height="60dp"
         android:layout_marginHorizontal="8dp"
-        android:background="@drawable/bg_play_button"
+        android:background="?attr/selectableItemBackgroundBorderless"
         android:contentDescription="播放/暂停"
         android:padding="16dp"
         android:scaleType="center" />
@@ -126,7 +126,7 @@
     <ImageButton android:id="@+id/custom_next"
         android:layout_width="46dp"
         android:layout_height="46dp"
-        android:background="@drawable/bg_glass_button"
+        android:background="@drawable/bg_player_glass"
         android:contentDescription="下一集"
         android:padding="12dp"
         android:src="@drawable/ic_skip_next"/>

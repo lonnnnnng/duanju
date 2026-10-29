@@ -6,7 +6,7 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- 顶栏：logo + 搜索胶囊（点击进入搜索页） -->
+    <!-- 顶栏：搜索胶囊占满整行（点击进入搜索页） -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="50dp"
@@ -14,21 +14,10 @@
         android:orientation="horizontal"
         android:paddingHorizontal="14dp">
 
-        <TextView
-            android:layout_width="30dp"
-            android:layout_height="30dp"
-            android:background="@drawable/bg_nav_logo"
-            android:gravity="center"
-            android:includeFontPadding="false"
-            android:text="🎬"
-            android:textSize="13sp" />
-
         <LinearLayout
             android:id="@+id/search_pill"
-            android:layout_width="0dp"
+            android:layout_width="match_parent"
             android:layout_height="40dp"
-            android:layout_marginStart="10dp"
-            android:layout_weight="1"
             android:background="@drawable/bg_pill"
             android:clickable="true"
             android:focusable="true"

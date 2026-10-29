@@ -162,16 +162,31 @@
                             android:background="@drawable/bg_tab_indicator" />
                     </LinearLayout>
 
-                    <TextView
-                        android:id="@+id/detail_tab_related"
+                    <LinearLayout
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="22dp"
-                        android:paddingHorizontal="2dp"
-                        android:paddingVertical="3dp"
-                        android:text="相关"
-                        android:textColor="@color/app_on_surface_variant"
-                        android:textSize="15sp" />
+                        android:gravity="center_horizontal"
+                        android:orientation="vertical">
+
+                        <TextView
+                            android:id="@+id/detail_tab_related"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:paddingHorizontal="2dp"
+                            android:paddingVertical="3dp"
+                            android:text="相关"
+                            android:textColor="@color/app_on_surface_variant"
+                            android:textSize="15sp" />
+
+                        <View
+                            android:id="@+id/detail_tab_related_indicator"
+                            android:layout_width="20dp"
+                            android:layout_height="3dp"
+                            android:layout_marginTop="2dp"
+                            android:background="@drawable/bg_tab_indicator"
+                            android:visibility="gone" />
+                    </LinearLayout>
                 </LinearLayout>
 
                 <HorizontalScrollView

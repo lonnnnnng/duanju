@@ -3,7 +3,7 @@
     android:id="@+id/custom_forward"
     android:layout_width="46dp"
     android:layout_height="46dp"
-    android:background="@drawable/bg_glass_button"
+    android:background="@drawable/bg_player_glass"
     android:clickable="true"
     android:focusable="true">
 

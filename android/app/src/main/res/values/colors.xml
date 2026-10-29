@@ -28,5 +28,8 @@
     <color name="tag_badge">#E6E0334F</color>
     <color name="toast_bg">#F0FFFFFF</color>
     <color name="cover_placeholder">#FFEFEEEA</color>
+    <!-- 播放器控件专用恒定色：不随主题切换，保证在任意视频画面上可读 -->
     <color name="on_cover_badge">#FFFFFFFF</color>
+    <color name="player_glass_bg">#59000000</color>
+    <color name="player_icon">#FFFFFFFF</color>
 </resources>

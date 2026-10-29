@@ -54,10 +54,11 @@
                 android:layout_width="38dp"
                 android:layout_height="38dp"
                 android:layout_marginStart="6dp"
-                android:background="@drawable/bg_glass_button"
+                android:background="@drawable/bg_player_glass"
                 android:contentDescription="返回"
                 android:padding="9dp"
-                android:src="@drawable/ic_back" />
+                android:src="@drawable/ic_back"
+                app:tint="@color/player_icon" />
 
             <TextView
                 android:id="@+id/fullscreen_title"
@@ -74,7 +75,7 @@
         </LinearLayout>
     </FrameLayout>
 
-    <!-- 状态行：集数进度 + 自动连播开关（原型：11sp 暗灰 + 珊瑚开关） -->
+    <!-- 状态行：本集清晰度/大小/进度 + 下一集状态（11sp 暗灰，自动连播开关已移到 tab 行） -->
     <LinearLayout
         android:id="@+id/header"
         android:layout_width="match_parent"
@@ -90,28 +91,20 @@
             android:orientation="horizontal">
 
             <!-- 集数进度 + 清晰度/文件大小 + 下一集预取状态 -->
+            <!-- 固定两行高度：文案从一行变两行时布局不能跳（下方选集面板会被顶着上下晃）。 -->
             <TextView
                 android:id="@+id/status"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:lineSpacingExtra="2dp"
+                android:lines="2"
                 android:maxLines="2"
+                android:minLines="2"
                 android:text="准备播放"
                 android:textColor="@color/nav_icon_inactive"
                 android:textSize="11sp" />
-
-            <Switch
-                android:id="@+id/auto_next"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:checked="true"
-                android:minHeight="0dp"
-                android:text="自动连播"
-                android:textColor="@color/nav_icon_inactive"
-                android:textSize="11sp"
-                android:thumb="@drawable/switch_thumb"
-                android:track="@drawable/switch_track" />
         </LinearLayout>
     </LinearLayout>
 
@@ -155,28 +148,50 @@
                     android:background="@drawable/bg_tab_indicator" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tab_related"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="22dp"
-                android:paddingHorizontal="2dp"
-                android:paddingVertical="3dp"
-                android:text="相关"
-                android:textColor="@color/app_on_surface_variant"
-                android:textSize="15sp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tab_related"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="2dp"
+                    android:paddingVertical="3dp"
+                    android:text="相关"
+                    android:textColor="@color/app_on_surface_variant"
+                    android:textSize="15sp" />
+
+                <View
+                    android:id="@+id/tab_related_indicator"
+                    android:layout_width="20dp"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_tab_indicator"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <Space
                 android:layout_width="0dp"
                 android:layout_height="1dp"
                 android:layout_weight="1" />
 
-            <TextView
-                android:id="@+id/episode_group_label"
+            <!-- 自动连播开关放到 tab 行最右侧，状态行只留文案。 -->
+            <Switch
+                android:id="@+id/auto_next"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
+                android:checked="true"
+                android:minHeight="0dp"
+                android:text="自动连播"
                 android:textColor="@color/nav_icon_inactive"
-                android:textSize="11sp" />
+                android:textSize="11sp"
+                android:thumb="@drawable/switch_thumb"
+                android:track="@drawable/switch_track" />
+
         </LinearLayout>
 
         <HorizontalScrollView
