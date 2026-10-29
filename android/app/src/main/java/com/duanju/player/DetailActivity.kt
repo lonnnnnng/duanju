@@ -40,7 +40,9 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var scroll: View
     private lateinit var topBar: TopBar
     private lateinit var tabEpisodes: TextView
+    private lateinit var tabEpisodesIndicator: View
     private lateinit var tabRelated: TextView
+    private lateinit var tabRelatedIndicator: View
     private lateinit var relatedList: RecyclerView
     private lateinit var relatedStatus: TextView
     private lateinit var relatedAdapter: RelatedAdapter
@@ -89,7 +91,9 @@ class DetailActivity : AppCompatActivity() {
         episodeView.adapter = episodeAdapter
 
         tabEpisodes = findViewById(R.id.detail_tab_episodes)
+        tabEpisodesIndicator = findViewById(R.id.detail_tab_episodes_indicator)
         tabRelated = findViewById(R.id.detail_tab_related)
+        tabRelatedIndicator = findViewById(R.id.detail_tab_related_indicator)
         relatedList = findViewById(R.id.detail_related)
         relatedStatus = findViewById(R.id.detail_related_status)
         relatedAdapter = RelatedAdapter(seriesId) { season -> openSeason(season) }
@@ -246,7 +250,11 @@ class DetailActivity : AppCompatActivity() {
     /** 选集 / 相关 切换；相关页首次点击时才请求搜索接口。 */
     private fun showRelated(show: Boolean) {
         showingRelated = show
-        SectionTabs.apply(if (show) tabRelated else tabEpisodes, if (show) tabEpisodes else tabRelated)
+        if (show) {
+            SectionTabs.apply(tabRelated, tabRelatedIndicator, tabEpisodes, tabEpisodesIndicator)
+        } else {
+            SectionTabs.apply(tabEpisodes, tabEpisodesIndicator, tabRelated, tabRelatedIndicator)
+        }
         groupScroll.visibility = if (show) View.GONE else View.VISIBLE
         episodeView.visibility = if (show) View.GONE else View.VISIBLE
         relatedList.visibility = if (show) View.VISIBLE else View.GONE

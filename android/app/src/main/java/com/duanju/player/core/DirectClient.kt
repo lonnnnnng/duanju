@@ -927,4 +927,26 @@ object DirectClient {
         }
         return dev to ins
     }
+
+    /**
+     * 读本地解密后 MP4 的画面宽高（px）。解密用的是 -c copy，尺寸与原始一致。
+     * 用途：播放前就知道这一集是横屏还是竖屏，容器高度一次到位，
+     * 不用等 ExoPlayer 解出首帧才回调 onVideoSizeChanged（那会导致切集时高度跳一下）。
+     * 阻塞调用，需在工作线程执行；解析失败返回 null。
+     */
+    fun probeSize(file: File): Pair<Int, Int>? = try {
+        if (!file.exists() || file.length() == 0L) {
+            null
+        } else {
+            val session = com.arthenica.ffmpegkit.FFprobeKit.getMediaInformation(file.absolutePath)
+            val info = session?.getMediaInformation()
+            val video = info?.getStreams()?.firstOrNull { it.getType() == "video" }
+            val w = video?.getWidth() ?: 0L
+            val h = video?.getHeight() ?: 0L
+            if (w > 0 && h > 0) w.toInt() to h.toInt() else null
+        }
+    } catch (e: Exception) {
+        android.util.Log.d("DirectClient", "probeSize 失败 ${file.name}: ${e.message}")
+        null
+    }
 }

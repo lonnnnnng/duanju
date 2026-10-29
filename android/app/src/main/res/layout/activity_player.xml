@@ -91,13 +91,17 @@
             android:orientation="horizontal">
 
             <!-- 集数进度 + 清晰度/文件大小 + 下一集预取状态 -->
+            <!-- 固定两行高度：文案从一行变两行时布局不能跳（下方选集面板会被顶着上下晃）。 -->
             <TextView
                 android:id="@+id/status"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_weight="1"
+                android:ellipsize="end"
                 android:lineSpacingExtra="2dp"
+                android:lines="2"
                 android:maxLines="2"
+                android:minLines="2"
                 android:text="准备播放"
                 android:textColor="@color/nav_icon_inactive"
                 android:textSize="11sp" />
@@ -156,28 +160,32 @@
                     android:background="@drawable/bg_tab_indicator" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/tab_related"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="22dp"
-                android:paddingHorizontal="2dp"
-                android:paddingVertical="3dp"
-                android:text="相关"
-                android:textColor="@color/app_on_surface_variant"
-                android:textSize="15sp" />
+                android:gravity="center_horizontal"
+                android:orientation="vertical">
 
-            <Space
-                android:layout_width="0dp"
-                android:layout_height="1dp"
-                android:layout_weight="1" />
+                <TextView
+                    android:id="@+id/tab_related"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:paddingHorizontal="2dp"
+                    android:paddingVertical="3dp"
+                    android:text="相关"
+                    android:textColor="@color/app_on_surface_variant"
+                    android:textSize="15sp" />
 
-            <TextView
-                android:id="@+id/episode_group_label"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textColor="@color/nav_icon_inactive"
-                android:textSize="11sp" />
+                <View
+                    android:id="@+id/tab_related_indicator"
+                    android:layout_width="20dp"
+                    android:layout_height="3dp"
+                    android:layout_marginTop="2dp"
+                    android:background="@drawable/bg_tab_indicator"
+                    android:visibility="gone" />
+            </LinearLayout>
+
         </LinearLayout>
 
         <HorizontalScrollView
