@@ -150,7 +150,7 @@ class DetailActivity : AppCompatActivity() {
             val chip = TextView(this).apply {
                 this.text = text
                 textSize = 10f
-                setTextColor(0xFFB9B9C9.toInt())
+                setTextColor(resolveSecondaryColor())
                 setBackgroundResource(R.drawable.bg_chip_type)
                 setPadding(dp(8), dp(3), dp(8), dp(3))
             }

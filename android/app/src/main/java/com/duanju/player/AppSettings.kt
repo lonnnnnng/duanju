@@ -21,4 +21,12 @@ object AppSettings {
 
     const val DEFAULT_CACHE_LIMIT_MB = 2048
     const val MIN_CACHE_LIMIT_MB = 128
+
+    /** 主题模式：0 跟随系统 / 1 深色 / 2 浅色。 */
+    const val THEME_FOLLOW_SYSTEM = 0
+    const val THEME_DARK = 1
+    const val THEME_LIGHT = 2
+
+    fun themeMode(context: Context): Int = prefs(context).getInt("theme_mode", THEME_FOLLOW_SYSTEM)
+    fun setThemeMode(context: Context, value: Int) = prefs(context).edit().putInt("theme_mode", value).apply()
 }

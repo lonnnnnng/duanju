@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Cinema Noir (style1-cinema-dark): night matches base, dark is the only theme -->
+    <!-- Cinema Noir（深色模式，style1-cinema-dark） -->
     <color name="accent">#FFFF3B5C</color>
     <color name="accent_warm">#FFFF7A45</color>
     <color name="accent_dark">#FFD92B49</color>
@@ -27,4 +27,5 @@
     <color name="tag_badge">#E6FF3B5C</color>
     <color name="toast_bg">#F01E1E2A</color>
     <color name="cover_placeholder">#FF14141C</color>
+    <color name="on_cover_badge">#FFFFFFFF</color>
 </resources>

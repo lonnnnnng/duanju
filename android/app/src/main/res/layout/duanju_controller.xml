@@ -52,7 +52,7 @@
           android:insetBottom="0dp"
           android:minWidth="0dp"
           android:text="1.0×"
-          android:textColor="#FFFFFF"
+          android:textColor="@color/app_on_bg"
           android:textSize="11sp"/>
 
       <androidx.appcompat.widget.AppCompatButton android:id="@+id/custom_mute"
@@ -65,7 +65,7 @@
           android:insetBottom="0dp"
           android:minWidth="0dp"
           android:text="静音"
-          android:textColor="#FFFFFF"
+          android:textColor="@color/app_on_bg"
           android:textSize="11sp"/>
 
       <androidx.appcompat.widget.AppCompatButton android:id="@+id/custom_fullscreen"
@@ -78,7 +78,7 @@
           android:insetBottom="0dp"
           android:minWidth="0dp"
           android:text="全屏"
-          android:textColor="#FFFFFF"
+          android:textColor="@color/app_on_bg"
           android:textSize="11sp"/>
 
     </LinearLayout>

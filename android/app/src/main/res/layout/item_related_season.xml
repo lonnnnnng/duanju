@@ -59,7 +59,7 @@
         android:paddingHorizontal="8dp"
         android:paddingVertical="2dp"
         android:text="当前"
-        android:textColor="#FFFFFFFF"
+        android:textColor="@color/app_on_bg"
         android:textSize="10sp"
         android:visibility="gone" />
 </LinearLayout>

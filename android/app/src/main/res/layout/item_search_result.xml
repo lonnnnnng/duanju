@@ -31,7 +31,7 @@
             android:background="@drawable/bg_badge_dark"
             android:paddingHorizontal="5dp"
             android:paddingVertical="1dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_cover_badge"
             android:textSize="9sp"
             android:visibility="gone" />
     </FrameLayout>
@@ -69,7 +69,7 @@
                 android:background="@drawable/bg_tag_badge"
                 android:paddingHorizontal="6dp"
                 android:paddingVertical="1dp"
-                android:textColor="#FFFFFFFF"
+                android:textColor="@color/on_cover_badge"
                 android:textSize="10sp"
                 android:visibility="gone" />
 

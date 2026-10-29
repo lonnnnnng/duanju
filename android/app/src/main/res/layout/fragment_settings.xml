@@ -214,8 +214,41 @@
                     android:layout_marginStart="4dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right" />
+            <LinearLayout
+                android:id="@+id/row_theme"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:background="?attr/selectableItemBackground"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:paddingHorizontal="14dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="主题模式"
+                    android:textColor="?android:attr/textColorPrimary"
+                    android:textSize="13.5sp" />
+
+                <TextView
+                    android:id="@+id/theme_value"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/nav_icon_inactive"
+                    android:textSize="12sp" />
+
+                <ImageView
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="4dp"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_chevron_right" />
             </LinearLayout>
         </LinearLayout>
+    </LinearLayout>
+
+
 
         <TextView
             android:layout_width="wrap_content"

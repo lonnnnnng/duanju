@@ -29,7 +29,7 @@
             android:background="@drawable/bg_badge_rank"
             android:paddingHorizontal="5dp"
             android:paddingVertical="1dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_cover_badge"
             android:textSize="9sp" />
     </FrameLayout>
 

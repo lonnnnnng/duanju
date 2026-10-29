@@ -95,7 +95,7 @@
                             android:paddingHorizontal="22dp"
                             android:stateListAnimator="@null"
                             android:text="播放第 1 集"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="@color/app_on_bg"
                             android:textSize="13sp" />
                     </LinearLayout>
                 </LinearLayout>
@@ -151,7 +151,7 @@
                             android:paddingHorizontal="2dp"
                             android:paddingVertical="3dp"
                             android:text="选集"
-                            android:textColor="#FFFFFFFF"
+                            android:textColor="@color/app_on_bg"
                             android:textSize="15sp" />
 
                         <View

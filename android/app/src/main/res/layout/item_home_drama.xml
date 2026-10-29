@@ -33,7 +33,7 @@
             android:background="@drawable/bg_badge_dark"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_cover_badge"
             android:textSize="9sp"
             android:visibility="gone" />
 
@@ -46,7 +46,7 @@
             android:background="@drawable/bg_badge_rank"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_cover_badge"
             android:textSize="9sp"
             android:textStyle="bold"
             android:visibility="gone" />
@@ -60,7 +60,7 @@
             android:background="@drawable/bg_tag_badge"
             android:paddingHorizontal="6dp"
             android:paddingVertical="2dp"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/on_cover_badge"
             android:textSize="9sp"
             android:visibility="gone" />
     </FrameLayout>

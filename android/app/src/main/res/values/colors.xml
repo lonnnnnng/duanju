@@ -1,30 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Cinema Noir (style1-cinema-dark) -->
-    <color name="accent">#FFFF3B5C</color>
-    <color name="accent_warm">#FFFF7A45</color>
-    <color name="accent_dark">#FFD92B49</color>
-    <color name="app_bg">#FF050508</color>
-    <color name="app_bg_elevated">#FF0A0A0E</color>
-    <color name="app_surface">#FF12121A</color>
-    <color name="app_surface_variant">#FF16161F</color>
-    <color name="app_surface_strong">#FF1A1A25</color>
-    <color name="app_surface_disabled">#FF2A2A38</color>
-    <color name="app_on_bg">#FFEAEAF0</color>
-    <color name="app_on_surface_variant">#FF8A8A9A</color>
-    <color name="app_text_tertiary">#FF5A5A6C</color>
-    <color name="app_text_hint">#FF4A4A5E</color>
-    <color name="app_outline">#FF2A2A38</color>
-    <color name="app_stroke">#FF23232F</color>
-    <color name="app_stroke_soft">#FF1F1F2B</color>
-    <color name="app_stroke_nav">#FF262633</color>
-    <color name="divider">#FF1B1B26</color>
-    <color name="nav_icon_active">#FFFF3B5C</color>
-    <color name="nav_icon_inactive">#FF77778A</color>
-    <color name="nav_pill_bg">#E016161F</color>
-    <color name="glass_button">#24FFFFFF</color>
-    <color name="badge_dark">#9E000000</color>
-    <color name="tag_badge">#E6FF3B5C</color>
-    <color name="toast_bg">#F01E1E2A</color>
-    <color name="cover_placeholder">#FF14141C</color>
+    <!-- Cinema Day（浅色模式）：暖白底 + 墨字 + 同款红橙渐变 accent。
+         深色值在 values-night/colors.xml（Cinema Noir）。 -->
+    <color name="accent">#FFE0334F</color>
+    <color name="accent_warm">#FFE06A2E</color>
+    <color name="accent_dark">#FFC22743</color>
+    <color name="app_bg">#FFF7F6F4</color>
+    <color name="app_bg_elevated">#FFFFFFFF</color>
+    <color name="app_surface">#FFFFFFFF</color>
+    <color name="app_surface_variant">#FFF2F1EE</color>
+    <color name="app_surface_strong">#FFEAE8E4</color>
+    <color name="app_surface_disabled">#FFDDDAD4</color>
+    <color name="app_on_bg">#FF1F1E26</color>
+    <color name="app_on_surface_variant">#FF6E6C78</color>
+    <color name="app_text_tertiary">#FF98959F</color>
+    <color name="app_text_hint">#FFB4B1BB</color>
+    <color name="app_outline">#FFDDDAD4</color>
+    <color name="app_stroke">#FFE5E3DE</color>
+    <color name="app_stroke_soft">#FFEAE8E4</color>
+    <color name="app_stroke_nav">#FFE5E3DE</color>
+    <color name="divider">#FFEFEEEA</color>
+    <color name="nav_icon_active">#FFE0334F</color>
+    <color name="nav_icon_inactive">#FF98959F</color>
+    <color name="nav_pill_bg">#F2FFFFFF</color>
+    <color name="glass_button">#14000000</color>
+    <color name="badge_dark">#A6000000</color>
+    <color name="tag_badge">#E6E0334F</color>
+    <color name="toast_bg">#F0FFFFFF</color>
+    <color name="cover_placeholder">#FFEFEEEA</color>
+    <color name="on_cover_badge">#FFFFFFFF</color>
 </resources>

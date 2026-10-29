@@ -20,7 +20,7 @@
         android:layout_gravity="center"
         android:layout_marginTop="2dp"
         android:text="15"
-        android:textColor="#FFFFFFFF"
+        android:textColor="@color/app_on_bg"
         android:textSize="9sp"
         android:textStyle="bold" />
 </FrameLayout>

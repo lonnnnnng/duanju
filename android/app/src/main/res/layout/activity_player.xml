@@ -69,7 +69,7 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:textColor="#FFFFFFFF"
+                android:textColor="@color/app_on_bg"
                 android:textSize="15sp" />
         </LinearLayout>
     </FrameLayout>
@@ -144,7 +144,7 @@
                     android:paddingHorizontal="2dp"
                     android:paddingVertical="3dp"
                     android:text="选集"
-                    android:textColor="#FFFFFFFF"
+                    android:textColor="@color/app_on_bg"
                     android:textSize="15sp" />
 
                 <View

@@ -14,8 +14,10 @@ class SettingsFragment : Fragment() {
 
     private val speeds = listOf(1.0f, 1.25f, 1.5f, 1.75f, 2.0f, 3.0f, 4.0f)
     private val speedLabels = listOf("1.0 倍", "1.25 倍", "1.5 倍", "1.75 倍", "2.0 倍", "3.0 倍", "4.0 倍")
+    private val themeLabels = listOf("跟随系统", "深色模式", "浅色模式")
     private var cacheSize: TextView? = null
     private var cacheLimit: TextView? = null
+    private var themeValue: TextView? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_settings, container, false)
@@ -53,6 +55,10 @@ class SettingsFragment : Fragment() {
         view.findViewById<View>(R.id.row_version).setOnClickListener {
             checkUpdate(version)
         }
+
+        themeValue = view.findViewById(R.id.theme_value)
+        renderTheme()
+        view.findViewById<View>(R.id.row_theme).setOnClickListener { pickTheme() }
 
         cacheSize = view.findViewById(R.id.cache_size)
         cacheLimit = view.findViewById(R.id.cache_limit_value)
@@ -204,5 +210,27 @@ class SettingsFragment : Fragment() {
         val current = AppSettings.speed(requireContext())
         val index = speeds.indexOfFirst { it == current }.takeIf { it >= 0 } ?: 0
         target.text = speedLabels[index]
+    }
+
+    private fun renderTheme() {
+        themeValue?.text = themeLabels.getOrElse(AppSettings.themeMode(requireContext())) { themeLabels[0] }
+    }
+
+    /** 主题模式三选一，选中后立即应用到全局 night mode（Activity 自动重建换肤）。 */
+    private fun pickTheme() {
+        val context = context ?: return
+        val current = AppSettings.themeMode(context)
+        AlertDialog.Builder(context)
+            .setTitle("主题模式")
+            .setSingleChoiceItems(themeLabels.toTypedArray(), current) { dialog, which ->
+                dialog.dismiss()
+                if (which != AppSettings.themeMode(context)) {
+                    AppSettings.setThemeMode(context, which)
+                    renderTheme()
+                    (context.applicationContext as DuanjuApp).applyThemeMode()
+                }
+            }
+            .setNegativeButton("取消", null)
+            .show()
     }
 }
