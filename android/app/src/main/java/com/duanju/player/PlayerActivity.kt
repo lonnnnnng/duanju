@@ -754,8 +754,9 @@ statusView = findViewById(R.id.status)
         )
     }
 
+    /** 临时状态（准备播放/已解析/失败…）也只占第一行，第二行保持预取状态，高度恒定。 */
     private fun status(message: String) {
-        statusView.text = message
+        statusView.text = message + "\n" + prefetchLine()
     }
 
     private fun qualitySuffix(): String = if (prefetchQuality > 0) " · ${prefetchQuality}p" else ""
@@ -836,23 +837,27 @@ statusView = findViewById(R.id.status)
         if (mediaQuality > 0) text.append(" · ${mediaQuality}p")
         if (playingBytes > 0L) text.append(" · ${VideoCache.formatSize(playingBytes)}")
         text.append(" · ${position}s / ${duration}s")
-        // 第二行：始终有内容（固定两行高度，避免文案一行/两行切换时布局抽动）。
-        // 开了预加载就报进度/结果，没开就直接说明未开启。
-        val prefetch = when {
-            !AppSettings.prefetchNext(this) -> "未开启预加载下一集"
-            prefetchTarget > 0 && prefetchPercent >= 0 ->
-                "下一集预取中" + qualitySuffix() + " · ${prefetchPercent}%"
-            prefetchTarget > 0 -> "下一集预取中" + qualitySuffix() + "…"
-            prefetchReadyEpisode > 0 ->
-                "下一集已预载" + qualitySuffix() + " · ${VideoCache.formatSize(prefetchReadyBytes)}" +
-                    // 命中磁盘缓存时没有下载耗时，别显示"耗时-"
-                    if (prefetchElapsedMs > 0L) " · 耗时${formatElapsed(prefetchElapsedMs)}" else " · 已缓存"
-            prefetchFailedEpisode > 0 -> "第${prefetchFailedEpisode}集预取失败"
-            selectedEpisode >= episodes -> "已是最后一集"
-            else -> "下一集预取待命中…"
-        }
-        text.append("\n").append(prefetch)
+        text.append("\n").append(prefetchLine())
         statusView.text = text.toString()
+    }
+
+    /**
+     * 状态行第二行（预取状态）。必须始终返回非空文本：
+     * lineSpacingExtra 只在真的有两行时才计入高度，单行文本会让状态行矮一行间距（约 2dp），
+     * 表现为切集时下方选集面板轻微跳动。
+     */
+    private fun prefetchLine(): String = when {
+        !AppSettings.prefetchNext(this) -> "未开启预加载下一集"
+        prefetchTarget > 0 && prefetchPercent >= 0 ->
+            "下一集预取中" + qualitySuffix() + " · ${prefetchPercent}%"
+        prefetchTarget > 0 -> "下一集预取中" + qualitySuffix() + "…"
+        prefetchReadyEpisode > 0 ->
+            "下一集已预载" + qualitySuffix() + " · ${VideoCache.formatSize(prefetchReadyBytes)}" +
+                // 命中磁盘缓存时没有下载耗时，别显示"耗时-"
+                if (prefetchElapsedMs > 0L) " · 耗时${formatElapsed(prefetchElapsedMs)}" else " · 已缓存"
+        prefetchFailedEpisode > 0 -> "第${prefetchFailedEpisode}集预取失败"
+        selectedEpisode >= episodes -> "已是最后一集"
+        else -> "下一集预取待命中…"
     }
 
     private val ticker = object : Runnable {
