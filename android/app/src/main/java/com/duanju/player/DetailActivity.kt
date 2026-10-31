@@ -14,6 +14,8 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 import com.duanju.player.core.DirectClient
 import java.util.concurrent.Executors
 
@@ -47,6 +49,8 @@ class DetailActivity : AppCompatActivity() {
     private lateinit var relatedStatus: TextView
     private lateinit var relatedAdapter: RelatedAdapter
     private var relatedLoaded = false
+    private var relatedLoading = false
+    private var relatedGeneration = 0L
     private var showingRelated = false
 
     private val executor = Executors.newSingleThreadExecutor()
@@ -55,6 +59,16 @@ class DetailActivity : AppCompatActivity() {
     private var seriesId = ""
     private var seriesTitle = ""
     private var detail: DirectClient.SeriesDetail? = null
+    internal var loadDetail: () -> DirectClient.SeriesDetail = {
+        val (deviceId, installId) = DirectClient.identity(this)
+        DirectClient.seriesDetail(seriesId, deviceId, installId)
+    }
+    internal var loadSeasons: () -> List<com.duanju.player.core.SeriesAggregator.Season> = {
+        val (deviceId, installId) = DirectClient.identity(this)
+        val firstVid = detail?.list?.firstOrNull { !it.disabled }?.vid
+        DirectClient.relatedSeasons(seriesId, firstVid, deviceId, installId, detail?.title ?: seriesTitle, detail?.cover)
+    }
+    private var relatedThread: Thread? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -119,8 +133,7 @@ class DetailActivity : AppCompatActivity() {
         scroll.visibility = View.INVISIBLE
         executor.execute {
             try {
-                val (deviceId, installId) = DirectClient.identity(this)
-                val data = DirectClient.seriesDetail(seriesId, deviceId, installId)
+                val data = loadDetail()
                 main.post {
                     if (isFinishing || isDestroyed) return@post
                     render(data)
@@ -144,9 +157,11 @@ class DetailActivity : AppCompatActivity() {
         topBar.setTitle(data.title)
         // 标题可能来自首页卡片（简写），拿到详情后重算「相关」的搜索词。
         relatedLoaded = false
+        relatedLoading = false
+        relatedGeneration++
         if (showingRelated) showRelated(true)
 
-        data.cover?.takeIf { it.isNotBlank() }?.let { BitmapLoader.load(it, cover) }
+        BitmapLoader.load(data.cover, cover)
 
         subtitles.removeAllViews()
         val chips = data.subTitles.ifEmpty { listOfNotNull(data.category.ifBlank { null }) }
@@ -262,13 +277,26 @@ class DetailActivity : AppCompatActivity() {
             relatedStatus.visibility = View.GONE
             return
         }
-        if (relatedLoaded) return
+        if (relatedLoaded) {
+            relatedList.visibility = if (relatedAdapter.itemCount > 0) View.VISIBLE else View.GONE
+            relatedStatus.visibility = if (relatedAdapter.itemCount == 0) View.VISIBLE else View.GONE
+            return
+        }
+        if (relatedLoading) {
+            relatedStatus.visibility = View.VISIBLE
+            relatedList.visibility = View.GONE
+            return
+        }
         loadRelated()
     }
 
     private fun loadRelated() {
+        if (relatedLoading) return
+        relatedLoading = true
+        val generation = ++relatedGeneration
         val current = detail?.title ?: seriesTitle
         if (current.isBlank()) {
+            relatedLoading = false
             relatedStatus.text = "暂无可关联的剧集"
             relatedStatus.visibility = View.VISIBLE
             return
@@ -276,21 +304,20 @@ class DetailActivity : AppCompatActivity() {
         relatedStatus.text = "加载中…"
         relatedStatus.visibility = View.VISIBLE
         relatedList.visibility = View.GONE
-        Thread {
-            val seasons = runCatching {
-                val (deviceId, installId) = DirectClient.identity(this)
-                val firstVid = detail?.list?.firstOrNull { !it.disabled }?.vid
-                DirectClient.relatedSeasons(seriesId, firstVid, deviceId, installId, current, detail?.cover)
-            }.getOrElse { emptyList() }
+        relatedThread = Thread {
+            val seasons = runCatching { loadSeasons() }.getOrElse { emptyList() }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
+                if (generation != relatedGeneration) return@runOnUiThread
+                relatedLoading = false
                 relatedLoaded = true
                 relatedAdapter.submit(seasons)
-                relatedStatus.visibility = if (seasons.isEmpty()) View.VISIBLE else View.GONE
+                // long: 回复只更新数据，是否显示仍服从用户当前选择的 Tab。
+                relatedStatus.visibility = if (showingRelated && seasons.isEmpty()) View.VISIBLE else View.GONE
                 if (seasons.isEmpty()) relatedStatus.text = "未找到相关剧集"
-                relatedList.visibility = if (seasons.isEmpty()) View.GONE else View.VISIBLE
+                relatedList.visibility = if (showingRelated && seasons.isNotEmpty()) View.VISIBLE else View.GONE
             }
-        }.start()
+        }.also { it.start() }
     }
 
     /** 打开某一季的详情；当前这一季直接忽略。 */
@@ -308,6 +335,7 @@ class DetailActivity : AppCompatActivity() {
         )
     }
 
+    @OptIn(UnstableApi::class)
     private fun play(episode: Int) {
         startActivity(
             Intent(this, PlayerActivity::class.java)
@@ -327,5 +355,6 @@ class DetailActivity : AppCompatActivity() {
     override fun onDestroy() {
         super.onDestroy()
         executor.shutdownNow()
+        relatedThread?.interrupt()
     }
 }

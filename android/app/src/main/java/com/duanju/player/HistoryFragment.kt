@@ -9,6 +9,8 @@ import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
+import androidx.annotation.OptIn
+import androidx.media3.common.util.UnstableApi
 
 class HistoryFragment : Fragment() {
 
@@ -46,6 +48,7 @@ class HistoryFragment : Fragment() {
         empty.visibility = if (entries.isEmpty()) View.VISIBLE else View.GONE
     }
 
+    @OptIn(UnstableApi::class)
     private fun openPlayer(entry: HistoryEntry) {
         startActivity(
             Intent(requireContext(), PlayerActivity::class.java)

@@ -30,8 +30,7 @@ class SearchResultAdapter(private val onClick: (HomeDrama) -> Unit) :
     override fun onBindViewHolder(holder: Holder, position: Int) {
         val item = items[position]
         holder.title.text = item.title
-        holder.cover.setImageBitmap(null)
-        item.cover?.takeIf { it.isNotBlank() }?.let { BitmapLoader.load(it, holder.cover) }
+        BitmapLoader.load(item.cover, holder.cover)
 
         if (item.episodes > 0) {
             holder.badge.visibility = View.VISIBLE

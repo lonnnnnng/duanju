@@ -124,7 +124,7 @@ Referer:    https://hongguoduanju.com/
 ```
 ffmpeg -y -decryption_key <hex> -i <CDN 直链> \
        -map 0:v:0 -map 0:a:0? -c copy -movflags +faststart \
-       -f mp4 cache/direct/<seriesId>_<episode>.mp4.tmp
+       -f mp4 cache/direct/<seriesId>_<episode>.mp4.<taskId>.tmp
 ```
 
 成功后原子重命名为 `.mp4`，再交给 ExoPlayer（`ProgressiveMediaSource`）播放。
@@ -132,10 +132,18 @@ ffmpeg 需要 `-cafile`：App 启动时把 `/apex/com.android.conscrypt/cacerts`
 `/system/etc/security/cacerts` 合并导出为 `system-ca.pem`（ffmpeg 的 openssl 不带 Android 系统 CA）。
 
 缓存策略：
-- 命中 `.mp4` 直接跳过下载；预加载下一集在后台解密，切集时等其落盘后命中；
+- 命中非空 `.mp4` 直接本地播放，不再请求详情或取流，断网时也可从历史重开已缓存分集；
+- 预加载下一集在后台解密；切入正在预取的集时等待其结束，不再 60 秒超时后重复启动下载；
+- 每次下载使用独立临时文件；切集、退出或超时会显式取消 native 会话，只有完整成功且未取消的任务才能发布成品；
 - 上限 `AppSettings.cacheLimitMb`（默认 2048 MB），超限按 `lastModified` LRU 淘汰，
-  正在播放的集与刚写入的集不参与；命中缓存时刷新访问时间；
-- 设置页显示占用并可一键清理（只删 `.mp4`/`.tmp`，保留 `system-ca.pem`）。
+  正在准备/播放的集与刚写入的集不参与；命中缓存时刷新访问时间；
+- 设置页显示占用并可一键清理（只删未被使用的 `.mp4`/`.tmp`，保留 `system-ca.pem`）。
+
+播放状态与页面回调：
+- 切集前保存并停止旧媒体，新媒体 READY 后才接受新集的进度；准备中退出不覆盖原续播进度；
+- 离开播放页暂停，回前台按用户原有播放/暂停意图恢复，后台不自动起播或连播；
+- 搜索关键词改变时取消旧请求，迟到的成功和失败回复都不得改写当前界面；
+- 详情与播放页的相关结果可以缓存，但显示哪个 Tab 始终服从当前选择。
 
 ## 3. 排查手册（安卓）
 
@@ -186,7 +194,7 @@ adb logcat -d -s 'PlayerActivity:*' 'DirectClient:*' | tail -20
 
 ```bash
 cd android
-./gradlew :app:testDebugUnitTest   # 含签名向量与聚合规则回归
+./gradlew :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ./gradlew :app:assembleRelease     # R8 + 资源裁剪 + 本地签名
 ```
 
@@ -200,4 +208,9 @@ cd android
 ## 5. 依赖
 
 Media3 1.4（`media3-exoplayer` / `media3-ui`）、appcompat、recyclerview、swiperefreshlayout、
-material、FFmpegKitNext 9.0.2。
+material、FFmpegKitNext 9.0.2、Coil 2.7.0（按控件尺寸解码、取消复用控件的旧请求）。
+
+启用 `desugar_jdk_libs:2.1.5`，为最低支持的 API 24/25 提供播放密钥派生所需的
+`java.util.Base64`。JVM 回归覆盖切集进度归属、迟到回调、取消/超时、独立临时文件、
+并发成品发布、离线缓存与播放文件保护；Robolectric 覆盖搜索清空/改词、相关 Tab 迟到回复、
+footer 结构通知和空封面复用。native 实际停止、视频播放及真机 UI 仍需设备验收。

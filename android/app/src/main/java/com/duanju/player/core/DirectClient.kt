@@ -11,7 +11,6 @@ import java.net.URLEncoder
 import java.security.SecureRandom
 import java.util.concurrent.Callable
 import java.util.concurrent.Executors
-import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Future
 import java.util.concurrent.TimeUnit
 
@@ -123,15 +122,17 @@ object DirectClient {
      * 同一请求随后几秒再发就恢复正常。这类瞬时降级不能当致命错误，
      * 否则播放/详情页会直接弹「详情无数据」。
      */
-    private fun detailEntry(seriesId: String, params: String): JSONObject {
+    private fun detailEntry(seriesId: String, params: String, cancellation: TaskCancellation? = null): JSONObject {
         var reason = "详情为空"
         for (attempt in 1..3) {
+            cancellation?.check()
             val text = try {
                 httpGetOpen(
                     "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?$params" +
-                        "&video_series_id=$seriesId&vs_id_type=1"
+                        "&video_series_id=$seriesId&vs_id_type=1", cancellation
                 )
             } catch (e: Exception) {
+                cancellation?.check()
                 reason = e.message ?: e.toString()
                 if (attempt < 3) Thread.sleep(attempt * 600L)
                 continue
@@ -158,10 +159,10 @@ object DirectClient {
      * 分集列表：开放详情接口（无签名），按 vid_index 排序。
      * 注意不能用 vid 字符串排序——那是雪花 id 的大小顺序，与集数无关（会打乱集数）。
      */
-    fun chapters(dramaId: String, deviceId: String, installId: String): List<String> {
+    fun chapters(dramaId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<String> {
         // 与详情页统一用完整参数：详情页刚用这套参数成功过，播放再取分集时
         // 不该换成另一套精简参数去赌上游行为。
-        val entry = detailEntry(dramaId, openCommonFull(deviceId, installId))
+        val entry = detailEntry(dramaId, openCommonFull(deviceId, installId), cancellation)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
         val list = data.optJSONArray("video_list") ?: throw DirectException("分集列表为空")
         val rows = ArrayList<Pair<Int, String>>(list.length())
@@ -181,11 +182,11 @@ object DirectClient {
      * 取流：开放接口（无签名），video_platform 必须为 1024。
      * 旧的签名接口 novel/player/multi_video_model/v1 现已恒返回 200+空正文，改用此接口。
      */
-    fun media(videoId: String, deviceId: String, installId: String): DirectMedia {
+    fun media(videoId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): DirectMedia {
         val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_model/v/?" +
             "${openCommonFull(deviceId, installId, "74232")}&video_id=$videoId" +
             "&video_platform=1024&need_all_video_definition=1"
-        val root = JSONObject(httpGetOpenRetry(url))
+        val root = JSONObject(httpGetOpenRetry(url, cancellation))
         val code = root.optInt("code", -1)
         if (code != 0) throw DirectException("取流失败($code)")
         val entry = root.optJSONObject("data")?.optJSONObject("video_model_data")?.optJSONObject(videoId)
@@ -233,65 +234,50 @@ object DirectClient {
 
     /** 本地 ffmpeg 解密下载：CDN 直链 → -c copy -decryption_key → 清晰 MP4。
      *  写临时文件，成功后原子重命名，避免进程被杀留下无 moov 的坏文件。 */
-    fun decryptTo(sourceUrl: String, keyHex: String, outFile: File) {
-        decryptTo(sourceUrl, keyHex, outFile, null)
-    }
-
-    /**
-     * 可通知会话 ID 的解密，用于预加载：调用方可通过 FFmpegKit.cancel(sessionId) 中止。
-     */
-    fun decryptTo(sourceUrl: String, keyHex: String, outFile: File, onSession: ((Long) -> Unit)?) {
+    fun decryptTo(
+        sourceUrl: String, keyHex: String, outFile: File,
+        cancellation: TaskCancellation, onTempFile: (File) -> Unit = {}
+    ) {
         // 优先 ffmpeg 直接拉流（网络好时一步到位且不落加密原片）。
-        decryptViaFfmpeg(sourceUrl, keyHex, outFile, exportSystemCa(File(outFile.parentFile, "system-ca.pem")), onSession)
+        decryptViaFfmpeg(sourceUrl, keyHex, outFile, exportSystemCa(File(outFile.parentFile, "system-ca.pem")), cancellation, onTempFile)
     }
 
     /** ffmpeg 直接拉流并解密（源是 http/https）。
      *  ffmpeg 的 openssl 不带 Android 系统CA，证书验证会失败；
      *  这里把系统 cacerts 合并导出为 PEM，经 -cafile 交给 ffmpeg，正常完成校验。 */
     private fun decryptViaFfmpeg(
-        sourceUrl: String, keyHex: String, outFile: File, caFile: File?, onSession: ((Long) -> Unit)?
+        sourceUrl: String, keyHex: String, outFile: File, caFile: File?,
+        cancellation: TaskCancellation, onTempFile: (File) -> Unit
     ) {
         val tlsArgs = if (caFile != null) arrayOf("-tls_verify", "1", "-cafile", caFile.absolutePath) else emptyArray()
-        val args = arrayOf(
-            "-y", "-hide_banner", "-loglevel", "verbose", "-nostdin",
-            "-rw_timeout", "20000000",
-            "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
-            *tlsArgs,
-            "-decryption_key", keyHex,
-            "-i", sourceUrl,
-            "-map", "0:v:0", "-map", "0:a:0?",
-            "-c", "copy",
-            "-avoid_negative_ts", "make_zero",
-            "-movflags", "+faststart",
-            "-f", "mp4", File(outFile.parentFile, outFile.name + ".tmp").absolutePath
-        )
-        finishFfmpeg(args, File(outFile.parentFile, outFile.name + ".tmp"), outFile, onSession)
-    }
-
-    private fun finishFfmpeg(args: Array<String>, tmp: File, outFile: File, onSession: ((Long) -> Unit)?) {
-        val latch = CountDownLatch(1)
-        var rc: com.arthenica.ffmpegkit.ReturnCode? = null
-        val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(
-            args,
-            { completed -> rc = completed.getReturnCode(); latch.countDown() },
-            null,
-            null
-        )
-        onSession?.invoke(session.getSessionId())
-        if (!latch.await(10, TimeUnit.MINUTES)) throw DirectException("解密超时")
-        if (!com.arthenica.ffmpegkit.ReturnCode.isSuccess(rc) || !tmp.exists() || tmp.length() == 0L) {
-            tmp.delete()
-            android.util.Log.d("DirectClient", "ffmpeg失败日志=" + session.getAllLogsAsString(2000))
-            throw DirectException("解密失败: rc=" + rc?.value + " " + session.getOutput().takeLast(300))
-        }
-        if (outFile.exists()) outFile.delete()
-        if (!tmp.renameTo(outFile)) {
-            tmp.delete()
-            throw DirectException("缓存写入失败")
+        CacheDownload.run(outFile, cancellation, onTempFile) { tmp, complete ->
+            val args = arrayOf(
+                "-y", "-hide_banner", "-loglevel", "verbose", "-nostdin",
+                "-rw_timeout", "20000000",
+                "-protocol_whitelist", "file,http,https,tcp,tls,crypto",
+                *tlsArgs,
+                "-decryption_key", keyHex,
+                "-i", sourceUrl,
+                "-map", "0:v:0", "-map", "0:a:0?",
+                "-c", "copy",
+                "-avoid_negative_ts", "make_zero",
+                "-movflags", "+faststart",
+                "-f", "mp4", tmp.absolutePath
+            )
+            val session = com.arthenica.ffmpegkit.FFmpegKit.executeWithArgumentsAsync(
+                args,
+                { finished ->
+                    val rc = finished.getReturnCode()
+                    complete(if (com.arthenica.ffmpegkit.ReturnCode.isSuccess(rc)) null else "解密失败: rc=${rc?.value}")
+                }, null, null
+            )
+            val cancel: () -> Unit = { com.arthenica.ffmpegkit.FFmpegKit.cancel(session.getSessionId()) }
+            cancel
         }
     }
 
     /** 合并 Android 系统 CA 为单个 PEM（供 ffmpeg -cafile 使用，一次导出缓存复用）。 */
+    @Synchronized
     private fun exportSystemCa(target: File): File? {
         if (target.exists() && target.length() > 0L) return target
         val dirs = arrayOf(
@@ -322,26 +308,25 @@ object DirectClient {
         }
     }
 
-    /** 清理残缺的临时文件。 */
-    fun cleanPartial(cacheDir: File) {
-        cacheDir.listFiles()?.forEach { if (it.name.endsWith(".tmp")) it.delete() }
-    }
-
     /**
      * 搜索 + 详情补齐，返回与首页同款的卡片数据。
      * 搜索结果本身只有标题/类型，封面、集数、播放量、分类需逐条拉详情（8 线程并行）。
      */
-    fun searchHomeItems(keyword: String, deviceId: String, installId: String): List<HomeDrama> {
-        val hits = searchHits(keyword, deviceId, installId)
+    fun searchHomeItems(keyword: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<HomeDrama> {
+        val hits = searchHits(keyword, deviceId, installId, cancellation)
         if (hits.isEmpty()) return emptyList()
         val pool = Executors.newFixedThreadPool(8)
+        val registration = cancellation?.onCancel { pool.shutdownNow() }
         return try {
             val futures = hits.map { hit ->
-                hit to pool.submit(Callable { runCatching { detailBrief(hit.id, deviceId, installId) }.getOrNull() })
+                cancellation?.check()
+                hit to pool.submit(Callable { runCatching { detailBrief(hit.id, deviceId, installId, cancellation) }.getOrNull() })
             }
             val out = ArrayList<HomeDrama>(hits.size)
             for ((hit, future) in futures) {
+                cancellation?.check()
                 val detail = runCatching { future.get(20, TimeUnit.SECONDS) }.getOrNull()
+                cancellation?.check()
                 out.add(
                     detail ?: HomeDrama(
                         id = hit.id, title = hit.title, episodes = hit.episodes, cover = null,
@@ -352,7 +337,8 @@ object DirectClient {
             }
             out
         } finally {
-            pool.shutdown()
+            registration?.close()
+            pool.shutdownNow()
         }
     }
 
@@ -360,13 +346,15 @@ object DirectClient {
      * 流式读取搜索响应，截取并解析 data 数组后立即断开。
      * 该接口的 debug_info 会膨胀到数十 MB，完整读取会拖慢搜索且浪费流量。
      */
-    private fun readSearchData(url: String): JSONArray? {
+    private fun readSearchData(url: String, cancellation: TaskCancellation? = null): JSONArray? {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
         }
+        val registration = cancellation?.onCancel { conn.disconnect() }
         try {
+            cancellation?.check()
             if (conn.responseCode != 200) throw DirectException("HTTP ${conn.responseCode}")
             val buffer = StringBuilder(256 * 1024)
             val chunk = CharArray(32 * 1024)
@@ -374,6 +362,7 @@ object DirectClient {
             var dataStart = -1
             conn.inputStream.bufferedReader().use { reader ->
                 while (true) {
+                    cancellation?.check()
                     length = reader.read(chunk)
                     if (length <= 0) break
                     buffer.append(chunk, 0, length)
@@ -389,6 +378,7 @@ object DirectClient {
             val arrayJson = extractJsonArray(buffer, dataStart) ?: return null
             return JSONArray(arrayJson)
         } finally {
+            registration?.close()
             conn.disconnect()
         }
     }
@@ -475,8 +465,8 @@ object DirectClient {
     }
 
     /** 无签名详情：取剧名/封面/集数/播放量/分类（封面为 JPEG，避免 HEIC 解码失败）。 */
-    private fun detailBrief(seriesId: String, deviceId: String, installId: String): HomeDrama {
-        val entry = detailEntry(seriesId, openCommonFull(deviceId, installId))
+    private fun detailBrief(seriesId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): HomeDrama {
+        val entry = detailEntry(seriesId, openCommonFull(deviceId, installId), cancellation)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
         var category = ""
         val schema = data.optString("category_schema")
@@ -824,16 +814,18 @@ object DirectClient {
      * 搜索命中（无签名 fetch-debug）。返回列表页所需字段：类型/集数/CP方。
      * 搜索结果本身不含封面，这也是官方 App 搜索页不放封面图的原因。
      */
-    fun searchHits(keyword: String, deviceId: String, installId: String): List<SearchHit> {
+    fun searchHits(keyword: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<SearchHit> {
         val url = "$OPEN_HOST/reading/bookapi/search/fetch-debug/v/?${openCommonFull(deviceId, installId)}" +
             "&query=" + URLEncoder.encode(keyword, "UTF-8") + "&count=20"
         var rows: JSONArray? = null
         var last: Exception? = null
         for (attempt in 1..3) {
+            cancellation?.check()
             try {
-                rows = readSearchData(url)
+                rows = readSearchData(url, cancellation)
                 if (rows != null) break
             } catch (e: Exception) {
+                cancellation?.check()
                 last = e
                 if (attempt < 3) Thread.sleep(attempt * 600L)
             }
@@ -864,7 +856,7 @@ object DirectClient {
      * 取源文件总大小（Content-Length），用于展示预取进度；失败返回 null，
      * 调用方退化为只显示"下载中"。HEAD 很轻，且 CDN 支持。
      */
-    fun contentLength(url: String): Long? {
+    fun contentLength(url: String, cancellation: TaskCancellation? = null): Long? {
         val conn = try {
             (URL(url).openConnection() as HttpURLConnection).apply {
                 requestMethod = "HEAD"
@@ -874,23 +866,29 @@ object DirectClient {
         } catch (e: Exception) {
             return null
         }
+        val registration = cancellation?.onCancel { conn.disconnect() }
         return try {
+            cancellation?.check()
             if (conn.responseCode !in 200..299) return null
             conn.contentLengthLong.takeIf { it > 0L }
         } catch (e: Exception) {
+            cancellation?.check()
             null
         } finally {
+            registration?.close()
             conn.disconnect()
         }
     }
 
     /** 无签名开放接口：偶发 200+空正文，重试 3 次。 */
-    private fun httpGetOpenRetry(url: String): String {
+    private fun httpGetOpenRetry(url: String, cancellation: TaskCancellation? = null): String {
         var last: Exception? = null
         for (attempt in 1..3) {
+            cancellation?.check()
             try {
-                return httpGetOpen(url)
+                return httpGetOpen(url, cancellation)
             } catch (e: Exception) {
+                cancellation?.check()
                 last = e
                 if (attempt < 3) Thread.sleep(attempt * 600L)
             }
@@ -899,19 +897,26 @@ object DirectClient {
     }
 
     /** 无签名开放接口：GET，不复用签名 UA。 */
-    private fun httpGetOpen(url: String): String {
+    private fun httpGetOpen(url: String, cancellation: TaskCancellation? = null): String {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
         }
-        val code = conn.responseCode
-        val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
-            ?.bufferedReader()?.use { it.readText() } ?: ""
-        conn.disconnect()
-        if (code != 200) throw DirectException("HTTP $code")
-        if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
-        return text
+        val registration = cancellation?.onCancel { conn.disconnect() }
+        return try {
+            cancellation?.check()
+            val code = conn.responseCode
+            val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
+                ?.bufferedReader()?.use { it.readText() } ?: ""
+            cancellation?.check()
+            if (code != 200) throw DirectException("HTTP $code")
+            if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
+            text
+        } finally {
+            registration?.close()
+            conn.disconnect()
+        }
     }
 
 

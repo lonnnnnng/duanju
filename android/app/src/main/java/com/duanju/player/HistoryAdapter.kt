@@ -35,10 +35,7 @@ class HistoryAdapter(
         holder.updated.text = relativeTime(entry.updatedAt)
         renderProgress(holder, entry)
 
-        holder.cover.setImageBitmap(null)
-        if (entry.cover.isNotBlank()) {
-            BitmapLoader.load(entry.cover, holder.cover)
-        }
+        BitmapLoader.load(entry.cover, holder.cover)
         holder.itemView.setOnClickListener { onPick(entry) }
         holder.itemView.setOnLongClickListener {
             onDelete(entry)

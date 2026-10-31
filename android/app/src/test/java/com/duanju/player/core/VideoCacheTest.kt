@@ -2,10 +2,13 @@ package com.duanju.player.core
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertThrows
 import org.junit.Rule
 import org.junit.Test
 import org.junit.rules.TemporaryFolder
 import java.io.File
+import java.io.IOException
 
 class VideoCacheTest {
 
@@ -17,6 +20,38 @@ class VideoCacheTest {
         f.writeBytes(ByteArray(size))
         f.setLastModified(mtime)
         return f
+    }
+
+    @Test
+    fun completeLocalCacheNeverNeedsUpstreamResolution() {
+        val cached = file("1_1.mp4", 20, 1000)
+        val hit = VideoCache.ensureAvailable(cached) { throw IOException("离线，上游不可达") }
+        assertTrue(hit)
+        assertEquals(20L, cached.length())
+    }
+
+    @Test
+    fun zeroLengthCacheMustBeDownloadedAndPartialOutputIsRejected() {
+        val empty = file("1_1.mp4", 0, 1000)
+        assertFalse(VideoCache.ensureAvailable(empty) { empty.writeText("downloaded") })
+        assertEquals("downloaded", empty.readText())
+        val missing = File(temp.root, "1_2.mp4")
+        assertThrows(IOException::class.java) {
+            VideoCache.ensureAvailable(missing) { File(temp.root, "1_2.mp4.tmp").writeText("partial") }
+        }
+        assertFalse(missing.exists())
+    }
+
+    @Test
+    fun foregroundCacheIsProtectedFromConcurrentPrefetchEviction() {
+        val playing = file("1_1.mp4", 400, 1000)
+        val prefetched = file("1_2.mp4", 400, 2000)
+        VideoCache.protect(playing).use {
+            assertEquals(0L, VideoCache.trim(temp.root, 100, setOf(prefetched.name)))
+            assertTrue(playing.exists())
+        }
+        assertEquals(400L, VideoCache.trim(temp.root, 400, setOf(prefetched.name)))
+        assertFalse(playing.exists())
     }
 
     @Test

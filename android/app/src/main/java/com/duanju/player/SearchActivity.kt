@@ -20,7 +20,9 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.duanju.player.core.DirectClient
+import com.duanju.player.core.TaskCancellation
 import java.util.concurrent.Executors
+import java.util.concurrent.Future
 
 /**
  * 搜索页：空态展示搜索历史（本地最近 10 条），结果以列表展示。
@@ -42,6 +44,13 @@ class SearchActivity : AppCompatActivity() {
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     private var searching = false
+    private var searchCancellation: TaskCancellation? = null
+    private var searchFuture: Future<*>? = null
+    private var searchKeyword = ""
+    internal var searchItems: (String, TaskCancellation) -> List<DirectClient.HomeDrama> = { keyword, cancellation ->
+        val (deviceId, installId) = DirectClient.identity(this)
+        DirectClient.searchHomeItems(keyword, deviceId, installId, cancellation)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -73,8 +82,12 @@ class SearchActivity : AppCompatActivity() {
             override fun afterTextChanged(s: Editable?) {
                 val empty = s.isNullOrEmpty()
                 clearButton.visibility = if (empty) View.GONE else View.VISIBLE
-                // 清空输入框后回到搜索历史，不残留上一次的结果
-                if (empty && !searching) {
+                // long: 修改关键词即使尚未提交，也不能让旧关键词的回复重新填回结果列表。
+                if (s.toString().trim() != searchKeyword) {
+                    searchCancellation?.cancel()
+                    searchFuture?.cancel(true)
+                    searching = false
+                    loadingView.visibility = View.GONE
                     adapter.submit(emptyList())
                     resultList.visibility = View.GONE
                     emptyView.visibility = View.GONE
@@ -124,7 +137,12 @@ class SearchActivity : AppCompatActivity() {
 
     private fun search() {
         val keyword = input.text.toString().trim()
-        if (keyword.isEmpty() || searching) return
+        if (keyword.isEmpty() || (searching && searchKeyword == keyword)) return
+        searchCancellation?.cancel()
+        searchFuture?.cancel(true)
+        val cancellation = TaskCancellation()
+        searchCancellation = cancellation
+        searchKeyword = keyword
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
         SearchHistoryStore.add(this, keyword)
         renderHistory()
@@ -132,12 +150,12 @@ class SearchActivity : AppCompatActivity() {
         loadingView.visibility = View.VISIBLE
         suggest.visibility = View.GONE
         emptyView.visibility = View.GONE
-        executor.execute {
+        resultList.visibility = View.GONE
+        searchFuture = executor.submit {
             try {
-                val (deviceId, installId) = DirectClient.identity(this)
-                val items = DirectClient.searchHomeItems(keyword, deviceId, installId)
+                val items = searchItems(keyword, cancellation)
                 main.post {
-                    if (isFinishing || isDestroyed) return@post
+                    if (!acceptsSearch(keyword, cancellation)) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     adapter.submit(items)
@@ -152,7 +170,7 @@ class SearchActivity : AppCompatActivity() {
                 }
             } catch (e: Exception) {
                 main.post {
-                    if (isFinishing || isDestroyed) return@post
+                    if (!acceptsSearch(keyword, cancellation)) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     resultList.visibility = View.GONE
@@ -162,6 +180,10 @@ class SearchActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun acceptsSearch(keyword: String, cancellation: TaskCancellation): Boolean =
+        !isFinishing && !isDestroyed && !cancellation.isCancelled &&
+            searchCancellation === cancellation && input.text.toString().trim() == keyword
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 
@@ -177,6 +199,9 @@ class SearchActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
+        searchCancellation?.cancel()
+        searchFuture?.cancel(true)
         executor.shutdownNow()
+        main.removeCallbacksAndMessages(null)
     }
 }

@@ -47,7 +47,7 @@ class RelatedAdapter(
             season.episodes > 0 -> "全${season.episodes}集"
             else -> season.type
         }
-        if (!season.cover.isNullOrBlank()) BitmapLoader.load(season.cover, holder.cover)
+        BitmapLoader.load(season.cover, holder.cover)
         holder.badge.visibility = if (current) View.VISIBLE else View.GONE
         holder.badge.text = "当前"
         holder.itemView.setOnClickListener { onPick(season) }

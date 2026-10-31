@@ -45,10 +45,17 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
     }
 
     fun setFooter(loading: Boolean, end: Boolean) {
+        val hadFooter = footerLoading || footerEnd
         val changed = footerLoading != loading || footerEnd != end
         footerLoading = loading
         footerEnd = end
-        if (changed && items.isNotEmpty()) notifyItemChanged(items.size)
+        val hasFooter = footerLoading || footerEnd
+        // long: footer 会改变条目数量，必须发结构通知，不能把新增/移除误报为内容刷新。
+        when {
+            !hadFooter && hasFooter -> notifyItemInserted(items.size)
+            hadFooter && !hasFooter -> notifyItemRemoved(items.size)
+            changed && hasFooter -> notifyItemChanged(items.size)
+        }
     }
 
     fun clear() {
@@ -89,8 +96,7 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
         holder as CardHolder
         val item = items[position]
         holder.title.text = item.title
-        holder.cover.setImageBitmap(null)
-        item.cover?.takeIf { it.isNotBlank() }?.let { BitmapLoader.load(it, holder.cover) }
+        BitmapLoader.load(item.cover, holder.cover)
 
         if (item.episodes > 0) {
             holder.episodes.visibility = View.VISIBLE
