@@ -21,12 +21,10 @@ async function saveSettings(){
 
 async function checkNetwork(){ $('checkNetworkBtn').disabled=true;$('settingsStatus').textContent='正在检测已保存的网络配置和入口，最多约一分钟…';try{const result=await post('/api/ui/network/check',{});$('settingsStatus').textContent=(result.data||[]).map(item=>item.name+'：'+(item.error||[item.status?'HTTP '+item.status:'',item.detail||''].filter(Boolean).join(' · '))).join('；');}catch(error){$('settingsStatus').textContent='检测失败：'+error.message;}finally{$('checkNetworkBtn').disabled=false;} }
 
-let updateInfo = null;
-function renderUpdateInfo(info){updateInfo=info;$('appVersionText').textContent='当前 '+(info.currentVersion||'未知')+' · commit '+(info.currentCommit||'未知')+' · 构建 '+(info.buildTime||'未知');$('applyAppUpdateBtn').hidden=!info.updateReady||!info.updateAvailable||info.updateApplied;$('appUpdateStatus').textContent=info.message||(info.latestVersion?'最新正式版 '+info.latestVersion+' · '+(info.assetName||'当前平台暂无安装包'):'尚未检查更新');}
-async function loadAppVersion(){try{const info=await api('/healthz');$('appVersionText').textContent='当前 '+(info.version||'未知')+' · commit '+(info.commit||'未知');}catch(error){$('appVersionText').textContent='版本信息读取失败：'+error.message;}}
+function setAppVersion(info){const version=info.currentVersion||info.version||'未知';$('appVersionText').textContent='当前 '+version;$('appVersionText').title='当前 '+version+(info.currentCommit?' · commit '+info.currentCommit:'')+(info.buildTime?' · 构建 '+info.buildTime:'');}
+function renderUpdateInfo(info){setAppVersion(info);$('appUpdateStatus').textContent=info.message||(info.latestVersion?'最新正式版 '+info.latestVersion+' · '+(info.assetName||'当前平台暂无安装包'):'尚未检查更新');}
+async function loadAppVersion(){try{const info=await api('/healthz');setAppVersion(info);}catch(error){$('appVersionText').textContent='版本读取失败';$('appVersionText').title=error.message;}}
 async function checkAppUpdate(){const button=$('checkAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在查询 GitHub Release…';try{renderUpdateInfo(await api('/api/ui/settings/update'));}catch(error){$('appUpdateStatus').textContent='检查失败：'+error.message;}finally{button.disabled=false;}}
-async function waitForUpdatedHealth(version){for(let attempt=0;attempt<60;attempt+=1){try{const health=await api('/healthz');if(health.version===version){$('appVersionText').textContent='当前 '+(health.version||'未知')+' · commit '+(health.commit||'未知');$('appUpdateStatus').textContent='服务已重启并运行新版本';return true;}}catch(error){/* long: systemd 重启期间连接会短暂失败，下一轮继续确认服务是否已恢复。 */}await new Promise(resolve=>setTimeout(resolve,1000));}return false;}
-async function applyAppUpdate(){if(!updateInfo?.updateReady)return;const button=$('applyAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在下载并校验程序…';try{const result=await post('/api/ui/settings/update',{});renderUpdateInfo(result);if(result.autoRestart&&result.latestVersion){$('appUpdateStatus').textContent='服务正在重启…';if(!await waitForUpdatedHealth(result.latestVersion))$('appUpdateStatus').textContent='程序已替换，但尚未确认新服务健康，请查看 systemd 状态';}else $('appUpdateStatus').textContent=result.message||'更新完成';}catch(error){$('appUpdateStatus').textContent='更新失败：'+error.message;}finally{button.disabled=false;}}
 
 async function importLegacyRecords() {
   const control = $('legacyImportBtn');
@@ -54,7 +52,6 @@ function init() {
   $('saveSettingsBtn').addEventListener('click', saveSettings);
   $('checkNetworkBtn').addEventListener('click', checkNetwork);
   $('checkAppUpdateBtn').addEventListener('click', checkAppUpdate);
-  $('applyAppUpdateBtn').addEventListener('click', applyAppUpdate);
   $('themeSelect').value = window.DuanjuTheme.get();
   $('themeSelect').addEventListener('change', () => window.DuanjuTheme.set($('themeSelect').value));
   document.addEventListener('themechange', event => {$('themeSelect').value = event.detail;});

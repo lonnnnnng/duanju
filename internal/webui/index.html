@@ -25,6 +25,11 @@
   </nav>
   <div class="header-actions">
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
+    <div class="header-update" aria-label="应用更新">
+      <span id="appVersionText" class="small header-version" title="当前版本">版本…</span>
+      <button id="checkAppUpdateBtn" class="secondary header-update-button">检查更新</button>
+      <span id="appUpdateStatus" class="small header-update-status" role="status" aria-live="polite"></span>
+    </div>
   </div>
 </header>
 <div id="viewerNotice" class="viewer-notice" role="status" hidden></div>
@@ -75,28 +80,6 @@
     <div id="taskScroll"><div id="groups" class="groups"></div></div>
     <p class="page-footnote">“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p>
   </section>
-</main>
-<nav class="mobile-nav" aria-label="手机主导航">
-  <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
-  <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
-  <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
-  <button class="nav-button" data-page="settings"><span data-icon="settings"></span><span>设置</span></button>
-</nav>
-<dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
-
-  <dialog id="rankingPanel" class="ranking-dialog" aria-labelledby="rankingTitle">
-    <div class="ranking-header">
-      <div class="heading"><h2 id="rankingTitle">站点榜单</h2><div class="ranking-heading-actions"><button id="refreshRankingBtn" class="secondary">刷新</button><button id="closeRankingsBtn" class="secondary" aria-label="关闭榜单">关闭</button></div></div>
-      <div class="ranking-controls"><select id="rankingSource" aria-label="榜单站源"></select><label class="download-quality" data-download-only>下载画质<select data-download-quality aria-label="榜单下载清晰度"></select></label><div id="rankingTabs" class="ranking-tabs" role="tablist" aria-label="榜单类型"></div></div>
-      <p id="rankingSummary" class="ranking-summary" aria-live="polite">按站点名次展示，独立于剧库筛选。</p>
-    </div>
-    <div id="rankingContent" class="ranking-content" role="tabpanel" tabindex="0" aria-label="榜单列表" aria-busy="false"><ol id="rankingList" class="ranking-list"></ol></div>
-    <div class="ranking-footer">
-      <div class="ranking-footer-row"><span id="rankingFetchedAt" class="small" role="status" aria-live="polite"></span><button id="rankingMoreBtn" class="secondary" hidden>加载更多</button></div>
-      <p id="rankingError" class="error ranking-error" role="alert"></p><p id="rankingActionStatus" class="ranking-action-status" role="status" aria-live="polite"></p>
-    </div>
-  </dialog>
-
   <section class="page-view settings-page" id="settingsPage" data-view="settings" aria-label="设置" hidden>
     <div class="page-heading"><div><h1 id="settingsTitle">设置</h1><p>按功能管理外观、网络、播放、站源、记录和 Emby 同步。</p></div></div>
     <section class="settings-section" aria-labelledby="appearanceSettingsTitle">
@@ -115,11 +98,6 @@
         <label>密码（可选）<input id="proxyPassword" type="password" autocomplete="new-password"></label>
       </div>
       <div class="toolbar"><button id="saveSettingsBtn">保存并应用</button><button id="checkNetworkBtn" class="secondary">检测当前连接</button><span id="settingsStatus" class="small" aria-live="polite"></span></div>
-    </section>
-    <section class="settings-section" aria-labelledby="appUpdateTitle">
-      <div class="settings-section-heading"><h2 id="appUpdateTitle">应用版本</h2><p id="appVersionText" class="small">正在读取版本信息…</p></div>
-      <div class="toolbar"><button id="checkAppUpdateBtn" class="secondary">检查更新</button><button id="applyAppUpdateBtn" hidden>下载并应用</button></div>
-      <p id="appUpdateStatus" class="small" role="status" aria-live="polite"></p>
     </section>
     <section class="settings-section playback-settings" aria-labelledby="playbackSettingsTitle">
       <div class="settings-section-heading"><h2 id="playbackSettingsTitle">播放与资源限制</h2><p class="small">控制播放会话、转码和直连策略</p></div>
@@ -185,6 +163,29 @@
       <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
     </section>
   </section>
+</main>
+<nav class="mobile-nav" aria-label="手机主导航">
+  <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
+  <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
+  <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
+  <button class="nav-button" data-page="settings"><span data-icon="settings"></span><span>设置</span></button>
+</nav>
+<dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
+
+  <dialog id="rankingPanel" class="ranking-dialog" aria-labelledby="rankingTitle">
+    <div class="ranking-header">
+      <div class="heading"><h2 id="rankingTitle">站点榜单</h2><div class="ranking-heading-actions"><button id="refreshRankingBtn" class="secondary">刷新</button><button id="closeRankingsBtn" class="secondary" aria-label="关闭榜单">关闭</button></div></div>
+      <div class="ranking-controls"><select id="rankingSource" aria-label="榜单站源"></select><label class="download-quality" data-download-only>下载画质<select data-download-quality aria-label="榜单下载清晰度"></select></label><div id="rankingTabs" class="ranking-tabs" role="tablist" aria-label="榜单类型"></div></div>
+      <p id="rankingSummary" class="ranking-summary" aria-live="polite">按站点名次展示，独立于剧库筛选。</p>
+    </div>
+    <div id="rankingContent" class="ranking-content" role="tabpanel" tabindex="0" aria-label="榜单列表" aria-busy="false"><ol id="rankingList" class="ranking-list"></ol></div>
+    <div class="ranking-footer">
+      <div class="ranking-footer-row"><span id="rankingFetchedAt" class="small" role="status" aria-live="polite"></span><button id="rankingMoreBtn" class="secondary" hidden>加载更多</button></div>
+      <p id="rankingError" class="error ranking-error" role="alert"></p><p id="rankingActionStatus" class="ranking-action-status" role="status" aria-live="polite"></p>
+    </div>
+  </dialog>
+
+
 
 
 <dialog id="playerPanel" class="player-dialog" aria-labelledby="playerTitle">
