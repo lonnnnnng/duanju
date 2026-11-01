@@ -1028,6 +1028,8 @@ func (a *UIApp) handleIndex(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, http.StatusMethodNotAllowed, map[string]string{"error": "method not allowed"})
 		return
 	}
+	setWebUIHeaders(w.Header())
+	w.Header().Set("Content-Security-Policy", uiContentSecurityPolicy)
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write([]byte(uiHTML))

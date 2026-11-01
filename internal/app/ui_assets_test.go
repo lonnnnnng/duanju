@@ -24,6 +24,17 @@ func TestEmbeddedInterfaceServesModulesWithoutExternalBuild(t *testing.T) {
 	if !strings.Contains(page.Body.String(), `<title>短剧</title>`) || !strings.Contains(page.Header().Get("Content-Type"), "text/html") {
 		t.Fatal("new embedded page was not served")
 	}
+	for header, expected := range map[string]string{
+		"Content-Security-Policy": uiContentSecurityPolicy,
+		"X-Content-Type-Options":  "nosniff",
+		"X-Frame-Options":         "DENY",
+		"Referrer-Policy":         "no-referrer",
+		"Permissions-Policy":      "camera=(), microphone=(), geolocation=()",
+	} {
+		if page.Header().Get(header) != expected {
+			t.Fatalf("page security header %s = %q, want %q", header, page.Header().Get(header), expected)
+		}
+	}
 	references := regexp.MustCompile(`(?:src|href)="(/assets/[a-z0-9.-]+\.(?:js|css))(?:\?v=[a-z0-9-]+)?"`)
 	imports := regexp.MustCompile(`from '\./([a-z-]+\.js)'`)
 	seen := map[string]bool{}
@@ -60,6 +71,16 @@ func TestEmbeddedInterfaceServesModulesWithoutExternalBuild(t *testing.T) {
 	asset := check("/assets/hls.min.js")
 	if !strings.Contains(asset.Header().Get("Content-Type"), "javascript") {
 		t.Error("dynamic HLS asset has unexpected content type", asset.Header().Get("Content-Type"))
+	}
+	for header, expected := range map[string]string{
+		"X-Content-Type-Options": "nosniff",
+		"X-Frame-Options":        "DENY",
+		"Referrer-Policy":        "no-referrer",
+		"Permissions-Policy":     "camera=(), microphone=(), geolocation=()",
+	} {
+		if asset.Header().Get(header) != expected {
+			t.Fatalf("asset security header %s = %q, want %q", header, asset.Header().Get(header), expected)
+		}
 	}
 }
 

@@ -1034,15 +1034,11 @@
     syncMobileSheetAccessibility();
   });
   try {
-    const legacyAutoNext = localStorage.getItem('duanju.playback.autoNext');
-    const autoNext = localStorage.getItem('duanju.playback.autoNext') ?? legacyAutoNext;
-    if (autoNext !== null && localStorage.getItem('duanju.playback.autoNext') === null) localStorage.setItem('duanju.playback.autoNext', autoNext);
+    const autoNext = localStorage.getItem('duanju.playback.autoNext');
     node('autoNextEpisode').checked = autoNext !== 'false';
-    const legacyRate = localStorage.getItem('duanju.playback.rate');
     const validRate = value => value !== null && Array.from(node('playbackRate').options).some(option => option.value === value);
     const storedRate = localStorage.getItem('duanju.playback.rate');
-    const rate = validRate(storedRate) ? storedRate : validRate(legacyRate) ? legacyRate : null;
-    if (rate !== null && storedRate !== rate) localStorage.setItem('duanju.playback.rate', rate);
+    const rate = validRate(storedRate) ? storedRate : null;
     if (rate !== null) node('playbackRate').value = rate;
   } catch (_) {}
   node('autoNextEpisode').addEventListener('change', () => {try {localStorage.setItem('duanju.playback.autoNext', String(node('autoNextEpisode').checked));} catch (_) {}});

@@ -82,8 +82,6 @@ function metadataPriorityIDs(){const pending=new Set(dramas.filter(drama=>!drama
 
 function updateRefreshLabel(){ const source=$('sourceSelect').value;const hongguo=app.viewer?.sources?.includes('hongguo')!==false&&(!source||source==='hongguo');updateLibraryButton();$('onlineSearchBtn').hidden=!hongguo;$('searchInput').placeholder='搜索剧名、简介或标签';$('onlineSearchBtn').title='联网搜索，也可按回车'; }
 
-function placeholder(text){ return element('div','cover placeholder',text||'暂无封面'); }
-
 function dramaMetaText(drama) {
   const history = window.DuanjuHistory.progressText(drama.id);
   const count = episodeCount(drama);
