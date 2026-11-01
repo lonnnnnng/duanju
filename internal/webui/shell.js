@@ -2,7 +2,7 @@ import { $, element, button, sourceLabel, normalizeSource, readPreference, saveP
 
 export function createShell(app) {
   const main = $('workspaceMain');
-  const positions = {library: 0, following: 0, downloads: 0};
+  const positions = {library: 0, following: 0, downloads: 0, settings: 0};
   let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
   let sourceNotice;
   const sourceRows = new Map(), sourceErrors = new Map();
@@ -148,15 +148,8 @@ export function createShell(app) {
     $('headerMenu').addEventListener('toggle', () => $('moreButton').setAttribute('aria-expanded', String($('headerMenu').open)));
     $('menuHistoryBtn').addEventListener('click', () => $('openHistoryBtn').click());
     $('sourceStatusBtn').addEventListener('click', showSources);
-    $('aboutBtn').addEventListener('click', () => info('使用提示', content => {
-      for (const text of ['输入关键词先筛选本地剧库，点击“联网搜索”补充结果。', '更新剧库会查新、继续加载目录，并在后台补齐历史资料。', '观看记录和追剧清单按浏览器独立保存。', '下载保存到运行短剧的电脑；手机浏览器不会把下载任务保存到手机相册。']) content.appendChild(element('p', 'notice', text));
-    }));
     $('activityToggle').addEventListener('click', () => activity($('activityPanel').hidden));
     $('closeActivityBtn').addEventListener('click', () => activity(false));
-    $('downloadLocationBtn').addEventListener('click', () => {
-      window.DuanjuDialogs.open('settingsPanel');
-      $('downloadDirectory').focus();
-    });
     document.addEventListener('click', event => {
       for (const menu of document.querySelectorAll('.action-menu[open]')) {
         if (!menu.contains(event.target) || event.target.closest('button')) menu.open = false;

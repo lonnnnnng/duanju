@@ -105,7 +105,7 @@ func (document configDocument) config() (Config, error) {
 		}
 		cfg.InsecureTLS = advanced.InsecureTLS
 	}
-	settings := runtimeSettings{Concurrency: cfg.Concurrency, RequestConcurrency: cfg.RequestConcurrency, RequestIntervalMS: cfg.RequestIntervalMS, ProxyURL: &cfg.ProxyURL, OutputDir: &cfg.OutputDir}
+	settings := runtimeSettings{Concurrency: cfg.Concurrency, RequestConcurrency: cfg.RequestConcurrency, RequestIntervalMS: cfg.RequestIntervalMS, ProxyURL: &cfg.ProxyURL}
 	if err := settings.validate(); err != nil {
 		return Config{}, err
 	}

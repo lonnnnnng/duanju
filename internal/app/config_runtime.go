@@ -15,15 +15,9 @@ type runtimeSettings struct {
 	RequestConcurrency int     `json:"requestConcurrency"`
 	RequestIntervalMS  int     `json:"requestIntervalMs"`
 	ProxyURL           *string `json:"proxyURL,omitempty"`
-	OutputDir          *string `json:"outputDir,omitempty"`
 }
 
 func (settings runtimeSettings) validate() error {
-	if settings.OutputDir != nil {
-		if _, err := normalizedOutputDirectory(*settings.OutputDir); err != nil {
-			return err
-		}
-	}
 	if settings.ProxyURL != nil {
 		if _, err := configuredProxy(*settings.ProxyURL); err != nil {
 			return err
@@ -91,9 +85,6 @@ func applyRuntimeSettings(cfg *Config, settings runtimeSettings) {
 	if settings.ProxyURL != nil {
 		cfg.ProxyURL = *settings.ProxyURL
 	}
-	if settings.OutputDir != nil {
-		cfg.OutputDir, _ = normalizedOutputDirectory(*settings.OutputDir)
-	}
 }
 
 func (a *UIApp) updateRuntimeSettings(writer http.ResponseWriter, request *http.Request) bool {
@@ -116,23 +107,7 @@ func (a *UIApp) updateRuntimeSettings(writer http.ResponseWriter, request *http.
 		value := a.cfg.ProxyURL
 		settings.ProxyURL = &value
 	}
-	if settings.OutputDir == nil {
-		value := firstNonEmpty(a.nextOutputDir, cfg.outputDirSetting, cfg.OutputDir)
-		settings.OutputDir = &value
-	}
 	a.mu.Unlock()
-	directory, err := normalizedOutputDirectory(*settings.OutputDir)
-	if err != nil {
-		writeJSON(writer, http.StatusBadRequest, map[string]string{"error": err.Error()})
-		return false
-	}
-	settings.OutputDir = &directory
-	if !sameDirectory(directory, cfg.OutputDir) {
-		if err := checkOutputDirectory(directory); err != nil {
-			writeJSON(writer, http.StatusBadRequest, map[string]string{"error": a.redactError(err)})
-			return false
-		}
-	}
 	if err := saveRuntimeSettings(cfg.runtimeSettingsDirectory(), settings); err != nil {
 		writeJSON(writer, http.StatusInternalServerError, map[string]string{"error": "设置保存失败: " + a.redactError(err)})
 		return false
@@ -144,7 +119,6 @@ func (a *UIApp) updateRuntimeSettings(writer http.ResponseWriter, request *http.
 	a.cfg.RequestConcurrency = settings.RequestConcurrency
 	a.cfg.RequestIntervalMS = settings.RequestIntervalMS
 	a.cfg.ProxyURL = *settings.ProxyURL
-	a.nextOutputDir = directory
 	a.downloader.limiter.configure(settings.RequestConcurrency, time.Duration(settings.RequestIntervalMS)*time.Millisecond)
 	a.ensureWorkersLocked()
 	a.cond.Broadcast()
@@ -166,9 +140,6 @@ func saveRuntimeSettings(directory string, settings runtimeSettings) error {
 	document.Download.Concurrency = settings.Concurrency
 	document.Network.RequestConcurrency = settings.RequestConcurrency
 	document.Network.RequestIntervalMS = settings.RequestIntervalMS
-	if settings.OutputDir != nil {
-		document.Download.Directory = *settings.OutputDir
-	}
 	if settings.ProxyURL != nil {
 		document.Network.Proxy = *settings.ProxyURL
 	}

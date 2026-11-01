@@ -14,7 +14,7 @@ func serviceSettingsPath(path string) bool {
 		return true
 	}
 	switch path {
-	case "/api/ui/config", "/api/ui/network/check", "/api/ui/directory/pick", "/api/ui/ffmpeg":
+	case "/api/ui/config", "/api/ui/network/check", "/api/ui/ffmpeg":
 		return true
 	}
 	return false

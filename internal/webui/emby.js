@@ -10,7 +10,6 @@ export function createEmby(app) {
     const settings = state.settings;
     $('embyEnabled').checked = settings.enabled;
     $('embyOutputDir').value = settings.outputDir;
-    $('embyBaseURL').value = settings.baseUrl || location.origin;
     $('embyInterval').value = settings.intervalMinutes;
     $('embyMergedOnly').checked = Boolean(settings.mergedOnly);
     $('embySourceScope').disabled = Boolean(settings.mergedOnly);
@@ -24,9 +23,6 @@ export function createEmby(app) {
 
   function sourceFields() {
     const local = $('embyMergedOnly').checked;
-    // long: 本地全集由 Emby 读取共享目录，只有在线分集模式才需要可访问的剧库播放地址。
-    $('embyBaseURL').disabled = local;
-    $('embyBaseURL').required = $('embyEnabled').checked && !local;
     $('embySourceScope').disabled = local;
   }
 
@@ -87,7 +83,8 @@ export function createEmby(app) {
     if (saving || !state) return;
     saving = true;
     $('embySaveBtn').disabled = true;
-    const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyMergedOnly').checked ? '' : $('embyBaseURL').value.trim(), intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
+    // long: 播放地址不再作为用户配置项暴露，在线分集始终跟随当前服务地址，避免保存过期主机地址。
+    const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyMergedOnly').checked ? '' : location.origin, intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
     if ($('embyAPIKey').value) input.apiKey = $('embyAPIKey').value;
     try {
       state = await app.post('/api/ui/settings/emby', input);
