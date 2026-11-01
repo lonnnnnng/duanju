@@ -3,7 +3,6 @@
   const entries = new Map();
   let options, generation = 0, requestID = 0, busy = false, removing = false, limit = 500;
   const node = id => document.getElementById(id);
-  const dialog = node('historyPanel');
   const list = node('historyList');
   const get = id => entries.get(id);
 
@@ -49,7 +48,6 @@
   function render() {
     controls();
     node('historyCount').textContent = entries.size ? entries.size + ' 部' : '';
-    if (!dialog.open) return;
     const keyword = node('historySearch').value.trim().toLocaleLowerCase();
     const ordered = Array.from(entries.values()).sort((left, right) => new Date(right.watchedAt) - new Date(left.watchedAt));
     const visible = ordered.filter(entry => !keyword || (entry.title + ' ' + options.sourceLabel(entry.source)).toLocaleLowerCase().includes(keyword));
@@ -66,7 +64,7 @@
       const actions = element('div', 'history-actions');
       const resume = element('button', 'secondary', '继续观看');
       resume.setAttribute('aria-label', '继续观看 ' + entry.title);
-      resume.addEventListener('click', () => {dialog.close(); options.play(entry.dramaId, entry.title);});
+      resume.addEventListener('click', () => options.play(entry.dramaId, entry.title));
       const remove = element('button', 'secondary history-remove', '×');
       remove.title = '删除此记录';
       remove.setAttribute('aria-label', '删除 ' + entry.title + ' 的观看记录');
@@ -154,13 +152,6 @@
 
   function init(configuration) {
     options = configuration;
-    node('openHistoryBtn').addEventListener('click', () => {
-      node('historySearch').value = '';
-      dialog.showModal();
-      node('historyContent').scrollTop = 0;
-      refresh();
-    });
-    node('closeHistoryBtn').addEventListener('click', () => dialog.close());
     node('clearHistoryBtn').addEventListener('click', () => removeEntries(''));
     node('retryHistoryBtn').addEventListener('click', refresh);
     node('historySearch').addEventListener('input', render);

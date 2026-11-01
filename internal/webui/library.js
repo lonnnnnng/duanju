@@ -211,7 +211,7 @@ async function loadDramas(update) {
     libraryIsLoading = Boolean(result.loading || result.metadata?.running);
     libraryMetadataRemaining = result.metadataRemaining || {};
     app.shell.sourceStates(result.sources, result.loading);
-    sourceWarning = result.error ? '更新尚未完成，可在“更多”查看状态' : '';
+    sourceWarning = result.error ? '更新尚未完成，可在“设置”查看状态' : '';
     if (Array.isArray(result.data)) {
       dramas.length = 0;
       byID.clear();
@@ -232,7 +232,6 @@ async function loadDramas(update) {
     const loaded = result.loadedAt && !result.loadedAt.startsWith('0001') ? new Date(result.loadedAt).toLocaleString() : '';
     $('libraryUpdatedAt').textContent = loaded ? '更新于 ' + loaded : '';
     $('libraryUpdatedAt').title = $('libraryUpdatedAt').textContent;
-    $('libraryMenuUpdatedAt').textContent = $('libraryUpdatedAt').textContent;
     const metadata = result.metadata || {};
     libraryBusyText = result.loading ? '正在更新剧库，已有内容可继续使用' : metadata.running ? '后台补充资料 ' + metadata.checked + ' / ' + metadata.total : '';
     updateLibraryStatus();

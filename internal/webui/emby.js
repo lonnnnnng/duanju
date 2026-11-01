@@ -2,7 +2,6 @@ import { $, element } from './ui-core.js';
 
 export function createEmby(app) {
   let state, timer, loading = false, saving = false;
-  const panel = $('embyPanel');
   const date = value => value && !value.startsWith('0001') ? new Date(value).toLocaleString() : '尚未同步';
   const posterStates = {pending: '海报待同步', waiting: '海报等待扫描', synced: '海报已同步', existing: '保留已有海报', missing: '暂无海报地址', unconfigured: '海报未连接 Emby', failed: '海报同步失败，将重试'};
 
@@ -60,10 +59,11 @@ export function createEmby(app) {
 
   function poll(delay) {
     clearTimeout(timer);
-    if (panel.open) timer = setTimeout(() => load(false), delay ?? (state?.running ? 1500 : 10000));
+    if (document.body.dataset.page === 'settings') timer = setTimeout(() => load(false), delay ?? (state?.running ? 1500 : 10000));
   }
 
   async function load(fill = true) {
+    if (document.body.dataset.page !== 'settings') return;
     if (loading) return;
     loading = true;
     try {
@@ -118,12 +118,7 @@ export function createEmby(app) {
     $('embyEnabled').addEventListener('change', sourceFields);
     $('embyMergedOnly').addEventListener('change', sourceFields);
     $('embyRunBtn').addEventListener('click', run);
-    $('openEmbyBtn').addEventListener('click', () => {
-      $('embyFeedback').textContent = '';
-      window.DuanjuDialogs.open('embyPanel');
-      load();
-    });
-    panel.addEventListener('close', () => clearTimeout(timer));
+    if (document.body.dataset.page === 'settings') load();
   }
-  return {init};
+  return {init, refresh: () => load()};
 }

@@ -25,7 +25,6 @@
   </nav>
   <div class="header-actions">
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
-    <details id="headerMenu" class="action-menu header-menu"><summary id="moreButton" aria-label="更多" aria-expanded="false" aria-controls="morePanel"><span data-icon="more"></span></summary><div id="morePanel" class="action-popover menu-list"><button id="openEmbyBtn" aria-haspopup="dialog" aria-controls="embyPanel"><span data-icon="library"></span>Emby 同步<span data-icon="right"></span></button><button id="menuHistoryBtn"><span data-icon="clock"></span>历史记录<span data-icon="right"></span></button><button id="sourceStatusBtn"><span data-icon="activity"></span>站源状态<span data-icon="right"></span></button><span id="libraryMenuUpdatedAt" class="small"></span></div></details>
   </div>
 </header>
 <div id="viewerNotice" class="viewer-notice" role="status" hidden></div>
@@ -60,11 +59,11 @@
     </div>
   </section>
   <section class="page-view" id="followingPage" data-view="following" aria-label="我的追剧" hidden>
-    <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，接着上次看。</p></div><button id="openHistoryBtn" class="secondary button-content" aria-label="完整观看记录" aria-haspopup="dialog" aria-controls="historyPanel"><span data-icon="clock"></span>历史记录</button></div>
+    <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，接着上次看。</p></div></div>
     <div class="following-toolbar"><div class="segments" role="group" aria-label="追剧分组"><button data-follow-tab="watching" aria-pressed="true">在看 <span id="watchingCount">0</span></button><button data-follow-tab="saved" aria-pressed="false">想看 <span id="savedCount">0</span></button><button data-follow-tab="completed" aria-pressed="false">已看 <span id="completedCount">0</span></button></div><input id="followingSearch" type="search" maxlength="80" aria-label="搜索追剧清单" placeholder="搜索我的追剧"></div>
     <div id="followingError" class="error notice" role="status"></div><button id="retryFollowingBtn" class="secondary" hidden>重新读取追剧清单</button>
     <div id="followingList" class="following-list" aria-live="polite"></div>
-    <p class="page-footnote">新集提示来自已更新的剧库资料。完整播放记录仍保留在“历史记录”。</p>
+    <p class="page-footnote">新集提示来自已更新的剧库资料。完整播放记录可在“设置”中查看。</p>
   </section>
   <section class="page-view" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
     <div class="page-heading"><div><h1>下载管理 <span id="taskCount" class="small"></span></h1><p>文件保存在运行短剧的电脑。</p></div></div>
@@ -85,7 +84,6 @@
 </nav>
 <dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
 
-<dialog id="infoPanel" aria-labelledby="infoTitle"><div class="dialog-heading"><h2 id="infoTitle">信息</h2><button class="quiet icon-button" data-close aria-label="关闭信息"><span data-icon="close"></span></button></div><div class="dialog-body" id="infoContent"></div></dialog>
   <dialog id="rankingPanel" class="ranking-dialog" aria-labelledby="rankingTitle">
     <div class="ranking-header">
       <div class="heading"><h2 id="rankingTitle">站点榜单</h2><div class="ranking-heading-actions"><button id="refreshRankingBtn" class="secondary">刷新</button><button id="closeRankingsBtn" class="secondary" aria-label="关闭榜单">关闭</button></div></div>
@@ -98,17 +96,9 @@
       <p id="rankingError" class="error ranking-error" role="alert"></p><p id="rankingActionStatus" class="ranking-action-status" role="status" aria-live="polite"></p>
     </div>
   </dialog>
-  <dialog id="historyPanel" class="history-dialog" aria-labelledby="historyTitle">
-    <div class="history-header">
-      <div class="heading"><h2 id="historyTitle">观看记录 <span id="historyCount" class="small"></span></h2><div class="history-heading-actions"><button id="clearHistoryBtn" class="secondary" disabled>清空</button><button id="closeHistoryBtn" class="secondary" aria-label="关闭观看记录">关闭</button></div></div>
-      <input id="historySearch" type="search" maxlength="80" placeholder="搜索本浏览器的观看记录" aria-label="搜索本浏览器的观看记录">
-      <div id="historyError" class="error" role="status" aria-live="polite"></div>
-    </div>
-    <div id="historyContent" class="history-content" tabindex="0" aria-label="观看记录列表" aria-busy="false"><ol id="historyList" class="history-list"></ol></div>
-    <div class="history-footer"><span id="historySummary" class="small"></span><button id="retryHistoryBtn" class="secondary" hidden>重试</button></div>
-  </dialog>
+
   <section class="page-view settings-page" id="settingsPage" data-view="settings" aria-label="设置" hidden>
-    <div class="page-heading"><div><h1 id="settingsTitle">设置</h1><p>按功能管理外观、网络、播放和应用状态。</p></div></div>
+    <div class="page-heading"><div><h1 id="settingsTitle">设置</h1><p>按功能管理外观、网络、播放、站源、记录和 Emby 同步。</p></div></div>
     <section class="settings-section" aria-labelledby="appearanceSettingsTitle">
       <div class="settings-section-heading"><h2 id="appearanceSettingsTitle">外观</h2><p class="small">选择适合当前环境的明暗模式</p></div>
       <div class="appearance-row"><label for="themeSelect">主题</label><select id="themeSelect" aria-label="外观"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
@@ -161,29 +151,41 @@
     </section>
     <div class="statusbar" id="configText"></div>
     <div class="small notice" id="ffmpegSettingsStatus" role="status"></div>
-  </section>
-<dialog id="embyPanel" class="emby-dialog" aria-labelledby="embyTitle">
-  <div class="dialog-heading"><h2 id="embyTitle">Emby 自动同步</h2><button class="quiet icon-button" data-close aria-label="关闭 Emby 同步"><span data-icon="close"></span></button></div>
-  <div class="dialog-body">
-    <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。在线分集会使用当前服务地址生成播放链接。</p>
-    <form id="embyForm" class="emby-form">
-      <label class="settings-check"><input id="embyEnabled" type="checkbox"><span>启用自动同步</span></label>
-      <div class="settings-grid">
-        <label class="wide">媒体库输出目录<input id="embyOutputDir" type="text" maxlength="2048" required placeholder="程序所在服务器的文件夹"></label>
-        <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required></label>
+    <section class="settings-section" aria-labelledby="sourceStatusTitle">
+      <div class="settings-section-heading"><h2 id="sourceStatusTitle">站源状态</h2><p class="small">查看并更新站源目录状态。</p></div>
+      <div id="sourceStatusContent"></div>
+    </section>
+    <section id="historySection" class="settings-section history-settings" aria-labelledby="historyTitle">
+      <div class="history-header">
+        <div class="heading"><h2 id="historyTitle">观看记录 <span id="historyCount" class="small"></span></h2><div class="history-heading-actions"><button id="clearHistoryBtn" class="secondary" disabled>清空</button></div></div>
+        <input id="historySearch" type="search" maxlength="80" placeholder="搜索本浏览器的观看记录" aria-label="搜索本浏览器的观看记录">
+        <div id="historyError" class="error" role="status" aria-live="polite"></div>
       </div>
-      <fieldset class="settings-fieldset"><legend>同步内容</legend><label class="settings-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
-      <fieldset id="embySourceScope" class="settings-fieldset"><legend>分集模式自动加入的范围</legend><label class="settings-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>最后保存设置的浏览器中的“在看”和“想看”。</small></span></label><label class="settings-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
-      <p id="embyFollowingScope" class="small"></p>
-      <details class="emby-refresh-settings"><summary>Emby 扫描与连接（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知 Emby 扫描。本地全集模式会把海报保存到输出目录，无需 API Key；在线分集模式由 Emby 获取和缓存海报。已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换 Emby 服务器后需重新填写 API Key。</p></details>
-      <div class="toolbar"><button id="embySaveBtn" type="submit">保存并应用</button><button id="embyRunBtn" class="secondary" type="button" disabled>立即同步</button></div>
-    </form>
-    <p id="embyFeedback" class="small" role="status" aria-live="polite"></p>
-    <div class="emby-status"><strong id="embySummary">尚未同步</strong><p id="embyPosterSummary" class="small"></p><p id="embySchedule" class="small"></p><p id="embyResult" class="small" role="status"></p></div>
-    <p id="embyEmpty" class="small">启用后会自动加入符合当前模式的剧集。</p><ul id="embyEntries" class="emby-entries" aria-label="Emby 同步记录"></ul>
-    <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
-  </div>
-</dialog>
+      <div id="historyContent" class="history-content" tabindex="0" aria-label="观看记录列表" aria-busy="false"><ol id="historyList" class="history-list"></ol></div>
+      <div class="history-footer"><span id="historySummary" class="small"></span><button id="retryHistoryBtn" class="secondary" hidden>重试</button></div>
+      </section>
+    <section id="embySection" class="settings-section emby-settings" aria-labelledby="embyTitle">
+      <div class="settings-section-heading"><h2 id="embyTitle">Emby 自动同步</h2><p class="small">管理自动入库、扫描通知和同步记录。</p></div>
+      <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。在线分集会使用当前服务地址生成播放链接。</p>
+      <form id="embyForm" class="emby-form">
+        <label class="settings-check"><input id="embyEnabled" type="checkbox"><span>启用自动同步</span></label>
+        <div class="settings-grid">
+          <label class="wide">媒体库输出目录<input id="embyOutputDir" type="text" maxlength="2048" required placeholder="程序所在服务器的文件夹"></label>
+          <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required></label>
+        </div>
+        <fieldset class="settings-fieldset"><legend>同步内容</legend><label class="settings-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
+        <fieldset id="embySourceScope" class="settings-fieldset"><legend>分集模式自动加入的范围</legend><label class="settings-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>最后保存设置的浏览器中的“在看”和“想看”。</small></span></label><label class="settings-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
+        <p id="embyFollowingScope" class="small"></p>
+        <details class="emby-refresh-settings"><summary>Emby 扫描与连接（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知 Emby 扫描。本地全集模式会把海报保存到输出目录，无需 API Key；在线分集模式由 Emby 获取和缓存海报。已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换 Emby 服务器后需重新填写 API Key。</p></details>
+        <div class="toolbar"><button id="embySaveBtn" type="submit">保存并应用</button><button id="embyRunBtn" class="secondary" type="button" disabled>立即同步</button></div>
+      </form>
+      <p id="embyFeedback" class="small" role="status" aria-live="polite"></p>
+      <div class="emby-status"><strong id="embySummary">尚未同步</strong><p id="embyPosterSummary" class="small"></p><p id="embySchedule" class="small"></p><p id="embyResult" class="small" role="status"></p></div>
+      <p id="embyEmpty" class="small">启用后会自动加入符合当前模式的剧集。</p><ul id="embyEntries" class="emby-entries" aria-label="Emby 同步记录"></ul>
+      <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
+    </section>
+  </section>
+
 
 <dialog id="playerPanel" class="player-dialog" aria-labelledby="playerTitle">
   <div id="playerViewport" class="player-viewport">

@@ -1,11 +1,9 @@
-.history-dialog{color:var(--text);background:var(--panel);border:1px solid var(--line);border-radius:12px;width:min(680px,calc(100vw - 20px));height:min(620px,82dvh);max-height:calc(100dvh - 20px);padding:0;overflow:hidden}
-.history-dialog::backdrop{background:#10151080}
-.history-dialog[open]{display:flex;flex-direction:column}
+.history-settings{display:flex;flex-direction:column;min-height:320px;max-height:620px;overflow:hidden}
 .history-header{padding:16px 18px 14px;border-bottom:1px solid var(--line);flex:none}
 .history-header .heading{flex-wrap:nowrap}
 .history-header h2{font-size:18px;white-space:nowrap}
 .history-heading-actions{display:flex;gap:6px;flex:none}
-.history-dialog button{font-size:12px;padding:5px 8px;white-space:nowrap}
+.history-settings button{font-size:12px;padding:5px 8px;white-space:nowrap}
 #historySearch{width:100%;margin-top:12px;font-size:16px;padding:7px 9px}
 .history-content{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-gutter:stable;padding:0 18px}
 .history-list{list-style:none;margin:0;padding:0}
@@ -22,8 +20,9 @@
 #historyError{font-size:12px;margin-top:7px}
 #historyError:empty,#playbackHistoryStatus:empty{display:none}
 #playbackHistoryStatus{font-size:12px;margin-top:5px;color:var(--muted)}
-.history-dialog [hidden]{display:none!important}
+.history-settings [hidden]{display:none!important}
 @media(max-width:600px){
+  .history-settings{max-height:none}
   .history-header{padding:10px}
   .history-header h2{font-size:16px}
   .history-content{padding:0 10px}

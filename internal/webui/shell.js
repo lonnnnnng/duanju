@@ -1,4 +1,4 @@
-import { $, element, button, sourceLabel, normalizeSource, readPreference, savePreference, populateIcons } from './ui-core.js';
+import { $, element, button, readPreference, savePreference, populateIcons } from './ui-core.js';
 
 export function createShell(app) {
   const main = $('workspaceMain');
@@ -20,6 +20,11 @@ export function createShell(app) {
     if (page === 'following') app.following?.render();
     if (page === 'downloads') app.downloads?.render();
     if (page === 'library') app.library?.layout();
+    if (page === 'settings') {
+      showSources();
+      app.emby?.refresh?.();
+      window.DuanjuHistory?.refresh?.();
+    }
     requestAnimationFrame(() => {main.scrollTop = positions[page] || 0;});
   }
 
@@ -30,16 +35,6 @@ export function createShell(app) {
     $('activityToggleLabel').textContent = visible ? '收起任务' : '任务侧栏';
     savePreference('activitySidebar', visible);
     if (visible) app.downloads?.render();
-  }
-
-  function info(title, build) {
-    sourceRows.clear();
-    sourceNotice = null;
-    $('infoTitle').textContent = title;
-    $('infoContent').replaceChildren();
-    if (typeof build === 'function') build($('infoContent'));
-    else $('infoContent').appendChild(element('p', '', build));
-    window.DuanjuDialogs.open('infoPanel');
   }
 
   function updateSourceRows() {
@@ -80,28 +75,30 @@ export function createShell(app) {
 
   function showSources() {
     const names = {hongguo: '主站'};
-    info('站源状态', content => {
-      for (const [id, label] of Object.entries(names)) {
-        const row = element('section', 'source-status-row');
-        row.dataset.source = id;
-        const heading = element('div', 'heading source-status-heading');
-        const actions = element('div', 'source-status-actions');
-        const status = element('span', 'tag');
-        status.setAttribute('aria-live', 'polite');
-        const action = button('更新', () => updateSource(id), false, 'secondary source-update');
-        action.setAttribute('aria-label', '更新' + label);
-        actions.append(status, action);
-        heading.append(element('h3', '', label), actions);
-        const detail = element('p', 'small'), error = element('p', 'error');
-        error.setAttribute('role', 'status');
-        row.append(heading, detail, error);
-        sourceRows.set(id, {row, label, status, action, detail, error});
-        content.appendChild(row);
-      }
-      sourceNotice = element('p', 'small notice');
-      content.appendChild(sourceNotice);
-      updateSourceRows();
-    });
+    const content = $('sourceStatusContent');
+    sourceRows.clear();
+    sourceNotice = null;
+    content.replaceChildren();
+    for (const [id, label] of Object.entries(names)) {
+      const row = element('section', 'source-status-row');
+      row.dataset.source = id;
+      const heading = element('div', 'heading source-status-heading');
+      const actions = element('div', 'source-status-actions');
+      const status = element('span', 'tag');
+      status.setAttribute('aria-live', 'polite');
+      const action = button('更新', () => updateSource(id), false, 'secondary source-update');
+      action.setAttribute('aria-label', '更新' + label);
+      actions.append(status, action);
+      heading.append(element('h3', '', label), actions);
+      const detail = element('p', 'small'), error = element('p', 'error');
+      error.setAttribute('role', 'status');
+      row.append(heading, detail, error);
+      sourceRows.set(id, {row, label, status, action, detail, error});
+      content.appendChild(row);
+    }
+    sourceNotice = element('p', 'small notice');
+    content.appendChild(sourceNotice);
+    updateSourceRows();
     void app.library.refresh();
   }
 
@@ -139,15 +136,6 @@ export function createShell(app) {
     }));
     document.querySelector('.brand').addEventListener('click', event => {event.preventDefault(); window.DuanjuDialogs.navigate('library');});
     document.querySelector('.skip-link').addEventListener('click', event => {event.preventDefault(); main.focus();});
-    $('headerMenu').addEventListener('click', event => {
-      if (event.target.closest('button')) {
-        $('headerMenu').open = false;
-        $('moreButton').focus({preventScroll: true});
-      }
-    }, true);
-    $('headerMenu').addEventListener('toggle', () => $('moreButton').setAttribute('aria-expanded', String($('headerMenu').open)));
-    $('menuHistoryBtn').addEventListener('click', () => $('openHistoryBtn').click());
-    $('sourceStatusBtn').addEventListener('click', showSources);
     $('activityToggle').addEventListener('click', () => activity($('activityPanel').hidden));
     $('closeActivityBtn').addEventListener('click', () => activity(false));
     document.addEventListener('click', event => {
@@ -180,5 +168,5 @@ export function createShell(app) {
     setPage(window.DuanjuDialogs.page());
   }
 
-  return {init, access, info, page: () => current, resetScroll: () => {main.scrollTop = 0;}, sourceStates: (value, loading) => {sourceStates = value || {}; sourceLoading = Boolean(loading); updateSourceRows();}};
+  return {init, access, page: () => current, resetScroll: () => {main.scrollTop = 0;}, sourceStates: (value, loading) => {sourceStates = value || {}; sourceLoading = Boolean(loading); updateSourceRows();}};
 }
