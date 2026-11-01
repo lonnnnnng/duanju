@@ -211,7 +211,7 @@ async function loadDramas(update) {
     libraryIsLoading = Boolean(result.loading || result.metadata?.running);
     libraryMetadataRemaining = result.metadataRemaining || {};
     app.shell.sourceStates(result.sources, result.loading);
-    sourceWarning = result.error ? '更新尚未完成，可在“设置”查看状态' : '';
+    sourceWarning = result.error ? '更新尚未完成，可在“系统设置”查看站源状态' : '';
     if (Array.isArray(result.data)) {
       dramas.length = 0;
       byID.clear();

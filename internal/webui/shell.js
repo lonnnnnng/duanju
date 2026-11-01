@@ -2,7 +2,7 @@ import { $, element, button, readPreference, savePreference, populateIcons } fro
 
 export function createShell(app) {
   const main = $('workspaceMain');
-  const positions = {library: 0, following: 0, downloads: 0, settings: 0};
+  const positions = {library: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0, 'watch-history': 0};
   let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
   let sourceNotice;
   const sourceRows = new Map(), sourceErrors = new Map();
@@ -20,9 +20,13 @@ export function createShell(app) {
     if (page === 'following') app.following?.render();
     if (page === 'downloads') app.downloads?.render();
     if (page === 'library') app.library?.layout();
-    if (page === 'settings') {
+    if (page === 'system-settings') {
       showSources();
+    }
+    if (page === 'emby-settings') {
       app.emby?.refresh?.();
+    }
+    if (page === 'watch-history') {
       window.DuanjuHistory?.refresh?.();
     }
     requestAnimationFrame(() => {main.scrollTop = positions[page] || 0;});

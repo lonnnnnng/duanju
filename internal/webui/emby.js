@@ -59,11 +59,11 @@ export function createEmby(app) {
 
   function poll(delay) {
     clearTimeout(timer);
-    if (document.body.dataset.page === 'settings') timer = setTimeout(() => load(false), delay ?? (state?.running ? 1500 : 10000));
+    if (document.body.dataset.page === 'emby-settings') timer = setTimeout(() => load(false), delay ?? (state?.running ? 1500 : 10000));
   }
 
   async function load(fill = true) {
-    if (document.body.dataset.page !== 'settings') return;
+    if (document.body.dataset.page !== 'emby-settings') return;
     if (loading) return;
     loading = true;
     try {
@@ -118,7 +118,7 @@ export function createEmby(app) {
     $('embyEnabled').addEventListener('change', sourceFields);
     $('embyMergedOnly').addEventListener('change', sourceFields);
     $('embyRunBtn').addEventListener('click', run);
-    if (document.body.dataset.page === 'settings') load();
+    if (document.body.dataset.page === 'emby-settings') load();
   }
   return {init, refresh: () => load()};
 }

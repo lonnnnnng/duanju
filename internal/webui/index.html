@@ -21,7 +21,9 @@
     <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span>剧库</button>
     <button class="nav-button" data-page="following"><span data-icon="bookmark"></span>追剧<span class="nav-count" data-follow-count hidden></span></button>
     <button class="nav-button" data-page="downloads"><span data-icon="download"></span>下载<span class="nav-count" data-download-count hidden></span></button>
-    <button class="nav-button" data-page="settings"><span data-icon="settings"></span>设置</button>
+    <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span>系统设置</button>
+    <button class="nav-button" data-page="emby-settings"><span data-icon="folder"></span>Emby设置</button>
+    <button class="nav-button" data-page="watch-history"><span data-icon="clock"></span>观看记录</button>
   </nav>
   <div class="header-actions">
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
@@ -68,7 +70,7 @@
     <div class="following-toolbar"><div class="segments" role="group" aria-label="追剧分组"><button data-follow-tab="watching" aria-pressed="true">在看 <span id="watchingCount">0</span></button><button data-follow-tab="saved" aria-pressed="false">想看 <span id="savedCount">0</span></button><button data-follow-tab="completed" aria-pressed="false">已看 <span id="completedCount">0</span></button></div><input id="followingSearch" type="search" maxlength="80" aria-label="搜索追剧清单" placeholder="搜索我的追剧"></div>
     <div id="followingError" class="error notice" role="status"></div><button id="retryFollowingBtn" class="secondary" hidden>重新读取追剧清单</button>
     <div id="followingList" class="following-list" aria-live="polite"></div>
-    <p class="page-footnote">新集提示来自已更新的剧库资料。完整播放记录可在“设置”中查看。</p>
+    <p class="page-footnote">新集提示来自已更新的剧库资料。完整播放记录可在“观看记录”页查看。</p>
   </section>
   <section class="page-view" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
     <div class="page-heading"><div><h1>下载管理 <span id="taskCount" class="small"></span></h1><p>文件保存在运行短剧的电脑。</p></div></div>
@@ -80,8 +82,8 @@
     <div id="taskScroll"><div id="groups" class="groups"></div></div>
     <p class="page-footnote">“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p>
   </section>
-  <section class="page-view settings-page" id="settingsPage" data-view="settings" aria-label="设置" hidden>
-    <div class="page-heading"><div><h1 id="settingsTitle">设置</h1><p>按功能管理外观、网络、播放、站源、记录和 Emby 同步。</p></div></div>
+  <section class="page-view settings-page" id="systemSettingsPage" data-view="system-settings" aria-label="系统设置" hidden>
+    <div class="page-heading"><div><h1>系统设置</h1><p>管理外观、网络、播放资源和站源状态。</p></div></div>
     <section class="settings-section" aria-labelledby="appearanceSettingsTitle">
       <div class="settings-section-heading"><h2 id="appearanceSettingsTitle">外观</h2><p class="small">选择适合当前环境的明暗模式</p></div>
       <div class="appearance-row"><label for="themeSelect">主题</label><select id="themeSelect" aria-label="外观"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
@@ -118,30 +120,15 @@
       <div class="toolbar"><button id="savePlaybackSettings" class="secondary">保存播放设置</button><span id="playbackSettingsStatus" class="small" role="status"></span></div>
     </section>
     <p class="small settings-note">保存后自动持久化。降低并发不终止正在下载的任务；代理变更用于后续连接，失败任务可重试。同一站源的剧库请求顺序执行，下载与剧库请求使用独立并发。</p>
-    <section class="viewer-settings settings-section" aria-labelledby="viewerSettingsTitle">
-      <div class="settings-section-heading"><h2 id="viewerSettingsTitle">个人记录</h2><span class="small" id="viewerIdentityLabel">当前浏览器</span></div>
-      <p class="small" id="viewerRecordsHint">观看记录和追剧清单按浏览器独立保存。</p>
-      <div id="legacyImportSection" hidden>
-        <div class="viewer-import-row"><label class="small">旧版记录恢复码<input id="legacyImportCode" type="password" maxlength="64" autocomplete="off" placeholder="粘贴一次性恢复码"></label><button id="legacyImportBtn" class="secondary">接回旧记录</button></div>
-        <p class="small">恢复码在服务所在电脑的 data/viewer-legacy-code 文件中。旧版记录接回当前浏览器。</p>
-      </div>
-      <p id="viewerImportStatus" class="small" role="status" aria-live="polite"></p>
-    </section>
     <div class="statusbar" id="configText"></div>
     <div class="small notice" id="ffmpegSettingsStatus" role="status"></div>
     <section class="settings-section" aria-labelledby="sourceStatusTitle">
       <div class="settings-section-heading"><h2 id="sourceStatusTitle">站源状态</h2><p class="small">查看并更新站源目录状态。</p></div>
       <div id="sourceStatusContent"></div>
     </section>
-    <section id="historySection" class="settings-section history-settings" aria-labelledby="historyTitle">
-      <div class="history-header">
-        <div class="heading"><h2 id="historyTitle">观看记录 <span id="historyCount" class="small"></span></h2><div class="history-heading-actions"><button id="clearHistoryBtn" class="secondary" disabled>清空</button></div></div>
-        <input id="historySearch" type="search" maxlength="80" placeholder="搜索本浏览器的观看记录" aria-label="搜索本浏览器的观看记录">
-        <div id="historyError" class="error" role="status" aria-live="polite"></div>
-      </div>
-      <div id="historyContent" class="history-content" tabindex="0" aria-label="观看记录列表" aria-busy="false"><ol id="historyList" class="history-list"></ol></div>
-      <div class="history-footer"><span id="historySummary" class="small"></span><button id="retryHistoryBtn" class="secondary" hidden>重试</button></div>
-      </section>
+  </section>
+  <section class="page-view settings-page" id="embySettingsPage" data-view="emby-settings" aria-label="Emby设置" hidden>
+    <div class="page-heading"><div><h1>Emby设置</h1><p>管理 Emby 自动入库、扫描通知和同步记录。</p></div></div>
     <section id="embySection" class="settings-section emby-settings" aria-labelledby="embyTitle">
       <div class="settings-section-heading"><h2 id="embyTitle">Emby 自动同步</h2><p class="small">管理自动入库、扫描通知和同步记录。</p></div>
       <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。在线分集会使用当前服务地址生成播放链接。</p>
@@ -163,12 +150,35 @@
       <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
     </section>
   </section>
+  <section class="page-view settings-page" id="watchHistoryPage" data-view="watch-history" aria-label="观看记录" hidden>
+    <div class="page-heading"><div><h1>观看记录</h1><p>查看并管理当前浏览器保存的播放进度。</p></div></div>
+    <section id="historySection" class="settings-section history-settings" aria-labelledby="historyTitle">
+      <div class="history-header">
+        <div class="heading"><h2 id="historyTitle">最近观看 <span id="historyCount" class="small"></span></h2><div class="history-heading-actions"><button id="clearHistoryBtn" class="secondary" disabled>清空</button></div></div>
+        <input id="historySearch" type="search" maxlength="80" placeholder="搜索本浏览器的观看记录" aria-label="搜索本浏览器的观看记录">
+        <div id="historyError" class="error" role="status" aria-live="polite"></div>
+      </div>
+      <div id="historyContent" class="history-content" tabindex="0" aria-label="观看记录列表" aria-busy="false"><ol id="historyList" class="history-list"></ol></div>
+      <div class="history-footer"><span id="historySummary" class="small"></span><button id="retryHistoryBtn" class="secondary" hidden>重试</button></div>
+    </section>
+    <section class="viewer-settings settings-section" aria-labelledby="viewerSettingsTitle">
+      <div class="settings-section-heading"><h2 id="viewerSettingsTitle">个人记录</h2><span class="small" id="viewerIdentityLabel">当前浏览器</span></div>
+      <p class="small" id="viewerRecordsHint">观看记录和追剧清单按浏览器独立保存。</p>
+      <div id="legacyImportSection" hidden>
+        <div class="viewer-import-row"><label class="small">旧版记录恢复码<input id="legacyImportCode" type="password" maxlength="64" autocomplete="off" placeholder="粘贴一次性恢复码"></label><button id="legacyImportBtn" class="secondary">接回旧记录</button></div>
+        <p class="small">恢复码在服务所在电脑的 data/viewer-legacy-code 文件中。旧版记录接回当前浏览器。</p>
+      </div>
+      <p id="viewerImportStatus" class="small" role="status" aria-live="polite"></p>
+    </section>
+  </section>
 </main>
 <nav class="mobile-nav" aria-label="手机主导航">
   <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
   <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
   <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
-  <button class="nav-button" data-page="settings"><span data-icon="settings"></span><span>设置</span></button>
+  <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span><span>系统设置</span></button>
+  <button class="nav-button" data-page="emby-settings"><span data-icon="folder"></span><span>Emby设置</span></button>
+  <button class="nav-button" data-page="watch-history"><span data-icon="clock"></span><span>观看记录</span></button>
 </nav>
 <dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
 
