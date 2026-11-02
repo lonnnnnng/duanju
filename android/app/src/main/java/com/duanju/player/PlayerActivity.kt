@@ -328,7 +328,8 @@ statusView = findViewById(R.id.status)
     override fun onResume() {
         super.onResume()
         foreground = true
-        player.playWhenReady = resumeWhenForeground && player.mediaItemCount > 0
+        // long: 首次进入仍允许已发起的首集准备流程启动；后台暂停标记为 false 时，回前台继续保持暂停。
+        if (!resumeWhenForeground) player.playWhenReady = false
         if (playback.playingEpisode == selectedEpisode) startPrefetch(selectedEpisode)
     }
 
@@ -337,7 +338,7 @@ statusView = findViewById(R.id.status)
         saveProgress()
         foreground = false
         // long: 离开播放页保留用户的暂停意图，下载完成也不能在后台自行发声或连播。
-        if (player.mediaItemCount > 0) resumeWhenForeground = player.playWhenReady
+        resumeWhenForeground = false
         player.pause()
     }
 

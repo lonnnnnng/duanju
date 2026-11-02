@@ -66,6 +66,8 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
 
     fun size(): Int = items.size
 
+    fun snapshot(): List<HomeDrama> = items.toList()
+
     fun isFooter(position: Int): Boolean = position >= items.size
 
     override fun getItemCount(): Int = items.size + if (footerEnd || footerLoading) 1 else 0

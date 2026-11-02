@@ -43,6 +43,7 @@ class LibraryFragment : Fragment() {
     private var loading = false
     private var selectedFilter: String? = null
     private var filterGroups: List<DirectClient.HomeFilterGroup> = emptyList()
+    private var filters: List<DirectClient.HomeFilter> = emptyList()
     private var selectedFilterName: String? = null
     /** 加载期间又发起了 reset 请求（如切筛选）时置位，在途回复结束后补发。 */
     private var pendingReset = false
@@ -77,7 +78,11 @@ class LibraryFragment : Fragment() {
         }
         view.findViewById<Button>(R.id.home_retry).setOnClickListener { load(reset = true) }
 
-        swipe.setOnRefreshListener { load(reset = true) }
+        swipe.setOnRefreshListener {
+            // long: 用户明确下拉刷新时清掉旧分页和筛选缓存，避免刷新后仍显示旧首页。
+            HomeCacheStore.clear(requireContext())
+            load(reset = true)
+        }
         grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
             override fun onScrolled(recyclerView: RecyclerView, dx: Int, dy: Int) {
                 if (dy > 0 && hasMore && !loading && !recyclerView.canScrollVertically(1)) {
@@ -86,7 +91,12 @@ class LibraryFragment : Fragment() {
             }
         })
 
-        if (adapter.size() == 0) load(reset = true)
+        val cached = HomeCacheStore.load(requireContext(), selectedFilter)
+        if (cached != null) {
+            applyPage(cached, reset = true)
+        } else {
+            load(reset = true)
+        }
     }
 
     private fun openDetail(drama: DirectClient.HomeDrama) {
@@ -148,8 +158,10 @@ class LibraryFragment : Fragment() {
                     } else {
                         emptyView.visibility = View.GONE
                     }
-                    filterGroups = page.filterGroups
+                    filters = if (page.filters.isNotEmpty() || reset) page.filters else filters
+                    filterGroups = if (page.filterGroups.isNotEmpty() || reset) page.filterGroups else filterGroups
                     if (reset) renderFilters(page.filters)
+                    saveCache()
                 }
             } catch (e: Exception) {
                 postUi {
@@ -169,6 +181,33 @@ class LibraryFragment : Fragment() {
                 }
             }
         }
+    }
+
+    private fun applyPage(page: DirectClient.HomePage, reset: Boolean) {
+        offset = page.nextOffset
+        sessionId = page.sessionId
+        hasMore = page.hasMore
+        if (reset) adapter.submit(page.items) else adapter.append(page.items)
+        adapter.setFooter(false, !hasMore && adapter.size() > 0)
+        emptyView.visibility = if (adapter.size() == 0) View.VISIBLE else View.GONE
+        filters = page.filters
+        filterGroups = page.filterGroups
+        if (reset) renderFilters(filters)
+    }
+
+    private fun saveCache() {
+        HomeCacheStore.save(
+            requireContext(),
+            selectedFilter,
+            DirectClient.HomePage(
+                items = adapter.snapshot(),
+                nextOffset = offset,
+                sessionId = sessionId,
+                hasMore = hasMore,
+                filters = filters,
+                filterGroups = filterGroups
+            )
+        )
     }
 
     private fun showLoading(show: Boolean) {
