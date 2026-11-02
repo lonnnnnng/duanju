@@ -21,8 +21,8 @@ android {
         applicationId = "com.duanju.player"
         minSdk = 24
         targetSdk = 34
-        versionCode = 20
-        versionName = "0.1.34"
+        versionCode = 21
+        versionName = "0.1.35"
     }
 
     buildFeatures {

@@ -1,5 +1,6 @@
 package com.duanju.player
 
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
@@ -43,13 +44,17 @@ class LibraryFragment : Fragment() {
     private var loading = false
     private var selectedFilter: String? = null
     private var filterGroups: List<DirectClient.HomeFilterGroup> = emptyList()
-    private var filters: List<DirectClient.HomeFilter> = emptyList()
     private var selectedFilterName: String? = null
     /** 加载期间又发起了 reset 请求（如切筛选）时置位，在途回复结束后补发。 */
     private var pendingReset = false
 
     private val executor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
+
+    internal var homePageLoader: (Context, Int, String, String?) -> DirectClient.HomePage = { context, pageOffset, pageSessionId, filter ->
+        val (deviceId, installId) = DirectClient.identity(context)
+        DirectClient.homeTab(8, pageOffset, pageSessionId, filter, deviceId, installId)
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_library, container, false)
@@ -79,8 +84,6 @@ class LibraryFragment : Fragment() {
         view.findViewById<Button>(R.id.home_retry).setOnClickListener { load(reset = true) }
 
         swipe.setOnRefreshListener {
-            // long: 用户明确下拉刷新时清掉旧分页和筛选缓存，避免刷新后仍显示旧首页。
-            HomeCacheStore.clear(requireContext())
             load(reset = true)
         }
         grid.addOnScrollListener(object : RecyclerView.OnScrollListener() {
@@ -91,12 +94,8 @@ class LibraryFragment : Fragment() {
             }
         })
 
-        val cached = HomeCacheStore.load(requireContext(), selectedFilter)
-        if (cached != null) {
-            applyPage(cached, reset = true)
-        } else {
-            load(reset = true)
-        }
+        // long: 首页视图首次创建时拉取数据；Tab 隐藏和前后台切换会复用此视图，因此不在恢复回调重复请求。
+        load(reset = true)
     }
 
     private fun openDetail(drama: DirectClient.HomeDrama) {
@@ -134,10 +133,7 @@ class LibraryFragment : Fragment() {
         errorBox.visibility = View.GONE
         executor.execute {
             try {
-                val (deviceId, installId) = DirectClient.identity(requireContext())
-                val page = DirectClient.homeTab(
-                    8, offset, sessionId, selectedFilter, deviceId, installId
-                )
+                val page = homePageLoader(requireContext(), offset, sessionId, selectedFilter)
                 postUi {
                     loading = false
                     swipe.isRefreshing = false
@@ -158,10 +154,8 @@ class LibraryFragment : Fragment() {
                     } else {
                         emptyView.visibility = View.GONE
                     }
-                    filters = if (page.filters.isNotEmpty() || reset) page.filters else filters
                     filterGroups = if (page.filterGroups.isNotEmpty() || reset) page.filterGroups else filterGroups
                     if (reset) renderFilters(page.filters)
-                    saveCache()
                 }
             } catch (e: Exception) {
                 postUi {
@@ -181,33 +175,6 @@ class LibraryFragment : Fragment() {
                 }
             }
         }
-    }
-
-    private fun applyPage(page: DirectClient.HomePage, reset: Boolean) {
-        offset = page.nextOffset
-        sessionId = page.sessionId
-        hasMore = page.hasMore
-        if (reset) adapter.submit(page.items) else adapter.append(page.items)
-        adapter.setFooter(false, !hasMore && adapter.size() > 0)
-        emptyView.visibility = if (adapter.size() == 0) View.VISIBLE else View.GONE
-        filters = page.filters
-        filterGroups = page.filterGroups
-        if (reset) renderFilters(filters)
-    }
-
-    private fun saveCache() {
-        HomeCacheStore.save(
-            requireContext(),
-            selectedFilter,
-            DirectClient.HomePage(
-                items = adapter.snapshot(),
-                nextOffset = offset,
-                sessionId = sessionId,
-                hasMore = hasMore,
-                filters = filters,
-                filterGroups = filterGroups
-            )
-        )
     }
 
     private fun showLoading(show: Boolean) {
