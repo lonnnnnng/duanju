@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- long: 48dp 为 34dp 底栏按钮保留约 7dp 上下留白，减少底栏占用的画面高度。 -->
+    <dimen name="exo_styled_bottom_bar_height">48dp</dimen>
+    <dimen name="exo_styled_bottom_bar_margin_top">6dp</dimen>
+</resources>

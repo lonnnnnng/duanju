@@ -91,7 +91,7 @@
       android:layout_gravity="bottom"
       android:layout_marginBottom="@dimen/exo_styled_progress_margin_bottom"/>
 
-  <!-- long: 五个槽位等宽分布，横竖屏和小窗/全屏都保持相同的视觉节奏，避免按钮挤在中心。 -->
+  <!-- long: 五槽等宽分散；保留水平内边距，让 Media3 将中央行宽与播放器宽区分开，避免误判为简化布局并隐藏底栏。 -->
   <LinearLayout
       android:id="@id/exo_center_controls"
       android:layout_width="match_parent"
@@ -100,7 +100,7 @@
       android:background="@android:color/transparent"
       android:gravity="center"
       android:baselineAligned="false"
-      android:paddingHorizontal="0dp"
+      android:paddingHorizontal="8dp"
       android:paddingVertical="4dp"
       android:clipToPadding="false"
       android:layoutDirection="ltr">
