@@ -99,6 +99,7 @@
       android:layout_gravity="center"
       android:background="@android:color/transparent"
       android:gravity="center"
+      android:baselineAligned="false"
       android:paddingHorizontal="8dp"
       android:paddingVertical="4dp"
       android:clipToPadding="false"
@@ -106,7 +107,7 @@
 
     <FrameLayout
         android:layout_width="0dp"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
         android:layout_weight="1"
         android:gravity="center">
 
@@ -122,7 +123,7 @@
 
     <FrameLayout
         android:layout_width="0dp"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
         android:layout_weight="1"
         android:gravity="center">
 
@@ -136,18 +137,18 @@
         android:gravity="center">
 
       <ImageButton android:id="@id/exo_play_pause"
-          android:layout_width="64dp"
-          android:layout_height="64dp"
+          android:layout_width="68dp"
+          android:layout_height="68dp"
           android:layout_gravity="center"
-          android:background="?attr/selectableItemBackgroundBorderless"
+          android:background="@drawable/bg_player_glass"
           android:contentDescription="播放/暂停"
-          android:padding="16dp"
-          android:scaleType="center" />
+          android:padding="8dp"
+          android:scaleType="fitCenter" />
     </FrameLayout>
 
     <FrameLayout
         android:layout_width="0dp"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
         android:layout_weight="1"
         android:gravity="center">
 
@@ -156,7 +157,7 @@
 
     <FrameLayout
         android:layout_width="0dp"
-        android:layout_height="64dp"
+        android:layout_height="72dp"
         android:layout_weight="1"
         android:gravity="center">
 
