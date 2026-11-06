@@ -8,6 +8,8 @@ import android.widget.TextView
 import android.widget.Switch
 import androidx.appcompat.app.AlertDialog
 import androidx.fragment.app.Fragment
+import com.duanju.player.core.RecipeStore
+import com.duanju.player.core.RecipeUpdater
 import com.duanju.player.core.VideoCache
 
 class SettingsFragment : Fragment() {
@@ -48,6 +50,25 @@ class SettingsFragment : Fragment() {
                 }
                 .setNegativeButton("取消", null)
                 .show()
+        }
+
+        val recipeValue = view.findViewById<TextView>(R.id.recipe_value)
+        renderRecipe(recipeValue)
+        view.findViewById<View>(R.id.row_recipe).setOnClickListener {
+            toast("检查接口配方…")
+            Thread {
+                val result = RecipeUpdater.refresh()
+                view.post {
+                    renderRecipe(recipeValue)
+                    toast(
+                        when (result) {
+                            true -> "配方已更新"
+                            false -> "配方已是最新"
+                            null -> "检查失败，继续使用当前配方"
+                        }
+                    )
+                }
+            }.start()
         }
 
         val version = view.findViewById<TextView>(R.id.version)
@@ -210,6 +231,11 @@ class SettingsFragment : Fragment() {
         val current = AppSettings.speed(requireContext())
         val index = speeds.indexOfFirst { it == current }.takeIf { it >= 0 } ?: 0
         target.text = speedLabels[index]
+    }
+
+    private fun renderRecipe(target: TextView) {
+        val (version, updated, source) = RecipeStore.info()
+        target.text = "v$version · $updated · ${if (source == "override") "远程" else "内置"}"
     }
 
     private fun renderTheme() {

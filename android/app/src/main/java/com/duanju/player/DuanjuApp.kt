@@ -3,11 +3,14 @@ package com.duanju.player
 import android.app.Application
 import androidx.appcompat.app.AppCompatDelegate
 import com.duanju.player.core.RecipeStore
+import com.duanju.player.core.RecipeUpdater
 
 class DuanjuApp : Application() {
     override fun onCreate() {
         super.onCreate()
         RecipeStore.init(this)
+        // 后台拉取远程配方（签名校验 + 版本单调），失败静默保留内置版本。
+        RecipeUpdater.refreshAsync()
         applyThemeMode()
     }
 

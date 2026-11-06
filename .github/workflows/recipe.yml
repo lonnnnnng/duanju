@@ -1,0 +1,48 @@
+name: 发布接口配方
+
+# 配方变化时自动签名并发布到固定的 `recipe` Release（预发布，不会成为 latest，
+# 因此不会干扰 App 的版本检查）。App 启动时拉取并验签，无需发新版 APK。
+
+on:
+  push:
+    paths:
+      - android/app/src/main/assets/recipes/hongguo.json
+      - .github/workflows/recipe.yml
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 校验并签名
+        env:
+          RECIPE_SIGNING_KEY: ${{ secrets.RECIPE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          if [ -z "${RECIPE_SIGNING_KEY:-}" ]; then
+            echo "缺少 secrets.RECIPE_SIGNING_KEY" >&2
+            exit 1
+          fi
+          python3 -c "import json;json.load(open('android/app/src/main/assets/recipes/hongguo.json'))"
+          printf '%s\n' "$RECIPE_SIGNING_KEY" > /tmp/recipe-key.pem
+          cp android/app/src/main/assets/recipes/hongguo.json recipe.json
+          openssl dgst -sha256 -sign /tmp/recipe-key.pem -out recipe.json.sig recipe.json
+          openssl ec -in /tmp/recipe-key.pem -pubout 2>/dev/null \
+            | openssl dgst -sha256 | sed 's/^/公钥指纹: /'
+          echo "配方版本: $(python3 -c "import json;print(json.load(open('recipe.json'))['version'])")"
+
+      - name: 发布到 recipe Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh release view recipe >/dev/null 2>&1 \
+            || gh release create recipe --prerelease \
+                 --title "接口配方" \
+                 --notes "由 CI 自动生成，App 启动时验签拉取。请勿手动修改资产。"
+          gh release upload recipe recipe.json recipe.json.sig --clobber
