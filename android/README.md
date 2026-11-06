@@ -71,6 +71,8 @@ cd android
 ```
 
 - FFmpegKitNext AAR 已随仓库提供（`android/libs/ffmpeg-kit-next-maven/`，arm64-v8a，源码编译）。
+- 已知问题与修复记录：见 `docs/2026-11-06-prefetch-rate-limit.md`（预取限流）、
+  `docs/2026-11-06-api-change-analysis.md`（接口变更史）。
 - 发版：`.github/workflows/release.yml`，仅安卓改动时可加 `android_only=true` 复用上一版本 Web 程序；见 `docs/releasing.md`。
 - 签名 keystore 在 `android/keystore/`（gitignore，丢失将无法覆盖升级，请自行备份）。
 

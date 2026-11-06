@@ -4,6 +4,7 @@
 - 代码位置：`android/`（Kotlin + Media3 + FFmpegKitNext）
 - 关联文档：Web 服务端接口见 [android-playback-endpoints.md](android-playback-endpoints.md)；
   上游变更史与规律见 [2026-11-06-api-change-analysis.md](2026-11-06-api-change-analysis.md)；
+  预取限流问题见 [2026-11-06-prefetch-rate-limit.md](2026-11-06-prefetch-rate-limit.md)；
   逆向细节见 `hongguo-ref/docs/API.md`、`hongguo-ref/docs/CHAIN.md`
 
 本文只描述安卓端。Web/服务器的取流方式、签名参数与排查手册不在这里重复。
