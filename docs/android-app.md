@@ -138,8 +138,9 @@ User-Agent: com.phoenix.read/73532 (...)
   上游再改这些，只需改 JSON（可放 `filesDir/recipes/hongguo.json` 覆盖，版本号更高即生效）。
 - **L2 原语**：`none`（不签名）、`legacy`（X-Gorgon/X-Argus/X-Ladon/X-Khronos/
   X-SS-Req-Ticket/X-SS-STUB）。配方按名字引用，不在 JSON 里写算法。
-- **档位降级**：`sign` 是有序数组；返回 `200 + 0 字节` 时自动切下一档。
-  例如 `["legacy","none"]` 表示先签名，被网关拦就退回免签，正好覆盖上游来回切的形态。
+- **档位降级**：`sign` 是有序数组；返回 `200 + 0 字节` 时先在**同档退避重试**
+  （区分瞬时抖动与网关拦截），仍为空再切下一档。例如 `["legacy","none"]`
+  表示先签名，被网关拦就退回免签，正好覆盖上游来回切的形态。
 - **参数规则**：`$var` 模板替换；`$var` 为空时整项省略（首页首次加载没有 `session_id`）。
 - **远程更新**（ECDSA 验签 + 版本单调）：
   - 源顺序：**gh-proxy 加速** → GitHub Release `recipe` → jsDelivr（`@main`）→ raw 直链。

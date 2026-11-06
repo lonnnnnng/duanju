@@ -109,8 +109,14 @@ internal object RecipeHttp {
                 try {
                     val body = get(url, headers, cancellation)
                     if (body.isEmpty()) {
-                        // 网关拦截：换签名档位，不再重试同一档。
+                        // 空正文可能是瞬时抖动，也可能是网关拦截：
+                        // 先在同档内退避重试，仍为空再切下一个签名档位。
                         last = GatewayEmptyException("空响应(HTTP 200) [$mode]")
+                        if (attempt < endpoint.retry.attempts) {
+                            sleep(endpoint.retry.backoffFor(attempt))
+                            attempt++
+                            continue
+                        }
                         break
                     }
                     return body
