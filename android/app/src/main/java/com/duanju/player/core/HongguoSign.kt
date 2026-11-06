@@ -232,6 +232,29 @@ object HongguoSign {
         return out.toByteArray()
     }
 
+    /**
+     * 旧版全套签名头：`/reading/bookapi` 下的受保护接口（详情、取流）必须携带。
+     *
+     * 注意 `query` 必须是**实际发出去的那串**（含顺序与 `+` 号），
+     * 网关会用同一串重新计算签名；不一致会退回 200 + 空正文。
+     */
+    fun legacyHeaders(
+        query: String,
+        aid: String = "8662",
+        now: Long = System.currentTimeMillis()
+    ): Map<String, String> {
+        val nonce = Nonce(ByteArray(11).also { java.security.SecureRandom().nextBytes(it) })
+        val stamp = now / 1000
+        return linkedMapOf(
+            "X-Gorgon" to legacyGorgon(query, stamp, nonce),
+            "X-Argus" to legacyArgus(query, stamp, nonce),
+            "X-Ladon" to legacyLadon(aid, stamp, nonce),
+            "X-Khronos" to stamp.toString(),
+            "X-SS-Req-Ticket" to now.toString(),
+            "X-SS-STUB" to ""
+        )
+    }
+
     // ==================== 测试入口 ====================
 
     fun legacyGorgonForTest(query: String, stamp: Long, nonce: ByteArray): String =

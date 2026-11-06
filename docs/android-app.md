@@ -37,8 +37,8 @@
 | --- | --- | --- | --- | --- |
 | 首页信息流 | `GET api5-normal-sinfonlinec.fqnovel.com/reading/bookapi/bookmall/tab/v/` | 65532 | 无 | `DirectClient.homeTab` |
 | 搜索 | `GET …/reading/bookapi/search/fetch-debug/v/` | 65532 | 无 | `DirectClient.searchHits` / `searchHomeItems` |
-| 详情/选集 | `GET …/reading/bookapi/video_tab/multi_video_detail/v/` | 65532 | 无 | `DirectClient.seriesDetail` / `chapters` / `detailBrief` |
-| 取流（直链+密钥） | `GET …/reading/bookapi/video_tab/multi_video_model/v/` | **74232** | 无 | `DirectClient.media` |
+| 详情/选集 | `GET …/reading/bookapi/video_tab/multi_video_detail/v/` | 65532 | **旧版签名** | `DirectClient.seriesDetail` / `chapters` / `detailBrief` |
+| 取流（直链+密钥） | `GET …/reading/bookapi/video_tab/multi_video_model/v/` | **74232** | **旧版签名** | `DirectClient.media` |
 | 分季（相关） | `GET hongguoduanju.com/player/<seriesId>/<videoId>` | — | 无 | `DirectClient.relatedSeasons` |
 | 预取进度 | `HEAD <CDN 直链>` | — | 无 | `DirectClient.contentLength` |
 | 视频下载 | CDN 直链（`https://`） | — | 无 | `DirectClient.decryptTo` → FFmpegKit |
@@ -92,6 +92,29 @@ iid & device_id & ac=wifi & channel=hongguo_baidu_pz_kaiping0105_android
 - 只接受 `https://` 的 `main_url`；
 - 取最高 `definition`（如 `1080p`）；
 - `encrypt_info.spade_a` → `HongguoSign.contentKey()` 派生 AES-128 密钥。
+
+### 2.2.1 签名分层（2026-11-06 变更）
+
+上游把接口分两档，**同一域名、同一 IP 下表现不同**：
+
+| 档位 | 接口 | 未签名表现 |
+| --- | --- | --- |
+| 开放 | `bookmall/tab`、`search/fetch-debug` | 正常返回 |
+| 受保护 | `multi_video_detail/v/`、`multi_video_model/v/` | `HTTP 200` + **0 字节正文** |
+
+受保护接口必须带旧版全套头（`HongguoSign.legacyHeaders(query)`）：
+
+```
+X-Gorgon / X-Argus / X-Ladon / X-Khronos / X-SS-Req-Ticket / X-SS-STUB
+User-Agent: com.phoenix.read/73532 (...)
+```
+
+- **签名用的 query 必须与实际发送的那串完全一致**（顺序、`+` 号都不许变）；
+  不一致会被当成无效签名，继续返回空正文。
+- `X-Khronos` 是秒级时间戳，`X-SS-Req-Ticket` 是毫秒级；`X-SS-STUB` 对 GET 传空串。
+- 2026-11-06 之前这两个接口是开放的，之后被划入受保护档；表现为
+  「首页/搜索正常，但详情空响应、播放取不到流、搜索封面全空（封面靠详情补）」。
+- 排查口径：**0 字节 = 网关拦截（签名问题），53 字节 `101116` = 业务层抖动**，两者不要混为一谈。
 
 ### 2.3 分季（「相关」Tab）
 
@@ -172,9 +195,14 @@ ffmpeg 需要 `-cafile`：App 启动时把 `/apex/com.android.conscrypt/cacerts`
 
 ## 3. 排查手册（安卓）
 
-### 3.1 一键判断「接口挂了」还是「编码不支持」
+### 3.1 一键判断接口档位与编码
 
-Mac 上直接跑，不需要 App、不需要签名：
+下面的脚本**故意不带签名**，用来区分两档：
+
+- 返回 JSON → 该接口仍是开放档，问题在别处（参数/编码/网络）；
+- 返回 `200` + 0 字节 → 该接口已转为受保护档，必须带 `legacyHeaders` 签名，见 §2.2.1。
+
+Mac 上直接跑：
 
 ```bash
 python3 - <<'PY'
@@ -195,7 +223,7 @@ PY
 
 | 现象 | 含义 | 处理 |
 | --- | --- | --- |
-| `失败：空响应(HTTP 200)` | 接口拒绝（风控/下线） | 先跑 3.1；开放接口也空说明域名族整体变动 |
+| `失败：空响应(HTTP 200)` | 网关拦截：该接口已转为受保护档，或签名 query 与实际发送不一致 | 先跑 3.1 判断档位；受保护接口必须带 `legacyHeaders` 全套头 |
 | `失败：该剧仅提供 H.266(bytevc2) 编码` | 没有 bytevc1/h264 | 检查取流 `version_code` 是否为 74232 |
 | `失败：取流失败(101116)` | 业务层 SERVICE_ERROR | 换设备 id 重试；持续则接口策略变更 |
 | `失败：取流失败(100103)` | PARAM_INVALID | `video_platform` 必须是 1024 |

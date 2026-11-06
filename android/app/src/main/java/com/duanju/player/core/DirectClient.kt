@@ -129,7 +129,7 @@ object DirectClient {
             val text = try {
                 httpGetOpen(
                     "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?$params" +
-                        "&video_series_id=$seriesId&vs_id_type=1", cancellation
+                        "&video_series_id=$seriesId&vs_id_type=1", signed = true, cancellation = cancellation
                 )
             } catch (e: Exception) {
                 cancellation?.check()
@@ -186,7 +186,7 @@ object DirectClient {
         val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_model/v/?" +
             "${openCommonFull(deviceId, installId, "74232")}&video_id=$videoId" +
             "&video_platform=1024&need_all_video_definition=1"
-        val root = JSONObject(httpGetOpenRetry(url, cancellation))
+        val root = JSONObject(httpGetOpenRetry(url, signed = true, cancellation = cancellation))
         val code = root.optInt("code", -1)
         if (code != 0) throw DirectException("取流失败($code)")
         val entry = root.optJSONObject("data")?.optJSONObject("video_model_data")?.optJSONObject(videoId)
@@ -881,12 +881,16 @@ object DirectClient {
     }
 
     /** 无签名开放接口：偶发 200+空正文，重试 3 次。 */
-    private fun httpGetOpenRetry(url: String, cancellation: TaskCancellation? = null): String {
+    private fun httpGetOpenRetry(
+        url: String,
+        signed: Boolean = false,
+        cancellation: TaskCancellation? = null
+    ): String {
         var last: Exception? = null
         for (attempt in 1..3) {
             cancellation?.check()
             try {
-                return httpGetOpen(url, cancellation)
+                return httpGetOpen(url, signed, cancellation)
             } catch (e: Exception) {
                 cancellation?.check()
                 last = e
@@ -896,12 +900,29 @@ object DirectClient {
         throw last ?: DirectException("开放接口失败")
     }
 
-    /** 无签名开放接口：GET，不复用签名 UA。 */
-    private fun httpGetOpen(url: String, cancellation: TaskCancellation? = null): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
+    /**
+     * 开放接口 GET。
+     *
+     * `signed=true` 时附加旧版全套签名头（X-Gorgon/X-Argus/X-Ladon/X-Khronos/
+     * X-SS-Req-Ticket/X-SS-STUB）——2026-11-06 起详情与取流接口被划入受保护档，
+     * 未签名会返回 `HTTP 200` + 空正文。签名用的 query 必须与实际发送完全一致。
+     */
+    private fun httpGetOpen(
+        url: String,
+        signed: Boolean = false,
+        cancellation: TaskCancellation? = null
+    ): String {
+        val target = URL(url)
+        val conn = (target.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
+            if (signed) {
+                setRequestProperty("User-Agent", HongguoSign.UA_MODEL)
+                HongguoSign.legacyHeaders(target.query ?: "").forEach { (key, value) ->
+                    setRequestProperty(key, value)
+                }
+            }
         }
         val registration = cancellation?.onCancel { conn.disconnect() }
         return try {
