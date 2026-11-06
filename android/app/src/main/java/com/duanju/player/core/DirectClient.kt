@@ -20,11 +20,9 @@ import java.util.concurrent.TimeUnit
  */
 object DirectClient {
 
-    private const val API_HOST = "https://api5-normal-sinfonlineb.fqnovel.com"
     /** 开放接口域名（搜索/详情无需签名）：sinfonlinec。 */
     private val SEARCH_TYPES = setOf("短剧", "漫剧")
 
-    private const val OPEN_HOST = "https://api5-normal-sinfonlinec.fqnovel.com"
     private const val WEB_HOST = "https://hongguoduanju.com"
     private const val UA_WEB = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 " +
         "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
@@ -122,15 +120,17 @@ object DirectClient {
      * 同一请求随后几秒再发就恢复正常。这类瞬时降级不能当致命错误，
      * 否则播放/详情页会直接弹「详情无数据」。
      */
-    private fun detailEntry(seriesId: String, params: String, cancellation: TaskCancellation? = null): JSONObject {
+    private fun detailEntry(
+        seriesId: String,
+        deviceId: String,
+        installId: String,
+        cancellation: TaskCancellation? = null
+    ): JSONObject {
         var reason = "详情为空"
         for (attempt in 1..3) {
             cancellation?.check()
             val text = try {
-                httpGetOpen(
-                    "$OPEN_HOST/reading/bookapi/video_tab/multi_video_detail/v/?$params" +
-                        "&video_series_id=$seriesId&vs_id_type=1", signed = true, cancellation = cancellation
-                )
+                RecipeHttp.execute("detail", mapOf("seriesId" to seriesId), deviceId, installId, cancellation)
             } catch (e: Exception) {
                 cancellation?.check()
                 reason = e.message ?: e.toString()
@@ -162,7 +162,7 @@ object DirectClient {
     fun chapters(dramaId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<String> {
         // 与详情页统一用完整参数：详情页刚用这套参数成功过，播放再取分集时
         // 不该换成另一套精简参数去赌上游行为。
-        val entry = detailEntry(dramaId, openCommonFull(deviceId, installId), cancellation)
+        val entry = detailEntry(dramaId, deviceId, installId, cancellation)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
         val list = data.optJSONArray("video_list") ?: throw DirectException("分集列表为空")
         val rows = ArrayList<Pair<Int, String>>(list.length())
@@ -183,15 +183,15 @@ object DirectClient {
      * 旧的签名接口 novel/player/multi_video_model/v1 现已恒返回 200+空正文，改用此接口。
      */
     fun media(videoId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): DirectMedia {
-        val url = "$OPEN_HOST/reading/bookapi/video_tab/multi_video_model/v/?" +
-            "${openCommonFull(deviceId, installId, "74232")}&video_id=$videoId" +
-            "&video_platform=1024&need_all_video_definition=1"
-        val root = JSONObject(httpGetOpenRetry(url, signed = true, cancellation = cancellation))
+        val text = RecipeHttp.execute("media", mapOf("videoId" to videoId), deviceId, installId, cancellation)
+        val root = JSONObject(text)
         val code = root.optInt("code", -1)
         if (code != 0) throw DirectException("取流失败($code)")
-        val entry = root.optJSONObject("data")?.optJSONObject("video_model_data")?.optJSONObject(videoId)
-            ?: throw DirectException("未返回该分集")
-        val modelRaw = entry.opt("video_model")
+        val modelRaw = RecipeHttp.extract(
+            text,
+            RecipeStore.endpoint("media").extract,
+            mapOf("videoId" to videoId)
+        ) ?: throw DirectException("未返回该分集")
         val model = when (modelRaw) {
             is String -> JSONObject(modelRaw)
             is JSONObject -> modelRaw
@@ -346,11 +346,16 @@ object DirectClient {
      * 流式读取搜索响应，截取并解析 data 数组后立即断开。
      * 该接口的 debug_info 会膨胀到数十 MB，完整读取会拖慢搜索且浪费流量。
      */
-    private fun readSearchData(url: String, cancellation: TaskCancellation? = null): JSONArray? {
+    private fun readSearchData(
+        url: String,
+        headers: Map<String, String> = emptyMap(),
+        cancellation: TaskCancellation? = null
+    ): JSONArray? {
         val conn = (URL(url).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 15000
             readTimeout = 30000
+            headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         val registration = cancellation?.onCancel { conn.disconnect() }
         try {
@@ -419,7 +424,7 @@ object DirectClient {
 
     /** 详情页完整数据（无签名接口，封面 JPEG）。 */
     fun seriesDetail(seriesId: String, deviceId: String, installId: String): SeriesDetail {
-        val entry = detailEntry(seriesId, openCommonFull(deviceId, installId))
+        val entry = detailEntry(seriesId, deviceId, installId)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
 
         var category = ""
@@ -466,7 +471,7 @@ object DirectClient {
 
     /** 无签名详情：取剧名/封面/集数/播放量/分类（封面为 JPEG，避免 HEIC 解码失败）。 */
     private fun detailBrief(seriesId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): HomeDrama {
-        val entry = detailEntry(seriesId, openCommonFull(deviceId, installId), cancellation)
+        val entry = detailEntry(seriesId, deviceId, installId, cancellation)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
         var category = ""
         val schema = data.optString("category_schema")
@@ -502,27 +507,6 @@ object DirectClient {
         html.replace(Regex("<[^>]+>"), "").replace("&nbsp;", " ").replace("&amp;", "&").trim()
 
     /**
-     * 完整真机参数集：首页接口翻页/筛选依赖它（仅 5 个必需参数时 offset>0 会返回重复内容）。
-     */
-    private fun openCommonFull(
-        deviceId: String,
-        installId: String,
-        versionCode: String = "65532"
-    ): String {
-        val dev = deviceId.takeIf { it.length >= 6 } ?: "1234567890123456"
-        val ins = installId.takeIf { it.length >= 6 } ?: "1234567890123456"
-        val versionName = if (versionCode == "65532") "6.5.5.32" else "7.4.2.32"
-        return "iid=$ins&device_id=$dev&ac=wifi&channel=hongguo_baidu_pz_kaiping0105_android" +
-            "&aid=8662&app_name=novelread&version_code=$versionCode&version_name=$versionName" +
-            "&device_platform=android&os=android&ssmix=a&device_type=Redmi+Note+8+Pro&device_brand=Redmi" +
-            "&language=zh&os_api=36&os_version=16&manifest_version_code=$versionCode" +
-            "&resolution=1080*2198&dpi=440&update_version_code=$versionCode&pv_player=$versionCode&gender=2" +
-            "&need_personal_recommend=1&player_so_load=1&is_android_pad_screen=0&host_abi=arm64-v8a" +
-            "&dragon_device_type=phone&rom_version=BP4A.251205.006+release-keys&compliance_status=0" +
-            "&cdid=1f1d14b3-8c25-4733-9f6b-2fdc01640081"
-    }
-
-    /**
      * 首页信息流（bookmall/tab，无签名）。
      * 三层结构 tab_item.cell_data[].cell_data[].video_data[]；hasMore 用 next_offset > offset 判断
      * （offset=0 时 has_more 恒为 false，不可信）。
@@ -531,14 +515,17 @@ object DirectClient {
         tabType: Int, offset: Int, sessionId: String, selectedItems: String?,
         deviceId: String, installId: String
     ): HomePage {
-        val url = buildString {
-            append("$OPEN_HOST/reading/bookapi/bookmall/tab/v/?")
-            append(openCommonFull(deviceId, installId))
-            append("&tab_type=$tabType&offset=$offset")
-            if (sessionId.isNotEmpty()) append("&session_id=").append(sessionId)
-            if (!selectedItems.isNullOrEmpty()) append("&selected_items=").append(selectedItems)
-        }
-        val root = JSONObject(httpGetOpenRetry(url))
+        val text = RecipeHttp.execute(
+            "home",
+            mapOf(
+                "tabType" to tabType.toString(),
+                "offset" to offset.toString(),
+                "sessionId" to sessionId,
+                "selectedItems" to (selectedItems ?: "")
+            ),
+            deviceId, installId
+        )
+        val root = JSONObject(text)
         val code = root.optInt("code", -1)
         if (code != 0) throw DirectException("首页加载失败($code)")
         val tabs = root.optJSONObject("data")?.optJSONArray("tab_item")
@@ -815,14 +802,17 @@ object DirectClient {
      * 搜索结果本身不含封面，这也是官方 App 搜索页不放封面图的原因。
      */
     fun searchHits(keyword: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<SearchHit> {
-        val url = "$OPEN_HOST/reading/bookapi/search/fetch-debug/v/?${openCommonFull(deviceId, installId)}" +
-            "&query=" + URLEncoder.encode(keyword, "UTF-8") + "&count=20"
+        val prepared = RecipeHttp.prepare(
+            "search",
+            mapOf("query" to keyword),
+            deviceId, installId
+        )
         var rows: JSONArray? = null
         var last: Exception? = null
         for (attempt in 1..3) {
             cancellation?.check()
             try {
-                rows = readSearchData(url, cancellation)
+                rows = readSearchData(prepared.url, prepared.headers, cancellation)
                 if (rows != null) break
             } catch (e: Exception) {
                 cancellation?.check()
@@ -879,67 +869,6 @@ object DirectClient {
             conn.disconnect()
         }
     }
-
-    /** 无签名开放接口：偶发 200+空正文，重试 3 次。 */
-    private fun httpGetOpenRetry(
-        url: String,
-        signed: Boolean = false,
-        cancellation: TaskCancellation? = null
-    ): String {
-        var last: Exception? = null
-        for (attempt in 1..3) {
-            cancellation?.check()
-            try {
-                return httpGetOpen(url, signed, cancellation)
-            } catch (e: Exception) {
-                cancellation?.check()
-                last = e
-                if (attempt < 3) Thread.sleep(attempt * 600L)
-            }
-        }
-        throw last ?: DirectException("开放接口失败")
-    }
-
-    /**
-     * 开放接口 GET。
-     *
-     * `signed=true` 时附加旧版全套签名头（X-Gorgon/X-Argus/X-Ladon/X-Khronos/
-     * X-SS-Req-Ticket/X-SS-STUB）——2026-11-06 起详情与取流接口被划入受保护档，
-     * 未签名会返回 `HTTP 200` + 空正文。签名用的 query 必须与实际发送完全一致。
-     */
-    private fun httpGetOpen(
-        url: String,
-        signed: Boolean = false,
-        cancellation: TaskCancellation? = null
-    ): String {
-        val target = URL(url)
-        val conn = (target.openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15000
-            readTimeout = 30000
-            if (signed) {
-                setRequestProperty("User-Agent", HongguoSign.UA_MODEL)
-                HongguoSign.legacyHeaders(target.query ?: "").forEach { (key, value) ->
-                    setRequestProperty(key, value)
-                }
-            }
-        }
-        val registration = cancellation?.onCancel { conn.disconnect() }
-        return try {
-            cancellation?.check()
-            val code = conn.responseCode
-            val text = (if (code in 200..299) conn.inputStream else conn.errorStream)
-                ?.bufferedReader()?.use { it.readText() } ?: ""
-            cancellation?.check()
-            if (code != 200) throw DirectException("HTTP $code")
-            if (text.isEmpty()) throw DirectException("空响应(HTTP $code)")
-            text
-        } finally {
-            registration?.close()
-            conn.disconnect()
-        }
-    }
-
 
     // 设备身份持久化（与服务器无关，App 自己的随机身份）
     fun identity(context: Context): Pair<String, String> {

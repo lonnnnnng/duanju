@@ -3,7 +3,8 @@
 - 适用版本：`v0.1.23`（`versionCode 9`）
 - 代码位置：`android/`（Kotlin + Media3 + FFmpegKitNext）
 - 关联文档：Web 服务端接口见 [android-playback-endpoints.md](android-playback-endpoints.md)；
-  上游接口逆向细节见 `hongguo-ref/docs/API.md`、`hongguo-ref/docs/CHAIN.md`
+  上游变更史与规律见 [2026-11-06-api-change-analysis.md](2026-11-06-api-change-analysis.md)；
+  逆向细节见 `hongguo-ref/docs/API.md`、`hongguo-ref/docs/CHAIN.md`
 
 本文只描述安卓端。Web/服务器的取流方式、签名参数与排查手册不在这里重复。
 
@@ -115,6 +116,36 @@ User-Agent: com.phoenix.read/73532 (...)
 - 2026-11-06 之前这两个接口是开放的，之后被划入受保护档；表现为
   「首页/搜索正常，但详情空响应、播放取不到流、搜索封面全空（封面靠详情补）」。
 - 排查口径：**0 字节 = 网关拦截（签名问题），53 字节 `101116` = 业务层抖动**，两者不要混为一谈。
+
+### 2.2.2 接口配方（L1）+ 签名原语（L2）
+
+从 v0.1.37 起，四个官方接口不再硬编码在 `DirectClient`，改由
+`android/app/src/main/assets/recipes/hongguo.json` 描述，`RecipeHttp` 执行：
+
+```json
+"detail": {
+  "host": "open",
+  "path": "/reading/bookapi/video_tab/multi_video_detail/v/",
+  "versionCode": "65532",
+  "sign": ["legacy", "none"],
+  "params": [["video_series_id", "$seriesId"], ["vs_id_type", "1"]],
+  "retry": { "attempts": 3, "backoffMs": [600, 1200], "on": ["network", "http5xx", "empty"] },
+  "extract": "data.video_detail_data"
+}
+```
+
+- **L1 配方**：路径、版本号、参数、签名档位顺序、重试判据、取值路径都是数据。
+  上游再改这些，只需改 JSON（可放 `filesDir/recipes/hongguo.json` 覆盖，版本号更高即生效）。
+- **L2 原语**：`none`（不签名）、`legacy`（X-Gorgon/X-Argus/X-Ladon/X-Khronos/
+  X-SS-Req-Ticket/X-SS-STUB）。配方按名字引用，不在 JSON 里写算法。
+- **档位降级**：`sign` 是有序数组；返回 `200 + 0 字节` 时自动切下一档。
+  例如 `["legacy","none"]` 表示先签名，被网关拦就退回免签，正好覆盖上游来回切的形态。
+- **参数规则**：`$var` 模板替换；`$var` 为空时整项省略（首页首次加载没有 `session_id`）。
+- **远程覆盖**：`RecipeStore.saveOverride(json)` 接收外部下发的配方（校验可解析且
+  版本不倒退），目前供调试/后续远程下发使用；解析失败始终保留内置版本。
+
+改动 Recipe 引擎或原语后必须跑：`./gradlew :app:testDebugUnitTest`（`RecipeTest` 覆盖
+解析、URL 拼装、空参省略、取值路径）。
 
 ### 2.3 分季（「相关」Tab）
 
