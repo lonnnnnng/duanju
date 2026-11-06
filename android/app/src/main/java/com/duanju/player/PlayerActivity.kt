@@ -106,6 +106,7 @@ class PlayerActivity : AppCompatActivity() {
     @Volatile private var prefetchTarget = -1
     private var prefetchCancellation: TaskCancellation? = null
     private var prefetchFuture: Future<*>? = null
+    private var prefetchRetryRunnable: Runnable? = null
     /** 当前播放器正在读取的缓存文件，LRU 清理时需跳过。 */
     @Volatile private var playingFile: File? = null
     /** 当前集对应的 vid，用于「相关」页拼剧集页 URL。 */
@@ -666,6 +667,8 @@ statusView = findViewById(R.id.status)
         val startedAt = System.currentTimeMillis()
         var resolveMs = 0L
         var downloadMs = 0L
+        // 本次解析拿到的分集列表，预取下一集时直接复用，避免重复请求详情（也少一次被限流的机会）。
+        var chaptersSnapshot: List<String>? = null
         val cacheHit = VideoCache.ensureAvailable(outFile) {
             val cachedAspect = probeCachedAspect(seriesId)
             cancellation.check()
@@ -676,6 +679,7 @@ statusView = findViewById(R.id.status)
             }
             val (deviceId, installId) = DirectClient.identity(this)
             val chapters = DirectClient.chapters(seriesId, deviceId, installId, cancellation)
+            chaptersSnapshot = chapters
             if (episode > chapters.size) throw DirectClient.DirectException("集数超出范围")
             val resolvedVideoId = chapters[episode - 1]
             videoId = resolvedVideoId
@@ -751,12 +755,12 @@ statusView = findViewById(R.id.status)
             player.prepare()
             player.playWhenReady = foreground && resumeWhenForeground
             player.setPlaybackSpeed(currentSpeed)
-            if (foreground) startPrefetch(episode)
+            if (foreground) startPrefetch(episode, chaptersSnapshot)
         }
     }
 
     /** long: 预取任务独立持有取消信号，迟到的结果不能覆盖另一集的预取状态。 */
-    private fun startPrefetch(episode: Int) {
+    private fun startPrefetch(episode: Int, knownChapters: List<String>? = null, retryRound: Int = 0) {
         val next = episode + 1
         if (!foreground || !AppSettings.prefetchNext(this) || next > episodes || prefetchTarget == next) return
         cancelPrefetch()
@@ -765,6 +769,107 @@ statusView = findViewById(R.id.status)
         val seriesId = dramaId.substringAfter(':')
         val context = applicationContext
         prefetchTarget = next
+        resetPrefetchProgress()
+        prefetchFuture = prefetchExecutor.submit {
+            val startedAt = System.currentTimeMillis()
+            var lastError = "未知错误"
+            // 预取失败多数是上游间歇 0 字节（限流）：整任务再试 2 次，仍失败才标记。
+            for (attempt in 1..3) {
+                cancellation.check()
+                try {
+                    prefetchEpisode(seriesId, next, context, knownChapters, startedAt, cancellation)
+                    return@submit
+                } catch (e: Exception) {
+                    if (cancellation.isCancelled) return@submit
+                    lastError = e.message ?: e.toString()
+                    android.util.Log.d("PlayerActivity", "预取第${next}集失败($attempt/3)：$lastError")
+                    if (attempt < 3) {
+                        postPrefetch(cancellation) { resetPrefetchProgress() }
+                        try {
+                            Thread.sleep(3000L * attempt)
+                        } catch (interrupted: InterruptedException) {
+                            return@submit
+                        }
+                    }
+                }
+            }
+            postPrefetch(cancellation) {
+                prefetchFailedEpisode = next
+                prefetchTarget = -1
+                prefetchTmp = null
+                main.removeCallbacks(prefetchTicker)
+                renderStatus()
+                // 上游限流通常几十秒后恢复：继续停留在本集时后台再试，避免切集时冷启动。
+                if (retryRound < 3) {
+                    val retry = Runnable {
+                        prefetchRetryRunnable = null
+                        android.util.Log.d(
+                            "PlayerActivity",
+                            "预取重试触发：foreground=$foreground selected=$selectedEpisode target=$episode"
+                        )
+                        if (foreground && selectedEpisode == episode) {
+                            startPrefetch(episode, knownChapters, retryRound + 1)
+                        }
+                    }
+                    prefetchRetryRunnable = retry
+                    main.postDelayed(retry, 20000L)
+                    android.util.Log.d("PlayerActivity", "预取第${next}集将在20s后重试(${retryRound + 1}/3)")
+                }
+            }
+        }
+    }
+
+    /** 预取一次；成功即返回，异常交给调用方重试。 */
+    private fun prefetchEpisode(
+        seriesId: String,
+        next: Int,
+        context: android.content.Context,
+        knownChapters: List<String>?,
+        startedAt: Long,
+        cancellation: TaskCancellation
+    ) {
+        val dir = VideoCache.dir(context)
+        val outFile = File(dir, "${seriesId}_$next.mp4")
+        val cacheHit = VideoCache.isComplete(outFile)
+        var quality = com.duanju.player.core.CacheMeta.get(context, outFile)?.first ?: 0
+        if (!cacheHit) {
+            val (deviceId, installId) = DirectClient.identity(context)
+            val chapters = knownChapters
+                ?: DirectClient.chapters(seriesId, deviceId, installId, cancellation)
+            if (next > chapters.size) throw DirectClient.DirectException("集数超出范围")
+            val media = DirectClient.media(chapters[next - 1], deviceId, installId, cancellation)
+            quality = media.quality
+            val total = DirectClient.contentLength(media.url, cancellation) ?: 0L
+            postPrefetch(cancellation) {
+                prefetchQuality = media.quality
+                prefetchTotalBytes = total
+            }
+            DirectClient.decryptTo(media.url, media.keyHex, outFile, cancellation) { tmp ->
+                postPrefetch(cancellation) {
+                    prefetchTmp = tmp
+                    main.removeCallbacks(prefetchTicker)
+                    main.post(prefetchTicker)
+                }
+            }
+            com.duanju.player.core.CacheMeta.put(context, outFile, quality)
+        }
+        cancellation.check()
+        val keep = buildSet { add(outFile.name); playingFile?.let { add(it.name) } }
+        VideoCache.trim(dir, VideoCache.mbToBytes(AppSettings.cacheLimitMb(context)), keep)
+        postPrefetch(cancellation) {
+            prefetchQuality = quality
+            prefetchReadyEpisode = next
+            prefetchReadyBytes = outFile.length()
+            prefetchElapsedMs = if (cacheHit) 0L else System.currentTimeMillis() - startedAt
+            prefetchTarget = -1
+            prefetchTmp = null
+            main.removeCallbacks(prefetchTicker)
+            android.util.Log.d("PlayerActivity", "预取第${next}集完成")
+            renderStatus()
+        }
+    }
+
+    private fun resetPrefetchProgress() {
         prefetchReadyEpisode = -1
         prefetchFailedEpisode = -1
         prefetchPercent = -1
@@ -772,54 +877,8 @@ statusView = findViewById(R.id.status)
         prefetchTotalBytes = 0L
         prefetchQuality = 0
         prefetchElapsedMs = 0L
-        prefetchFuture = prefetchExecutor.submit {
-            val startedAt = System.currentTimeMillis()
-            try {
-                val dir = VideoCache.dir(context)
-                val outFile = File(dir, "${seriesId}_$next.mp4")
-                val cacheHit = VideoCache.isComplete(outFile)
-                var quality = com.duanju.player.core.CacheMeta.get(context, outFile)?.first ?: 0
-                if (!cacheHit) {
-                    val (deviceId, installId) = DirectClient.identity(context)
-                    val chapters = DirectClient.chapters(seriesId, deviceId, installId, cancellation)
-                    if (next > chapters.size) throw DirectClient.DirectException("集数超出范围")
-                    val media = DirectClient.media(chapters[next - 1], deviceId, installId, cancellation)
-                    quality = media.quality
-                    val total = DirectClient.contentLength(media.url, cancellation) ?: 0L
-                    postPrefetch(cancellation) { prefetchQuality = media.quality; prefetchTotalBytes = total }
-                    DirectClient.decryptTo(media.url, media.keyHex, outFile, cancellation) { tmp ->
-                        postPrefetch(cancellation) {
-                            prefetchTmp = tmp
-                            main.removeCallbacks(prefetchTicker)
-                            main.post(prefetchTicker)
-                        }
-                    }
-                    com.duanju.player.core.CacheMeta.put(context, outFile, quality)
-                }
-                cancellation.check()
-                val keep = buildSet { add(outFile.name); playingFile?.let { add(it.name) } }
-                VideoCache.trim(dir, VideoCache.mbToBytes(AppSettings.cacheLimitMb(context)), keep)
-                postPrefetch(cancellation) {
-                    prefetchQuality = quality
-                    prefetchReadyEpisode = next
-                    prefetchReadyBytes = outFile.length()
-                    prefetchElapsedMs = if (cacheHit) 0L else System.currentTimeMillis() - startedAt
-                    prefetchTarget = -1
-                    prefetchTmp = null
-                    main.removeCallbacks(prefetchTicker)
-                    android.util.Log.d("PlayerActivity", "预取第${next}集完成")
-                    renderStatus()
-                }
-            } catch (e: Exception) {
-                postPrefetch(cancellation) {
-                    prefetchFailedEpisode = next
-                    prefetchTarget = -1
-                    prefetchTmp = null
-                    main.removeCallbacks(prefetchTicker)
-                    renderStatus()
-                }
-            }
-        }
+        prefetchTmp = null
+        main.removeCallbacks(prefetchTicker)
     }
 
     private fun postPrefetch(cancellation: TaskCancellation, block: () -> Unit) {
@@ -829,6 +888,8 @@ statusView = findViewById(R.id.status)
     }
 
     private fun cancelPrefetch() {
+        prefetchRetryRunnable?.let { main.removeCallbacks(it) }
+        prefetchRetryRunnable = null
         prefetchCancellation?.cancel()
         prefetchFuture?.cancel(true)
         prefetchCancellation = null
