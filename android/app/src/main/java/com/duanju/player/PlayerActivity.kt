@@ -641,11 +641,14 @@ statusView = findViewById(R.id.status)
                 cancellation.check()
                 playDirect(episode, startMs, generation, cancellation)
             } catch (e: Exception) {
-                if (!cancellation.isCancelled) postPlayback(episode, generation, cancellation) {
-                    main.removeCallbacks(stageTicker)
-                    stageTmp = null
-                    loading.visibility = View.GONE
-                    status("失败：${e.message}")
+                if (!cancellation.isCancelled) {
+                    android.util.Log.d("PlayerActivity", "第${episode}集播放失败：${e.message}")
+                    postPlayback(episode, generation, cancellation) {
+                        main.removeCallbacks(stageTicker)
+                        stageTmp = null
+                        loading.visibility = View.GONE
+                        status("失败：${e.message}")
+                    }
                 }
             }
         }
@@ -683,6 +686,7 @@ statusView = findViewById(R.id.status)
             if (episode > chapters.size) throw DirectClient.DirectException("集数超出范围")
             val resolvedVideoId = chapters[episode - 1]
             videoId = resolvedVideoId
+            android.util.Log.d("PlayerActivity", "第${episode}集 vid=$resolvedVideoId 分集数=${chapters.size}")
             val media = DirectClient.media(resolvedVideoId, deviceId, installId, cancellation)
             resolveMs = System.currentTimeMillis() - startedAt
             quality = media.quality
