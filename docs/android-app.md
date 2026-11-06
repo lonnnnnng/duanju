@@ -43,7 +43,7 @@
 | 分季（相关） | `GET hongguoduanju.com/player/<seriesId>/<videoId>` | — | 无 | `DirectClient.relatedSeasons` |
 | 预取进度 | `HEAD <CDN 直链>` | — | 无 | `DirectClient.contentLength` |
 | 视频下载 | CDN 直链（`https://`） | — | 无 | `DirectClient.decryptTo` → FFmpegKit |
-| 检查更新 | `GET api.github.com/repos/lonnnnnng/duanju/releases/latest` | — | 无 | `UpdateChecker.fetchLatest` |
+| 检查更新 | `GET api.github.com/repos/lonnnnnng/duanju/releases/latest` | — | 无 | `UpdateChecker.fetchLatest`（优先走 `gh-proxy.com`，失败再直连） |
 
 **版本号不能统一**：首页/搜索/详情 65532（筛选器更全、每页 9 部）；取流必须 74232，
 否则只会返回 `bytevc2`（H.266）或无数据。
@@ -141,8 +141,18 @@ User-Agent: com.phoenix.read/73532 (...)
 - **档位降级**：`sign` 是有序数组；返回 `200 + 0 字节` 时自动切下一档。
   例如 `["legacy","none"]` 表示先签名，被网关拦就退回免签，正好覆盖上游来回切的形态。
 - **参数规则**：`$var` 模板替换；`$var` 为空时整项省略（首页首次加载没有 `session_id`）。
-- **远程覆盖**：`RecipeStore.saveOverride(json)` 接收外部下发的配方（校验可解析且
-  版本不倒退），目前供调试/后续远程下发使用；解析失败始终保留内置版本。
+- **远程更新**（ECDSA 验签 + 版本单调）：
+  - 源顺序：**gh-proxy 加速** → GitHub Release `recipe` → jsDelivr（`@main`）→ raw 直链。
+    手机网络通常直连不了 GitHub，所以加速地址放第一位；
+  - 只接受内置 P-256 公钥验证通过的 `recipe.json`，且 `version` 必须大于当前版本；
+  - 失败（网络/签名/解析）静默保留现有配方，不影响启动；
+  - 启动时后台检查一次，设置页「关于 → 接口配方」可手动重试并查看版本/来源。
+- **发布流程**（无需发 APK）：
+  1. 改 `android/app/src/main/assets/recipes/hongguo.json`，提升 `version`；
+  2. `tools/publish-recipe.sh` 生成 `recipes/recipe.json` + `.sig`（私钥在
+     `android/keystore/recipe/`，已 gitignore；CI 用 Secret `RECIPE_SIGNING_KEY`）；
+  3. 提交推送，`.github/workflows/recipe.yml` 校验签名并更新 `recipe` 预发布资产；
+  4. 已安装的 App 下次启动即生效。
 
 改动 Recipe 引擎或原语后必须跑：`./gradlew :app:testDebugUnitTest`（`RecipeTest` 覆盖
 解析、URL 拼装、空参省略、取值路径）。

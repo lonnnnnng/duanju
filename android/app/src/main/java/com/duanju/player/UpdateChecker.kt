@@ -21,12 +21,31 @@ data class UpdateRelease(
  */
 object UpdateChecker {
 
-    private const val API_URL = "https://api.github.com/repos/lonnnnnng/duanju/releases/latest"
+    private const val API_PATH = "https://api.github.com/repos/lonnnnnng/duanju/releases/latest"
+
+    /** 手机网络通常直连不了 GitHub，优先走加速地址，失败再直连。 */
+    private val API_URLS = listOf(
+        "https://gh-proxy.com/$API_PATH",
+        API_PATH
+    )
     const val RELEASES_URL = "https://github.com/lonnnnnng/duanju/releases"
+
+    /** 把 GitHub 直链改写成加速地址（签名/内容不变，仅换入口）。 */
+    private fun proxied(url: String): String =
+        if (url.startsWith("https://github.com/") || url.startsWith("https://objects.githubusercontent.com/")) {
+            "https://gh-proxy.com/$url"
+        } else url
 
     /** 网络或解析失败返回 null，调用方按「检查失败」处理。 */
     fun fetchLatest(): UpdateRelease? {
-        val conn = (URL(API_URL).openConnection() as HttpURLConnection).apply {
+        for (apiUrl in API_URLS) {
+            fetchFrom(apiUrl)?.let { return it }
+        }
+        return null
+    }
+
+    private fun fetchFrom(apiUrl: String): UpdateRelease? {
+        val conn = (URL(apiUrl).openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"
             connectTimeout = 8000
             readTimeout = 8000
@@ -51,7 +70,7 @@ object UpdateChecker {
                     }
                 }
             }
-            UpdateRelease(version, pageUrl, downloadUrl)
+            UpdateRelease(version, pageUrl, proxied(downloadUrl))
         } catch (e: Exception) {
             null
         } finally {

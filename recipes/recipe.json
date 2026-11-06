@@ -1,0 +1,159 @@
+{
+  "version": 3,
+  "updated": "2026-11-06",
+  "hosts": {
+    "open": "https://api5-normal-sinfonlinec.fqnovel.com",
+    "web": "https://hongguoduanju.com"
+  },
+  "userAgents": {
+    "model": "com.phoenix.read/73532 (Linux; U; Android 16; zh_CN; 25053RT47C; Build/BP2A.250605.031.A3; Cronet/TTNetVersion:04657795 2026-01-23 QuicVersion:c67e9834 2025-09-08)"
+  },
+  "endpoints": {
+    "home": {
+      "desc": "首页信息流（开放档）",
+      "method": "GET",
+      "host": "open",
+      "path": "/reading/bookapi/bookmall/tab/v/",
+      "versionCode": "65532",
+      "sign": [
+        "none"
+      ],
+      "params": [
+        [
+          "tab_type",
+          "$tabType"
+        ],
+        [
+          "offset",
+          "$offset"
+        ],
+        [
+          "session_id",
+          "$sessionId"
+        ],
+        [
+          "selected_items",
+          "$selectedItems"
+        ]
+      ],
+      "retry": {
+        "attempts": 3,
+        "backoffMs": [
+          600,
+          1200
+        ],
+        "on": [
+          "network",
+          "http5xx",
+          "empty"
+        ]
+      },
+      "extract": "data"
+    },
+    "search": {
+      "desc": "搜索（开放档；响应可到数 MB，调用方流式读取）",
+      "method": "GET",
+      "host": "open",
+      "path": "/reading/bookapi/search/fetch-debug/v/",
+      "versionCode": "65532",
+      "sign": [
+        "none"
+      ],
+      "params": [
+        [
+          "query",
+          "$query"
+        ],
+        [
+          "count",
+          "20"
+        ]
+      ],
+      "retry": {
+        "attempts": 3,
+        "backoffMs": [
+          600,
+          1200
+        ],
+        "on": [
+          "network",
+          "http5xx"
+        ]
+      },
+      "extract": "data"
+    },
+    "detail": {
+      "desc": "详情/选集（2026-11-06 起为受保护档，先试旧版签名）",
+      "method": "GET",
+      "host": "open",
+      "path": "/reading/bookapi/video_tab/multi_video_detail/v/",
+      "versionCode": "65532",
+      "sign": [
+        "legacy",
+        "none"
+      ],
+      "params": [
+        [
+          "video_series_id",
+          "$seriesId"
+        ],
+        [
+          "vs_id_type",
+          "1"
+        ]
+      ],
+      "retry": {
+        "attempts": 3,
+        "backoffMs": [
+          600,
+          1200
+        ],
+        "on": [
+          "network",
+          "http5xx",
+          "empty",
+          "nonJson"
+        ]
+      },
+      "extract": "data.video_detail_data"
+    },
+    "media": {
+      "desc": "取流（受保护档；74232 才会返回 HEVC）",
+      "method": "GET",
+      "host": "open",
+      "path": "/reading/bookapi/video_tab/multi_video_model/v/",
+      "versionCode": "74232",
+      "sign": [
+        "legacy",
+        "none"
+      ],
+      "params": [
+        [
+          "video_id",
+          "$videoId"
+        ],
+        [
+          "video_platform",
+          "1024"
+        ],
+        [
+          "need_all_video_definition",
+          "1"
+        ]
+      ],
+      "retry": {
+        "attempts": 3,
+        "backoffMs": [
+          600,
+          1200
+        ],
+        "on": [
+          "network",
+          "http5xx",
+          "empty"
+        ]
+      },
+      "extract": "data.video_model_data.$videoId.video_model"
+    }
+  }
+}

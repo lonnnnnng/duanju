@@ -19,9 +19,17 @@ import java.util.Base64
 object RecipeUpdater {
 
     private const val TAG = "RecipeUpdater"
-    private const val BASE = "https://github.com/lonnnnnng/duanju/releases/download/recipe"
-    private const val JSON_URL = "$BASE/recipe.json"
-    private const val SIG_URL = "$BASE/recipe.json.sig"
+    /**
+     * 多源兜底：GitHub Release → jsDelivr（国内通常可达）→ raw。
+     * 任意一个源拿到「JSON + 验签通过」就采用；全部失败则保留现有配方。
+     */
+    private val SOURCES = listOf(
+        // 手机网络通常直连不了 GitHub，加速地址放最前。
+        "https://gh-proxy.com/https://github.com/lonnnnnng/duanju/releases/download/recipe",
+        "https://github.com/lonnnnnng/duanju/releases/download/recipe",
+        "https://cdn.jsdelivr.net/gh/lonnnnnng/duanju@main/recipes",
+        "https://raw.githubusercontent.com/lonnnnnng/duanju/main/recipes"
+    )
 
     /** P-256 公钥（X.509 SubjectPublicKeyInfo，DER → Base64）。私钥只在发布端保存。 */
     private const val PUBLIC_KEY_B64 =
@@ -30,23 +38,28 @@ object RecipeUpdater {
 
     /** 结果：null 表示失败；true 表示已更新；false 表示已是最新。 */
     fun refresh(): Boolean? {
-        return try {
-            val json = fetch(JSON_URL) ?: return null
-            val sig = fetch(SIG_URL) ?: return null
+        for (base in SOURCES) {
+            // 带时间戳绕过 CDN 边缘缓存：Release 资产覆盖后旧版本可能仍被缓存。
+            val bust = System.currentTimeMillis()
+            val json = runCatching { fetch("$base/recipe.json?ts=$bust") }.getOrNull() ?: continue
+            val sig = runCatching { fetch("$base/recipe.json.sig?ts=$bust") }.getOrNull() ?: continue
             if (!verifyBytes(json, sig)) {
-                Log.w(TAG, "配方签名校验失败，忽略远程版本")
-                return null
+                Log.w(TAG, "签名校验失败，跳过源: $base")
+                continue
             }
             val incoming = runCatching { RecipeParser.parse(String(json, Charsets.UTF_8)) }.getOrNull()
-                ?: return null
+            if (incoming == null) {
+                Log.w(TAG, "配方解析失败，跳过源: $base")
+                continue
+            }
+            Log.d(TAG, "命中配方源: $base (v${incoming.version})")
             if (incoming.version <= RecipeStore.recipe().version) return false
             if (!RecipeStore.saveOverride(String(json, Charsets.UTF_8))) return null
             Log.d(TAG, "配方已更新到 v${incoming.version} (${incoming.updated})")
-            true
-        } catch (e: Exception) {
-            Log.d(TAG, "配方更新失败：${e.message}")
-            null
+            return true
         }
+        Log.d(TAG, "所有配方源均不可用，继续使用本地版本")
+        return null
     }
 
     fun refreshAsync() {
@@ -59,7 +72,8 @@ object RecipeUpdater {
             connectTimeout = 8000
             readTimeout = 8000
             instanceFollowRedirects = true
-            setRequestProperty("Cache-Control", "no-cache")
+            useCaches = false
+            setRequestProperty("Cache-Control", "no-cache, no-store")
         }
         return try {
             if (conn.responseCode != 200) return null

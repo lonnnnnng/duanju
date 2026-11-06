@@ -36,6 +36,18 @@ jobs:
             | openssl dgst -sha256 | sed 's/^/公钥指纹: /'
           echo "配方版本: $(python3 -c "import json;print(json.load(open('recipe.json'))['version'])")"
 
+      - name: 校验仓库内签名产物
+        if: hashFiles('recipes/recipe.json') != ''
+        env:
+          RECIPE_SIGNING_KEY: ${{ secrets.RECIPE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          printf '%s\n' "$RECIPE_SIGNING_KEY" > /tmp/recipe-key.pem
+          openssl ec -in /tmp/recipe-key.pem -pubout -out /tmp/recipe-pub.pem 2>/dev/null
+          openssl dgst -sha256 -verify /tmp/recipe-pub.pem \
+            -signature recipes/recipe.json.sig recipes/recipe.json
+          python3 -c "import json;json.load(open('recipes/recipe.json'))"
+
       - name: 发布到 recipe Release
         env:
           GH_TOKEN: ${{ github.token }}

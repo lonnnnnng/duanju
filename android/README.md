@@ -56,7 +56,8 @@
 分季抓 `hongguoduanju.com/player/<seriesId>/<videoId>` 页面，检查更新读 GitHub Release。
 
 接口的路径/参数/签名档位/重试规则由 `android/app/src/main/assets/recipes/hongguo.json`
-描述（配方化，见 docs/android-app.md §2.2.2），换风控策略通常只需改这份 JSON。
+描述（配方化，见 docs/android-app.md §2.2.2），换风控策略通常只需改这份 JSON；
+分发走 `gh-proxy.com` → GitHub → jsDelivr → raw 多源，手机网络可用。
 
 参数、解析规则、分季聚合与排查手册统一维护在
 **[docs/android-app.md](../docs/android-app.md)**（本文件不再重复，避免两处漂移）。
