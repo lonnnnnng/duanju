@@ -1,10 +1,12 @@
 # 安卓客户端：功能、接口与实现
 
-- 适用版本：`v0.1.23`（`versionCode 9`）
+- 接口与配方章节更新于：2026-11-07（工作区实现，尚未发布）；早期功能清单始于 v0.1.23
 - 代码位置：`android/`（Kotlin + Media3 + FFmpegKitNext）
 - 关联文档：Web 服务端接口见 [android-playback-endpoints.md](android-playback-endpoints.md)；
   上游变更史与规律见 [2026-11-06-api-change-analysis.md](2026-11-06-api-change-analysis.md)；
   预取限流问题见 [2026-11-06-prefetch-rate-limit.md](2026-11-06-prefetch-rate-limit.md)；
+  首页真实请求、完整筛选枚举与原始入参/出参见 [2026-11-06-home-api-verification.md](2026-11-06-home-api-verification.md)；
+  全页面浅深主题与交互验收见 [2026-11-07-android-ui-polish.md](2026-11-07-android-ui-polish.md)；
   逆向细节见 `hongguo-ref/docs/API.md`、`hongguo-ref/docs/CHAIN.md`
 
 本文只描述安卓端。Web/服务器的取流方式、签名参数与排查手册不在这里重复。
@@ -29,6 +31,15 @@
 - 竖屏播放器窗口与下方内容 **5:5** 分栏；横屏视频按画面比例收紧，尽量不留黑边。
 - 播放页顶栏为「返回 + 剧名」，全屏时隐藏，改用播放器内悬浮返回栏。
 - 控制器不自动弹出，只有触摸视频区域才显示（5 秒后隐藏）。
+- 底部控制器为 48dp 单行：左侧为当前时间、进度条与总时长，右侧为倍速、静音、全屏；背景、进度条与按钮同时显隐，不再保留两秒进度条。
+- 全屏悬浮标题使用播放器专用白色，不随浅色主题切成深色文字，保证黑色遮罩上的可读性。
+- 历史卡片进度为「当前集数 / 全剧总集数」（第 10 集 / 共 100 集显示 10%），与单集播放秒数无关；未知总集数时不显示进度条。续播仍使用原有的集号与单集秒数。
+- 首页分页加载提示固定在底部导航上方；分页失败保留已有内容和游标，点击提示重试，滚动不再反复触发失败请求。
+- 首页剧集使用封面和信息合为一体的圆角描边卡片；顶部胶囊具有独立底色和描边，浅色模式下也能区分按钮轮廓。
+- 首页筛选、详情/播放页分组和当前集共用 `choice_*` 选择配色；详情播放按钮使用同一配色，并显式指定 Material 底色/描边。详情/普通播放返回栏与系统状态栏共用页面底色。
+- 全屏系统返回先退出全屏；播放失败停止加载并在视频内提供“重试本集”。选集分组点击始终使用实时当前集，小屏/大字体适当减少列数。
+- 搜索失败和关联剧请求失败有独立重试入口；搜索重建后恢复已提交关键词。首页刷新失败保留旧分页游标与现有内容，可点击重新刷新。
+- 设置自定义缓存上限的最小值为 0.125GB（128MB）；非法输入保留弹框并在输入框下方提示，不改原值。更新检查防重复，隐藏或销毁设置页后不弹出迟到结果。
 
 ## 2. 接口清单
 
@@ -46,12 +57,12 @@
 | 视频下载 | CDN 直链（`https://`） | — | 无 | `DirectClient.decryptTo` → FFmpegKit |
 | 检查更新 | `GET api.github.com/repos/lonnnnnng/duanju/releases/latest` | — | 无 | `UpdateChecker.fetchLatest`（优先走 `gh-proxy.com`，失败再直连） |
 
-**版本号不能统一**：首页/搜索/详情 65532（筛选器更全、每页 9 部）；取流必须 74232，
+**版本号不能统一**：当前首页/搜索/详情使用 65532（本轮首页单项筛选返回 6–9 部，并非固定每页 9 部）；取流使用 74232，
 否则只会返回 `bytevc2`（H.266）或无数据。
 
 ### 2.1 公共参数
 
-`DirectClient.openCommonFull()` 统一拼接约 30 项：
+`RecipeHttp.commonParams()` 统一拼接约 30 项：
 
 ```
 iid & device_id & ac=wifi & channel=hongguo_baidu_pz_kaiping0105_android
@@ -67,14 +78,29 @@ iid & device_id & ac=wifi & channel=hongguo_baidu_pz_kaiping0105_android
 & cdid=1f1d14b3-8c25-4733-9f6b-2fdc01640081
 ```
 
-公共请求头：**不设** UA / Accept / 签名。重试 3 次（600ms、1200ms 退避），
-连接 15s / 读取 30s。
+普通请求头由配方决定；`legacy` 档补齐签名头及模型 UA。
+每档发送次数与退避由各端点配方决定，连接超时 15s、读取超时 30s；详情没有额外一层固定重试。
 
 ### 2.2 各接口的调用与解析
 
-**首页**：`tab_type`（0=推荐）、`offset`、`session_id`、`selected_items`。
-三层结构 `tab_item.cell_data[].cell_data[].video_data[]`；`offset=0` 时 `has_more` 恒为 false，
-翻页用 `next_offset > offset` 判断。
+**首页**：`tab_type=8`（短剧信息流）、`offset`、可选 `session_id`、可选 `selected_items`。
+首次/切筛选时 `offset=0`，省略空 session 和筛选值；翻页沿用返回的 session 与 `next_offset`。
+三层结构 `tab_item.cell_data[].cell_data[].video_data[]`；本轮首屏 `has_more=false` 但下一页仍有数据，
+客户端用 `next_offset > offset` 判断。当前配方没有发送每页条数参数。
+
+筛选取响应的 `cell_selector`，不维护静态分类枚举。2026-11-06 正式取证返回 10 个快捷项与
+综合/时代背景/主题情节/角色设定 4 个内组，去重 63 个 ID，逐项请求均被识别。
+当前页面完整覆盖这些 ID：顶部快捷行可滚动，右侧筛选入口固定；面板包含快捷分类与全部内组，
+不再按组名隐藏“综合”。入口显示已选名称，重开面板定位具体项，可清除回到推荐。
+只有内组、没有快捷项时入口仍可用，多份 selector 合并同组并按 ID 去重。
+顶部按钮视觉高度约 32dp、面板选项约 36dp，触摸区域保留 48dp，避免点击区域扩大造成视觉膨胀。
+上游声明 `global_single=true`，
+因此继续全局单选；逗号组合会回显两个选择，但本轮没有证明返回内容是交集。
+完整请求和 63 项表格见 [首页实测报告](2026-11-06-home-api-verification.md)。
+
+配方 v6 只在 `home.headers` 设置 App 格式 `User-Agent`、`Accept` 与 `Accept-Language`。
+UA 的包名/版本/设备字段与首页公共参数一致，但不冒称逐字复制官方抓包或模拟 Cronet。
+搜索、详情、取流的配方与签名 UA 未变；68 次新首页请求与生产 Kotlin 联网回归均通过。
 
 **搜索**：`query`（≤30 字）+ `count=20`。响应可达 5MB，用流式读取只取 `data` 数组，
 避免整包解析与 `EOFException`。`data[]` 每项只有 `id`/`type`/`display.title`（HTML）/
@@ -86,7 +112,7 @@ iid & device_id & ac=wifi & channel=hongguo_baidu_pz_kaiping0105_android
 
 **详情/选集**：`video_series_id=<seriesId>` + `vs_id_type=1`。
 `data.video_detail_data.<seriesId>.video_data`，`video_list[]` 一次给全，集号用 `vid_index`。
-偶发 `code=0` 但容器内无该剧条目，`detailEntry()` 会重试 3 次并把 `code` 带进错误信息。
+`code=0` 但容器内无该剧条目时，按 `missingData` 和该端点的配方预算处理；不会拿其它剧的首项替代。
 
 **取流**：`video_id=<vid>` + `video_platform=1024` + `need_all_video_definition=1`。
 `data.video_model_data[<vid>].video_model` 是 JSON 字符串需二次解析：
@@ -97,14 +123,16 @@ iid & device_id & ac=wifi & channel=hongguo_baidu_pz_kaiping0105_android
 
 ### 2.2.1 签名分层（2026-11-06 变更）
 
-上游把接口分两档，**同一域名、同一 IP 下表现不同**：
+以下是历史故障与本次抽样观察，不能保证所有网络、设备身份与剧集永久呈现相同行为。
+2026-11-06 当前配方的联网验收及边界见 [实测记录](2026-11-06-recipe-hardening.md#6-当前接口实测2026-11-06)。
+本次同一网络下接口表现分为两档：
 
 | 档位 | 接口 | 未签名表现 |
 | --- | --- | --- |
 | 开放 | `bookmall/tab`、`search/fetch-debug` | 正常返回 |
 | 受保护 | `multi_video_detail/v/`、`multi_video_model/v/` | `HTTP 200` + **0 字节正文** |
 
-受保护接口必须带旧版全套头（`HongguoSign.legacyHeaders(query)`）：
+当前配方对受保护接口优先带旧版全套头（`HongguoSign.legacyHeaders(query)`）：
 
 ```
 X-Gorgon / X-Argus / X-Ladon / X-Khronos / X-SS-Req-Ticket / X-SS-STUB
@@ -116,15 +144,15 @@ User-Agent: com.phoenix.read/73532 (...)
 - `X-Khronos` 是秒级时间戳，`X-SS-Req-Ticket` 是毫秒级；`X-SS-STUB` 对 GET 传空串。
 - 2026-11-06 之前这两个接口是开放的，之后被划入受保护档；表现为
   「首页/搜索正常，但详情空响应、播放取不到流、搜索封面全空（封面靠详情补）」。
-- 排查口径：**0 字节 = 网关拒绝**（签名/档位不对，或高频/偶发限流——有效签名也可能间歇出现）；
-  53 字节 `101116` = 业务层抖动。两者都靠退避重试兜底，不要只归因于签名。
+- 排查口径：**0 字节是响应症状，不能单凭它确定风控原因**；`101116` 是上游业务错误码，
+  既可能短暂恢复，也有历史持续拒绝案例。当前配方只做有限重试，持续失败仍需重新核验。
 - 已知上游抖动：`multi_video_model` 会出现间歇 0 字节（实测有效签名下 3 次中 2 次），
   配方把它配置为 4 次重试、退避 1/2/3 秒。
 
 ### 2.2.2 接口配方（L1）+ 签名原语（L2）
 
-从 v0.1.37 起，四个官方接口不再硬编码在 `DirectClient`，改由
-`android/app/src/main/assets/recipes/hongguo.json` 描述，`RecipeHttp` 执行：
+当前工作区中，四个官方接口由 `android/app/src/main/assets/recipes/hongguo.json`
+描述，`RecipeHttp` 执行；实际发布版本以 Release 为准：
 
 ```json
 "detail": {
@@ -139,7 +167,7 @@ User-Agent: com.phoenix.read/73532 (...)
 ```
 
 - **L1 配方**：路径、版本号、参数、签名档位顺序、重试判据、取值路径都是数据。
-  上游再改这些，只需改 JSON（可放 `filesDir/recipes/hongguo.json` 覆盖，版本号更高即生效）。
+  已支持能力范围内的变更可改 JSON，验签与兼容性检查通过且版本更高时生效。行内字段映射、新协议与新签名仍由宿主实现。
 - **L2 原语**：`none`（不签名）、`legacy`（X-Gorgon/X-Argus/X-Ladon/X-Khronos/
   X-SS-Req-Ticket/X-SS-STUB）。配方按名字引用，不在 JSON 里写算法。
 - **档位降级**：`sign` 是有序数组；返回 `200 + 0 字节` 时先在**同档退避重试**
@@ -150,17 +178,25 @@ User-Agent: com.phoenix.read/73532 (...)
   - 源顺序：**gh-proxy 加速** → GitHub Release `recipe` → jsDelivr（`@main`）→ raw 直链。
     手机网络通常直连不了 GitHub，所以加速地址放第一位；
   - 只接受内置 P-256 公钥验证通过的 `recipe.json`，且 `version` 必须大于当前版本；
-  - 失败（网络/签名/解析）静默保留现有配方，不影响启动；
+  - 比较全部有效源并采用最高版本，旧镜像不会遮住新源；网络/畸形签名/配置错误保留现有配方；
+  - 保存时在同一锁内检查版本并原子落盘，拒绝并发降级、缺端点、未知方法/签名/变量和超限重试；
   - 启动时后台检查一次，设置页「关于 → 接口配方」可手动重试并查看版本/来源。
 - **发布流程**（无需发 APK）：
   1. 改 `android/app/src/main/assets/recipes/hongguo.json`，提升 `version`；
   2. `tools/publish-recipe.sh` 生成 `recipes/recipe.json` + `.sig`（私钥在
      `android/keystore/recipe/`，已 gitignore；CI 用 Secret `RECIPE_SIGNING_KEY`）；
-  3. 提交推送，`.github/workflows/recipe.yml` 校验签名并更新 `recipe` 预发布资产；
-  4. 已安装的 App 下次启动即生效。
+  3. 提交推送后，仅在明确要求发布配方时，手动运行 `.github/workflows/recipe.yml`，校验签名并更新 `recipe` 预发布资产；普通推送不触发该流水线；
+  4. 已安装的 App 下次检查更新时可拉取。注意 `recipes/recipe.json` 和签名同时提交后，raw / jsDelivr 的 `main` 源也能分发该配方；手动触发规则只控制 Release 资产更新，并不隔离这些源。
 
 改动 Recipe 引擎或原语后必须跑：`./gradlew :app:testDebugUnitTest`（`RecipeTest` 覆盖
 解析、URL 拼装、空参省略、取值路径）。
+
+本轮修复后，搜索、详情和取流共用重试状态机；`empty`、`nonJson`、`missingData`、
+`network`、`http5xx`、`http429` 和指定 `code:数字` 可作为条件，每档最多 5 次。
+`method` 支持 GET/POST，POST 可配置 JSON 对象 `body`，逐个字符串值替换变量；
+`headers` 可配置普通请求头。带 body 的签名尚未暴露，配置检查会拒绝该组合。
+`extract` 仅定位已有业务模型，不能替换所有行内字段解析。
+完整边界、测试与动态类加载评估见 [配方修复与动态扩展评估](2026-11-06-recipe-hardening.md)。
 
 ### 2.3 分季（「相关」Tab）
 
@@ -228,8 +264,8 @@ ffmpeg 需要 `-cafile`：App 启动时把 `/apex/com.android.conscrypt/cacerts`
 缓存策略：
 - 命中非空 `.mp4` 直接本地播放，不再请求详情或取流，断网时也可从历史重开已缓存分集；
 - 预加载下一集在后台解密；切入正在预取的集时等待其结束，不再 60 秒超时后重复启动下载；
-- 预取失败（实测刚下完本集后请求下一集常被上游限流返回 0 字节）整任务重试 3 次；
-  仍失败则停留在本集时每 20 秒再试，最多 3 轮，正好覆盖「等一会儿手动点就能成功」的场景；
+- 请求内按配方有限重试；预取临时故障在停留本集时每 20 秒再试，最多追加 3 轮，
+  不再叠加整任务立即 3 次重试。空正文无法单凭现象确定是签名失配还是限流；
 - 预取复用播放本集时已拿到的分集列表，不再重复请求详情，少一次被限流的机会；
 - 每次下载使用独立临时文件；切集、退出或超时会显式取消 native 会话，只有完整成功且未取消的任务才能发布成品；
 - 上限 `AppSettings.cacheLimitMb`（默认 2048 MB），超限按 `lastModified` LRU 淘汰，

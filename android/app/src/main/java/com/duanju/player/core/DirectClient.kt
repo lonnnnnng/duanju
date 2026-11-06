@@ -20,7 +20,7 @@ import java.util.concurrent.TimeUnit
  */
 object DirectClient {
 
-    /** 开放接口域名（搜索/详情无需签名）：sinfonlinec。 */
+    /** long: 搜索只展示可播放内容，过滤小说和相关搜索等其它索引类型。 */
     private val SEARCH_TYPES = setOf("短剧", "漫剧")
 
     private const val WEB_HOST = "https://hongguoduanju.com"
@@ -35,7 +35,7 @@ object DirectClient {
         val variants: List<Pair<Int, String>> // quality -> url
     )
 
-    class DirectException(message: String) : Exception(message)
+    class DirectException(message: String, val retryable: Boolean = false) : Exception(message)
 
     /** 首页卡片（字段取自 bookmall/tab 的 video_data）。 */
     data class HomeDrama(
@@ -126,37 +126,17 @@ object DirectClient {
         installId: String,
         cancellation: TaskCancellation? = null
     ): JSONObject {
-        var reason = "详情为空"
-        for (attempt in 1..3) {
-            cancellation?.check()
-            val text = try {
-                RecipeHttp.execute("detail", mapOf("seriesId" to seriesId), deviceId, installId, cancellation)
-            } catch (e: Exception) {
-                cancellation?.check()
-                reason = e.message ?: e.toString()
-                if (attempt < 3) Thread.sleep(attempt * 600L)
-                continue
-            }
-            val root = runCatching { JSONObject(text) }.getOrNull()
-            if (root == null) {
-                reason = "响应非 JSON"
-                if (attempt < 3) Thread.sleep(attempt * 600L)
-                continue
-            }
-            val code = root.optInt("code", -1)
-            val container = root.optJSONObject("data")?.optJSONObject("video_detail_data")
-            val entry = container?.optJSONObject(seriesId) ?: container?.keys()?.asSequence()
-                ?.mapNotNull { container.optJSONObject(it) }?.firstOrNull()
-            if (code == 0 && entry != null) return entry
-            reason = if (container == null) "详情为空(code=$code)" else "详情无数据(code=$code)"
-            android.util.Log.d("DirectClient", "详情重试$attempt/$3：$reason series=$seriesId")
-            if (attempt < 3) Thread.sleep(attempt * 600L)
+        val vars = mapOf("seriesId" to seriesId)
+        return RecipeHttp.readJson("detail", vars, deviceId, installId, cancellation) { text, endpoint ->
+            val container = RecipeHttp.extract(text, endpoint.extract, vars) as? JSONObject
+            // long: 批量响应必须精确匹配剧 ID，不能把其它剧的首项当作当前剧播放。
+            container?.optJSONObject(seriesId)
+                ?: throw RecipeHttp.ResponseFailure("missingData", "详情无数据(series=$seriesId)")
         }
-        throw DirectException(reason)
     }
 
     /**
-     * 分集列表：开放详情接口（无签名），按 vid_index 排序。
+     * long: 分集列表按 vid_index 排序，签名档位由配方控制。
      * 注意不能用 vid 字符串排序——那是雪花 id 的大小顺序，与集数无关（会打乱集数）。
      */
     fun chapters(dramaId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<String> {
@@ -177,25 +157,15 @@ object DirectClient {
         return rows.map { it.second }
     }
 
-    /** 播放模型（新版签名），返回直链 + 密钥 + 清晰度列表。 */
-    /**
-     * 取流：开放接口（无签名），video_platform 必须为 1024。
-     * 旧的签名接口 novel/player/multi_video_model/v1 现已恒返回 200+空正文，改用此接口。
-     */
+    /** long: 请求与提取共用一次配方快照，远程更新不能改变在途响应的解析方式。 */
     fun media(videoId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): DirectMedia {
-        val text = RecipeHttp.execute("media", mapOf("videoId" to videoId), deviceId, installId, cancellation)
-        val root = JSONObject(text)
-        val code = root.optInt("code", -1)
-        if (code != 0) throw DirectException("取流失败($code)")
-        val modelRaw = RecipeHttp.extract(
-            text,
-            RecipeStore.endpoint("media").extract,
-            mapOf("videoId" to videoId)
-        ) ?: throw DirectException("未返回该分集")
-        val model = when (modelRaw) {
-            is String -> JSONObject(modelRaw)
-            is JSONObject -> modelRaw
-            else -> throw DirectException("video_model 无效")
+        val vars = mapOf("videoId" to videoId)
+        val model = RecipeHttp.readJson("media", vars, deviceId, installId, cancellation) { text, endpoint ->
+            when (val raw = RecipeHttp.extract(text, endpoint.extract, vars)) {
+                is String -> JSONObject(raw)
+                is JSONObject -> raw
+                else -> throw RecipeHttp.ResponseFailure("missingData", "未返回该分集")
+            }
         }
         val videoList = model.optJSONArray("video_list") ?: throw DirectException("无清晰度列表")
         var best: JSONObject? = null
@@ -342,87 +312,7 @@ object DirectClient {
         }
     }
 
-    /**
-     * 流式读取搜索响应，截取并解析 data 数组后立即断开。
-     * 该接口的 debug_info 会膨胀到数十 MB，完整读取会拖慢搜索且浪费流量。
-     */
-    private fun readSearchData(
-        url: String,
-        headers: Map<String, String> = emptyMap(),
-        cancellation: TaskCancellation? = null
-    ): JSONArray? {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = 15000
-            readTimeout = 30000
-            headers.forEach { (k, v) -> setRequestProperty(k, v) }
-        }
-        val registration = cancellation?.onCancel { conn.disconnect() }
-        try {
-            cancellation?.check()
-            if (conn.responseCode != 200) throw DirectException("HTTP ${conn.responseCode}")
-            val buffer = StringBuilder(256 * 1024)
-            val chunk = CharArray(32 * 1024)
-            var length: Int
-            var dataStart = -1
-            conn.inputStream.bufferedReader().use { reader ->
-                while (true) {
-                    cancellation?.check()
-                    length = reader.read(chunk)
-                    if (length <= 0) break
-                    buffer.append(chunk, 0, length)
-                    if (dataStart < 0) {
-                        dataStart = buffer.indexOf("\"data\":")
-                        if (dataStart >= 0) dataStart += 7
-                    }
-                    if (dataStart >= 0 && extractJsonArray(buffer, dataStart) != null) break
-                    if (buffer.length > 8 * 1024 * 1024) break
-                }
-            }
-            if (dataStart < 0) return null
-            val arrayJson = extractJsonArray(buffer, dataStart) ?: return null
-            return JSONArray(arrayJson)
-        } finally {
-            registration?.close()
-            conn.disconnect()
-        }
-    }
-
-    /** 从上文 text 的 offset 处取一个完整 JSON 数组文本（含方括号）；未读完返回 null。 */
-    private fun extractJsonArray(text: CharSequence, offset: Int): String? {
-        var start = offset
-        while (start < text.length && text[start] != '[') {
-            val c = text[start]
-            if (c != ' ' && c != ':' && c != '\n' && c != '\r' && c != '\t') return null
-            start++
-        }
-        if (start >= text.length) return null
-        var depth = 0
-        var inString = false
-        var escaped = false
-        for (i in start until text.length) {
-            val c = text[i]
-            if (inString) {
-                when {
-                    escaped -> escaped = false
-                    c == '\\' -> escaped = true
-                    c == '"' -> inString = false
-                }
-                continue
-            }
-            when (c) {
-                '"' -> inString = true
-                '[' -> depth++
-                ']' -> {
-                    depth--
-                    if (depth == 0) return text.substring(start, i + 1)
-                }
-            }
-        }
-        return null
-    }
-
-    /** 详情页完整数据（无签名接口，封面 JPEG）。 */
+    /** long: 详情复用配方签名与重试策略，避免封面和选集走不同请求规则。 */
     fun seriesDetail(seriesId: String, deviceId: String, installId: String): SeriesDetail {
         val entry = detailEntry(seriesId, deviceId, installId)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
@@ -469,7 +359,7 @@ object DirectClient {
         )
     }
 
-    /** 无签名详情：取剧名/封面/集数/播放量/分类（封面为 JPEG，避免 HEIC 解码失败）。 */
+    /** long: 搜索补充封面与元数据也走同一详情入口，上游切换签名时不会遗漏封面请求。 */
     private fun detailBrief(seriesId: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): HomeDrama {
         val entry = detailEntry(seriesId, deviceId, installId, cancellation)
         val data = entry.optJSONObject("video_data") ?: throw DirectException("详情无 video_data")
@@ -515,20 +405,19 @@ object DirectClient {
         tabType: Int, offset: Int, sessionId: String, selectedItems: String?,
         deviceId: String, installId: String
     ): HomePage {
-        val text = RecipeHttp.execute(
-            "home",
-            mapOf(
-                "tabType" to tabType.toString(),
-                "offset" to offset.toString(),
-                "sessionId" to sessionId,
-                "selectedItems" to (selectedItems ?: "")
-            ),
-            deviceId, installId
+        val vars = mapOf(
+            "tabType" to tabType.toString(), "offset" to offset.toString(),
+            "sessionId" to sessionId, "selectedItems" to (selectedItems ?: "")
         )
-        val root = JSONObject(text)
-        val code = root.optInt("code", -1)
-        if (code != 0) throw DirectException("首页加载失败($code)")
-        val tabs = root.optJSONObject("data")?.optJSONArray("tab_item")
+        val data = RecipeHttp.readJson(
+            "home",
+            vars,
+            deviceId, installId
+        ) { text, endpoint ->
+            RecipeHttp.extract(text, endpoint.extract, vars) as? JSONObject
+                ?: throw RecipeHttp.ResponseFailure("missingData", "首页无数据")
+        }
+        val tabs = data.optJSONArray("tab_item")
             ?: throw DirectException("首页无 tab 数据")
         var target: JSONObject? = null
         for (i in 0 until tabs.length()) {
@@ -549,46 +438,47 @@ object DirectClient {
             }
             collectHomeDramas(cell.optJSONArray("video_data"), items, seen)
         }
-        var filters = emptyList<HomeFilter>()
-        for (i in 0 until (cells?.length() ?: 0)) {
-            val selector = cells?.optJSONObject(i)?.optJSONObject("cell_selector") ?: continue
-            val rows = selector.optJSONObject("outer_row")?.optJSONArray("items") ?: continue
-            val list = ArrayList<HomeFilter>()
-            for (j in 0 until rows.length()) {
-                val row = rows.optJSONObject(j) ?: continue
-                val id = row.optString("selector_item_id")
-                val name = row.optString("show_name")
-                if (id.isNotEmpty() && name.isNotEmpty()) list.add(HomeFilter(id, name))
+        val filters = LinkedHashMap<String, HomeFilter>()
+        val groups = LinkedHashMap<String, HomeFilterGroup>()
+        fun readFilters(rows: org.json.JSONArray?): List<HomeFilter> = buildList {
+            for (i in 0 until (rows?.length() ?: 0)) {
+                val row = rows?.optJSONObject(i) ?: continue
+                val id = row.optString("selector_item_id").trim()
+                val name = row.optString("show_name").trim()
+                if (id.isNotEmpty() && name.isNotEmpty()) add(HomeFilter(id, name))
             }
-            if (list.isNotEmpty()) { filters = list; break }
-        }
-        val groups = ArrayList<HomeFilterGroup>()
-        for (i in 0 until (cells?.length() ?: 0)) {
-            val selector = cells?.optJSONObject(i)?.optJSONObject("cell_selector") ?: continue
-            val innerRows = selector.optJSONArray("inner_rows") ?: continue
-            for (r in 0 until innerRows.length()) {
-                val row = innerRows.optJSONObject(r) ?: continue
-                val rowName = row.optString("row_name")
-                val rowItems = row.optJSONArray("items") ?: continue
-                val items = ArrayList<HomeFilter>()
-                for (j in 0 until rowItems.length()) {
-                    val item = rowItems.optJSONObject(j) ?: continue
-                    val id = item.optString("selector_item_id")
-                    val name = item.optString("show_name")
-                    if (id.isNotEmpty() && name.isNotEmpty()) items.add(HomeFilter(id, name))
+        }.distinctBy { it.id }
+        fun collectSelectors(rows: org.json.JSONArray?) {
+            for (i in 0 until (rows?.length() ?: 0)) {
+                val cell = rows?.optJSONObject(i) ?: continue
+                cell.optJSONObject("cell_selector")?.let { selector ->
+                    // long: 上游可能把分类拆到多个 cell；合并同组并按 ID 去重，不能在第一个有效 selector 处停止。
+                    readFilters(selector.optJSONObject("outer_row")?.optJSONArray("items")).forEach {
+                        filters.putIfAbsent(it.id, it)
+                    }
+                    val inner = selector.optJSONArray("inner_rows")
+                    for (r in 0 until (inner?.length() ?: 0)) {
+                        val row = inner?.optJSONObject(r) ?: continue
+                        val name = row.optString("row_name").trim().ifEmpty { "其他分类" }
+                        val key = row.optString("type") + ":" + name
+                        val entries = readFilters(row.optJSONArray("items"))
+                        if (entries.isNotEmpty()) {
+                            groups[key] = HomeFilterGroup(name, ((groups[key]?.items ?: emptyList()) + entries).distinctBy { it.id })
+                        }
+                    }
                 }
-                if (rowName.isNotEmpty() && items.isNotEmpty()) groups.add(HomeFilterGroup(rowName, items))
+                collectSelectors(cell.optJSONArray("cell_data"))
             }
-            if (groups.isNotEmpty()) break
         }
+        collectSelectors(cells)
         val nextOffset = tab.optInt("next_offset", offset + 1)
         return HomePage(
             items = items,
             nextOffset = nextOffset,
             sessionId = tab.optString("session_id"),
             hasMore = nextOffset > offset,
-            filters = filters,
-            filterGroups = groups
+            filters = filters.values.toList(),
+            filterGroups = groups.values.toList()
         )
     }
 
@@ -802,25 +692,15 @@ object DirectClient {
      * 搜索结果本身不含封面，这也是官方 App 搜索页不放封面图的原因。
      */
     fun searchHits(keyword: String, deviceId: String, installId: String, cancellation: TaskCancellation? = null): List<SearchHit> {
-        val prepared = RecipeHttp.prepare(
+        val data = RecipeHttp.exchange(
             "search",
             mapOf("query" to keyword),
-            deviceId, installId
-        )
-        var rows: JSONArray? = null
-        var last: Exception? = null
-        for (attempt in 1..3) {
-            cancellation?.check()
-            try {
-                rows = readSearchData(prepared.url, prepared.headers, cancellation)
-                if (rows != null) break
-            } catch (e: Exception) {
-                cancellation?.check()
-                last = e
-                if (attempt < 3) Thread.sleep(attempt * 600L)
+            deviceId, installId, cancellation
+        ) { conn, endpoint ->
+            conn.inputStream.reader(Charsets.UTF_8).use {
+                RecipeSearchReader.read(it, RecipeHttp.render(endpoint.extract!!, mapOf("query" to keyword)), cancellation)
             }
         }
-        val data = rows ?: run { if (last != null) throw last; return emptyList() }
         val out = ArrayList<SearchHit>(data.length())
         val seen = HashSet<String>()
         for (i in 0 until data.length()) {

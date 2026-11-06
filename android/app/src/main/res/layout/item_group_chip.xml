@@ -4,8 +4,10 @@
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:layout_marginEnd="8dp"
-    android:background="@drawable/bg_chip_normal"
+    android:background="@drawable/bg_group_chip_normal"
     android:paddingHorizontal="13dp"
-    android:paddingVertical="6dp"
-    android:textColor="@color/app_on_surface_variant"
+    android:paddingVertical="0dp"
+    android:minHeight="48dp"
+    android:gravity="center"
+    android:textColor="@color/choice_foreground"
     android:textSize="12sp" />

@@ -28,6 +28,91 @@ import java.util.concurrent.TimeUnit
 @Config(sdk = [28])
 @LooperMode(LooperMode.Mode.PAUSED)
 class AsyncPageRegressionTest {
+    @Test fun recreationRestoresSubmittedQueryAndResultsInsteadOfHistory() {
+        val original = Robolectric.buildActivity(SearchActivity::class.java).setup()
+        val saved = android.os.Bundle()
+        try {
+            val activity = original.get()
+            activity.searchItems = { _, _ -> listOf(drama("first")) }
+            activity.findViewById<EditText>(R.id.search_input).setText("示例")
+            activity.findViewById<View>(R.id.search_go).performClick()
+            finishQueuedWork(activity)
+            original.saveInstanceState(saved)
+        } finally { original.pause().stop().destroy() }
+        val restored = Robolectric.buildActivity(SearchActivity::class.java)
+        val queries = mutableListOf<String>()
+        restored.get().searchItems = { keyword, _ -> queries.add(keyword); listOf(drama("restored")) }
+        try {
+            restored.create(saved).start().restoreInstanceState(saved).resume().visible()
+            val activity = restored.get()
+            finishQueuedWork(activity)
+            assertEquals(listOf("示例"), queries)
+            assertEquals("示例", activity.findViewById<EditText>(R.id.search_input).text.toString())
+            assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.search_list).visibility)
+            assertEquals(View.GONE, activity.findViewById<View>(R.id.search_suggest).visibility)
+        } finally { restored.pause().stop().destroy() }
+    }
+
+    @Test fun failedSearchCanRetrySameKeywordAndClearingRestoresInputFocus() {
+        val controller = Robolectric.buildActivity(SearchActivity::class.java).setup()
+        val activity = controller.get()
+        var requests = 0
+        activity.searchItems = { _, _ ->
+            if (++requests == 1) throw java.io.IOException("模拟网络失败")
+            listOf(drama("recovered"))
+        }
+        try {
+            val input = activity.findViewById<EditText>(R.id.search_input)
+            input.setText("示例")
+            activity.findViewById<View>(R.id.search_go).performClick()
+            finishQueuedWork(activity)
+            assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.search_retry).visibility)
+            activity.findViewById<View>(R.id.search_retry).performClick()
+            finishQueuedWork(activity)
+            assertEquals(2, requests)
+            assertEquals(1, activity.findViewById<RecyclerView>(R.id.search_list).adapter!!.itemCount)
+            assertEquals(View.GONE, activity.findViewById<View>(R.id.search_retry).visibility)
+            activity.findViewById<View>(R.id.search_clear).performClick()
+            shadowOf(Looper.getMainLooper()).idle()
+            assertTrue(input.hasFocus())
+            assertEquals(View.VISIBLE, activity.findViewById<View>(R.id.search_suggest).visibility)
+        } finally { controller.pause().stop().destroy() }
+    }
+
+    @Test fun relatedFailureIsRetryableInsteadOfCachedAsEmpty() {
+        val intent = Intent(RuntimeEnvironment.getApplication(), DetailActivity::class.java)
+            .putExtra("dramaId", "series").putExtra("title", "示例剧")
+        val controller = Robolectric.buildActivity(DetailActivity::class.java, intent)
+        val activity = controller.get()
+        activity.loadDetail = { DirectClient.SeriesDetail("series", "示例剧", null, 1, 0, 1, "", emptyList(), "",
+            listOf(DirectClient.SeriesEpisode(1, "vid", 60, false))) }
+        var requests = 0
+        activity.loadSeasons = {
+            if (++requests == 1) throw java.io.IOException("模拟关联失败")
+            listOf(SeriesAggregator.Season("second", "示例剧第二季", "示例剧", 2, 2, "短剧", true, null))
+        }
+        fun awaitRelated() {
+            val thread = DetailActivity::class.java.getDeclaredField("relatedThread").apply { isAccessible = true }.get(activity) as Thread
+            thread.join(2000)
+            assertFalse(thread.isAlive)
+            shadowOf(Looper.getMainLooper()).idle()
+        }
+        try {
+            controller.setup()
+            finishQueuedWork(activity)
+            activity.findViewById<View>(R.id.detail_tab_related).performClick()
+            awaitRelated()
+            val status = activity.findViewById<android.widget.TextView>(R.id.detail_related_status)
+            assertTrue(status.isClickable)
+            assertEquals("加载失败，点击重试", status.text.toString())
+            status.performClick()
+            awaitRelated()
+            assertEquals(2, requests)
+            assertEquals(1, activity.findViewById<RecyclerView>(R.id.detail_related).adapter!!.itemCount)
+            assertEquals(View.GONE, status.visibility)
+        } finally { controller.pause().stop().destroy() }
+    }
+
     @Test
     fun emptyCoverClearsImageWhenRelatedHolderIsReused() {
         val controller = Robolectric.buildActivity(SearchActivity::class.java).setup()
@@ -157,13 +242,13 @@ class AsyncPageRegressionTest {
             override fun onItemRangeRemoved(positionStart: Int, itemCount: Int) { events.add("remove:$positionStart:$itemCount") }
             override fun onItemRangeChanged(positionStart: Int, itemCount: Int, payload: Any?) { events.add("change:$positionStart:$itemCount") }
         })
-        adapter.setFooter(true, false)
+        adapter.setFooter(true)
         assertEquals(2, adapter.itemCount)
-        adapter.setFooter(false, true)
+        adapter.setFooter(true)
         assertEquals(2, adapter.itemCount)
-        adapter.setFooter(false, false)
+        adapter.setFooter(false)
         assertEquals(1, adapter.itemCount)
-        assertEquals(listOf("insert:1:1", "change:1:1", "remove:1:1"), events)
+        assertEquals(listOf("insert:1:1", "remove:1:1"), events)
     }
 
     private fun finishQueuedWork(activity: Any) {

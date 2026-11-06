@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- long: 浅色导航图标从 API 27 才能通过主题控制，旧系统继续使用原导航栏行为。 -->
+    <style name="Theme.DuanjuPlayer" parent="Base.Theme.DuanjuPlayer">
+        <item name="android:navigationBarColor">@color/app_bg</item>
+        <item name="android:windowLightNavigationBar">@bool/light_system_bars</item>
+    </style>
+</resources>

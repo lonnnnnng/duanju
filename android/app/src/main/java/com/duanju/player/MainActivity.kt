@@ -46,14 +46,17 @@ class MainActivity : AppCompatActivity() {
     private fun renderNav(activeTag: String) {
         navItems.forEach { (tag, entry) ->
             val active = tag == activeTag
+            entry.row.isSelected = active
             entry.row.findViewById<ImageView>(entry.iconId)
                 .setColorFilter(ContextCompat.getColor(this, if (active) R.color.nav_icon_active else R.color.nav_icon_inactive))
             entry.row.findViewById<TextView>(entry.labelId).apply {
-                setTextColor(ContextCompat.getColor(context, if (active) R.color.app_on_bg else R.color.nav_icon_inactive))
+                setTextColor(ContextCompat.getColor(context, if (active) R.color.app_on_bg else R.color.app_on_surface_variant))
                 paint.isFakeBoldText = active
             }
         }
     }
+
+    internal fun showHome() = switchTo("library")
 
     /**
      * 用 hide/show 切换底部 tab，保留各页面状态：

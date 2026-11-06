@@ -1,0 +1,3 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- long: 返回按钮保留 38dp 可见轮廓，外层 48dp 负责手指命中。 -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android" android:inset="5dp" android:drawable="@drawable/bg_glass_button" />

@@ -34,6 +34,7 @@ class SearchActivity : AppCompatActivity() {
     private lateinit var clearButton: ImageButton
     private lateinit var loadingView: ProgressBar
     private lateinit var emptyView: TextView
+    private lateinit var retryButton: View
     private lateinit var resultList: RecyclerView
     private lateinit var suggest: View
     private lateinit var historyBox: com.google.android.flexbox.FlexboxLayout
@@ -47,6 +48,7 @@ class SearchActivity : AppCompatActivity() {
     private var searchCancellation: TaskCancellation? = null
     private var searchFuture: Future<*>? = null
     private var searchKeyword = ""
+    private var submitted = false
     internal var searchItems: (String, TaskCancellation) -> List<DirectClient.HomeDrama> = { keyword, cancellation ->
         val (deviceId, installId) = DirectClient.identity(this)
         DirectClient.searchHomeItems(keyword, deviceId, installId, cancellation)
@@ -60,6 +62,8 @@ class SearchActivity : AppCompatActivity() {
         clearButton = findViewById(R.id.search_clear)
         loadingView = findViewById(R.id.search_loading)
         emptyView = findViewById(R.id.search_empty)
+        retryButton = findViewById(R.id.search_retry)
+        retryButton.setOnClickListener { search() }
         resultList = findViewById(R.id.search_list)
         suggest = findViewById(R.id.search_suggest)
         historyBox = findViewById(R.id.history_words)
@@ -72,7 +76,10 @@ class SearchActivity : AppCompatActivity() {
 
         findViewById<ImageButton>(R.id.search_back).setOnClickListener { finish() }
         findViewById<Button>(R.id.search_go).setOnClickListener { search() }
-        clearButton.setOnClickListener { input.setText("") }
+        clearButton.setOnClickListener {
+            input.setText("")
+            showKeyboard()
+        }
         historyClear.setOnClickListener {
             SearchHistoryStore.clear(this)
             renderHistory()
@@ -84,6 +91,7 @@ class SearchActivity : AppCompatActivity() {
                 clearButton.visibility = if (empty) View.GONE else View.VISIBLE
                 // long: 修改关键词即使尚未提交，也不能让旧关键词的回复重新填回结果列表。
                 if (s.toString().trim() != searchKeyword) {
+                    submitted = false
                     searchCancellation?.cancel()
                     searchFuture?.cancel(true)
                     searching = false
@@ -91,6 +99,7 @@ class SearchActivity : AppCompatActivity() {
                     adapter.submit(emptyList())
                     resultList.visibility = View.GONE
                     emptyView.visibility = View.GONE
+                    retryButton.visibility = View.GONE
                     suggest.visibility = View.VISIBLE
                 }
             }
@@ -106,12 +115,11 @@ class SearchActivity : AppCompatActivity() {
                 false
             }
         }
-        input.requestFocus()
-        input.post {
-            (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
-                .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
-        }
         renderHistory()
+        input.setText(savedInstanceState?.getString("query").orEmpty())
+        input.setSelection(input.length())
+        // long: 换肤重建后恢复已提交的搜索，而不是带着旧关键词退回历史并弹出键盘。
+        if (savedInstanceState?.getBoolean("submitted") == true) search() else showKeyboard()
     }
 
     private fun renderHistory() {
@@ -127,6 +135,7 @@ class SearchActivity : AppCompatActivity() {
         (view.layoutParams as? com.google.android.flexbox.FlexboxLayout.LayoutParams)
             ?.setMargins(0, 0, dp(9), dp(9))
         view.findViewById<TextView>(R.id.word).text = word
+        view.contentDescription = "搜索：$word"
         view.setOnClickListener {
             input.setText(word)
             input.setSelection(word.length)
@@ -143,6 +152,7 @@ class SearchActivity : AppCompatActivity() {
         val cancellation = TaskCancellation()
         searchCancellation = cancellation
         searchKeyword = keyword
+        submitted = true
         (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(input.windowToken, 0)
         SearchHistoryStore.add(this, keyword)
         renderHistory()
@@ -150,6 +160,7 @@ class SearchActivity : AppCompatActivity() {
         loadingView.visibility = View.VISIBLE
         suggest.visibility = View.GONE
         emptyView.visibility = View.GONE
+        retryButton.visibility = View.GONE
         resultList.visibility = View.GONE
         searchFuture = executor.submit {
             try {
@@ -169,13 +180,15 @@ class SearchActivity : AppCompatActivity() {
                     }
                 }
             } catch (e: Exception) {
+                android.util.Log.d("SearchActivity", "搜索失败", e)
                 main.post {
                     if (!acceptsSearch(keyword, cancellation)) return@post
                     searching = false
                     loadingView.visibility = View.GONE
                     resultList.visibility = View.GONE
-                    emptyView.text = "搜索失败：${e.message}"
+                    emptyView.text = "搜索暂时不可用，请重试"
                     emptyView.visibility = View.VISIBLE
+                    retryButton.visibility = View.VISIBLE
                 }
             }
         }
@@ -186,6 +199,20 @@ class SearchActivity : AppCompatActivity() {
             searchCancellation === cancellation && input.text.toString().trim() == keyword
 
     private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
+
+    private fun showKeyboard() {
+        input.requestFocus()
+        input.post {
+            if (!isFinishing && !isDestroyed) (getSystemService(INPUT_METHOD_SERVICE) as InputMethodManager)
+                .showSoftInput(input, InputMethodManager.SHOW_IMPLICIT)
+        }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("query", input.text.toString())
+        outState.putBoolean("submitted", submitted)
+    }
 
     private fun openDetail(drama: DirectClient.HomeDrama) {
         startActivity(

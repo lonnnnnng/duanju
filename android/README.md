@@ -1,6 +1,6 @@
 # 短剧（Duanju Player 安卓客户端）
 
-一个**完全不依赖自建服务器**的红果短剧安卓播放器：手机直接调官方无签名开放接口、
+一个**完全不依赖自建服务器**的红果短剧安卓播放器：手机直接调用红果接口（签名策略由配方选择）、
 直连 CDN 下载、本地 CENC 解密、硬件解码 HEVC。出门在 4G/5G 下即可使用。
 
 ---
@@ -12,9 +12,9 @@
 
 本版本把整条链路搬进手机：
 
-1. **解析**：手机直接调用红果官方**无签名**开放接口（`bookmall/tab` / `search/fetch-debug` /
-   `multi_video_detail` / `multi_video_model`），只需公共参数与随机设备身份。
-   历史签名实现（X-Gorgon / X-Argus / X-Ladon / SM3）仍保留在 `HongguoSign.kt` 供回归测试。
+1. **解析**：手机直接调用红果接口（`bookmall/tab` / `search/fetch-debug` /
+   `multi_video_detail` / `multi_video_model`）。当前配方对首页/搜索不签名，详情/取流优先使用旧版签名。
+   `HongguoSign.kt` 提供运行时签名及密钥派生，并保留固定向量回归。
 2. **取流**：手机直连字节 CDN 下载原片（HEVC 1080p）。
 3. **解密**：内置 FFmpegKitNext（源码自编译）执行 `-c copy -decryption_key`，
    只解密、不转码，输出本地 MP4。
@@ -28,7 +28,7 @@
 - 想做手机本地解密 → ffmpeg-kit 于 2025-01 退役、二进制全下架。
 - 2026-07 原作者发布 **FFmpegKitNext**（source-only）→ 本地编译出 AAR。
 - 签名算法从服务器 Go 实现 1:1 移植到 Kotlin，用**固定向量 + 真实 spade_a 样本**
-  双向验证字节级一致；随后官方开放接口可用，安卓端改用无签名接口，签名仅留作回归与兜底参考。
+  双向验证字节级一致；曾改用无签名接口，2026-11-06 的详情/取流故障后恢复旧版签名。
 - 最终移除服务器依赖：剧库、搜索、封面、解析、解密全部手机直连。
 
 > 功能清单、接口调用方式与排查手册的完整版本见 [docs/android-app.md](../docs/android-app.md)；
@@ -51,13 +51,14 @@
 
 ## 4. 直连使用的接口
 
-全部无签名、手机直连，不经自建服务器：首页 `bookmall/tab`、搜索 `search/fetch-debug`、
+手机直连，不经自建服务器：首页 `bookmall/tab`、搜索 `search/fetch-debug`、
 详情 `multi_video_detail`（均 `version_code=65532`），取流 `multi_video_model`（必须 `74232`），
 分季抓 `hongguoduanju.com/player/<seriesId>/<videoId>` 页面，检查更新读 GitHub Release。
 
 接口的路径/参数/签名档位/重试规则由 `android/app/src/main/assets/recipes/hongguo.json`
-描述（配方化，见 docs/android-app.md §2.2.2），换风控策略通常只需改这份 JSON；
-分发走 `gh-proxy.com` → GitHub → jsDelivr → raw 多源，手机网络可用。
+描述（配方化，见 docs/android-app.md §2.2.2）；已内置能力范围内的变化可通过 JSON 更新，
+新签名算法或媒体协议仍需更新 APK。配方从 `gh-proxy.com`、GitHub、jsDelivr、raw 多源获取，
+实际可达性取决于网络。接口时效与联网验收见 [配方修复与动态扩展评估](../docs/2026-11-06-recipe-hardening.md)。
 
 参数、解析规则、分季聚合与排查手册统一维护在
 **[docs/android-app.md](../docs/android-app.md)**（本文件不再重复，避免两处漂移）。
@@ -78,10 +79,12 @@ cd android
 
 ## 6. 维护须知（上游改签名时）
 
-所有签名与密钥逻辑集中在两个文件，上游变更只需改这里并发新版 App：
+参数、路径、已有签名档位和重试可通过验签配方更新；新协议、签名或密钥派生仍需宿主代码与 APK 发布。主要位置：
 
 - `app/src/main/java/com/duanju/player/core/HongguoSign.kt`（签名 + spade_a 派生）
 - `app/src/main/java/com/duanju/player/core/DirectClient.kt`（接口调用 + 参数）
+
+当前不引入远程动态类加载，历史依据与能力边界见 [配方修复与动态扩展评估](../docs/2026-11-06-recipe-hardening.md)。
 
 回归保障：`LegacySignVectorTest` / `HongguoSignVectorTest` / `ContentKeyVectorTest`
 对固定向量断言。改算法前先在服务器侧（Go 版仍可用）生成新向量替换。

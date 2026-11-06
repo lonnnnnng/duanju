@@ -23,6 +23,7 @@ object SectionTabs {
 
     private fun style(tab: TextView, active: Boolean) {
         val context = tab.context
+        tab.isSelected = active
         // 不能用白色：浅色主题下白字在浅底上完全看不见（表现为 Tab 消失）。
         tab.setTextColor(
             ContextCompat.getColor(

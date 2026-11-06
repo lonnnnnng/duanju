@@ -24,7 +24,7 @@ class DetailActivity : AppCompatActivity() {
 
     private lateinit var cover: ImageView
     private lateinit var title: TextView
-    private lateinit var subtitles: LinearLayout
+    private lateinit var subtitles: com.google.android.flexbox.FlexboxLayout
     private lateinit var meta: TextView
     private lateinit var intro: TextView
     private lateinit var introToggle: TextView
@@ -101,7 +101,7 @@ class DetailActivity : AppCompatActivity() {
         groupsBox = findViewById(R.id.detail_groups)
 
         episodeAdapter = EpisodeNumberAdapter { ep -> play(ep.index) }
-        episodeView.layoutManager = GridLayoutManager(this, 6)
+        episodeView.layoutManager = GridLayoutManager(this, EpisodeGroups.columns(resources.configuration.screenWidthDp, resources.configuration.fontScale))
         episodeView.adapter = episodeAdapter
 
         tabEpisodes = findViewById(R.id.detail_tab_episodes)
@@ -110,6 +110,7 @@ class DetailActivity : AppCompatActivity() {
         tabRelatedIndicator = findViewById(R.id.detail_tab_related_indicator)
         relatedList = findViewById(R.id.detail_related)
         relatedStatus = findViewById(R.id.detail_related_status)
+        relatedStatus.setOnClickListener { if (!relatedLoaded && !relatedLoading) loadRelated() }
         relatedAdapter = RelatedAdapter(seriesId) { season -> openSeason(season) }
         relatedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         relatedList.adapter = relatedAdapter
@@ -173,10 +174,10 @@ class DetailActivity : AppCompatActivity() {
                 setBackgroundResource(R.drawable.bg_chip_type)
                 setPadding(dp(8), dp(3), dp(8), dp(3))
             }
-            val params = LinearLayout.LayoutParams(
+            val params = com.google.android.flexbox.FlexboxLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginEnd = dp(8) }
+            ).apply { marginEnd = dp(8); bottomMargin = dp(4) }
             subtitles.addView(chip, params)
         }
 
@@ -243,8 +244,12 @@ class DetailActivity : AppCompatActivity() {
             val chip = groupsBox.getChildAt(i) as TextView
             val label = chip.text.toString()
             val selected = label == EpisodeGroups.label(range)
-            chip.setBackgroundResource(if (selected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
-            chip.setTextColor(ContextCompat.getColor(this, if (selected) android.R.color.white else R.color.app_on_surface_variant))
+            // long: 与首页共用胶囊和配对文字色，浅色选中态不能继续叠固定白字。
+            chip.isSelected = selected
+            chip.setBackgroundResource(if (selected) R.drawable.bg_group_chip_selected else R.drawable.bg_group_chip_normal)
+            // long: InsetDrawable 切换会重置 View 的 padding，恢复胶囊两侧留白，防止集数贴边或被裁切。
+            chip.setPadding(dp(13), 0, dp(13), 0)
+            chip.setTextColor(ContextCompat.getColor(this, if (selected) R.color.choice_selected_foreground else R.color.choice_foreground))
         }
         episodeAdapter.submit(all.filter { it.index in range })
     }
@@ -270,7 +275,7 @@ class DetailActivity : AppCompatActivity() {
         } else {
             SectionTabs.apply(tabEpisodes, tabEpisodesIndicator, tabRelated, tabRelatedIndicator)
         }
-        groupScroll.visibility = if (show) View.GONE else View.VISIBLE
+        groupScroll.visibility = if (!show && (detail?.list?.size ?: 0) > EpisodeGroups.SIZE) View.VISIBLE else View.GONE
         episodeView.visibility = if (show) View.GONE else View.VISIBLE
         relatedList.visibility = if (show) View.VISIBLE else View.GONE
         if (!show) {
@@ -302,19 +307,24 @@ class DetailActivity : AppCompatActivity() {
             return
         }
         relatedStatus.text = "加载中…"
+        relatedStatus.isClickable = false
         relatedStatus.visibility = View.VISIBLE
         relatedList.visibility = View.GONE
         relatedThread = Thread {
-            val seasons = runCatching { loadSeasons() }.getOrElse { emptyList() }
+            val result = runCatching { loadSeasons() }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 if (generation != relatedGeneration) return@runOnUiThread
                 relatedLoading = false
-                relatedLoaded = true
+                // long: 接口失败不能缓存成“没有相关剧集”，保留重试入口及真实空结果的区别。
+                relatedLoaded = result.isSuccess
+                val seasons = result.getOrDefault(emptyList())
+                relatedStatus.isClickable = result.isFailure
+                relatedStatus.isFocusable = result.isFailure
                 relatedAdapter.submit(seasons)
                 // long: 回复只更新数据，是否显示仍服从用户当前选择的 Tab。
                 relatedStatus.visibility = if (showingRelated && seasons.isEmpty()) View.VISIBLE else View.GONE
-                if (seasons.isEmpty()) relatedStatus.text = "未找到相关剧集"
+                if (seasons.isEmpty()) relatedStatus.text = if (result.isFailure) "加载失败，点击重试" else "未找到相关剧集"
                 relatedList.visibility = if (showingRelated && seasons.isNotEmpty()) View.VISIBLE else View.GONE
             }
         }.also { it.start() }

@@ -20,6 +20,9 @@ class SettingsFragment : Fragment() {
     private var cacheSize: TextView? = null
     private var cacheLimit: TextView? = null
     private var themeValue: TextView? = null
+    private var updateChecking = false
+    internal var fetchUpdate: () -> UpdateRelease? = { UpdateChecker.fetchLatest() }
+    private var updateThread: Thread? = null
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View =
         inflater.inflate(R.layout.fragment_settings, container, false)
@@ -30,12 +33,14 @@ class SettingsFragment : Fragment() {
         autoNext.setOnCheckedChangeListener { _, checked ->
             AppSettings.setAutoNext(requireContext(), checked)
         }
+        view.findViewById<View>(R.id.row_auto_next).setOnClickListener { autoNext.performClick() }
 
         val prefetch = view.findViewById<Switch>(R.id.prefetch_next)
         prefetch.isChecked = AppSettings.prefetchNext(requireContext())
         prefetch.setOnCheckedChangeListener { _, checked ->
             AppSettings.setPrefetchNext(requireContext(), checked)
         }
+        view.findViewById<View>(R.id.row_prefetch).setOnClickListener { prefetch.performClick() }
 
         val speedValue = view.findViewById<TextView>(R.id.speed_value)
         renderSpeed(speedValue)
@@ -54,13 +59,18 @@ class SettingsFragment : Fragment() {
 
         val recipeValue = view.findViewById<TextView>(R.id.recipe_value)
         renderRecipe(recipeValue)
-        view.findViewById<View>(R.id.row_recipe).setOnClickListener {
+        val recipeRow = view.findViewById<View>(R.id.row_recipe)
+        recipeRow.setOnClickListener {
+            recipeRow.isEnabled = false
             toast("检查接口配方…")
             Thread {
-                val result = RecipeUpdater.refresh()
+                val result = runCatching { RecipeUpdater.refresh() }.getOrNull()
                 view.post {
+                    // long: 检查可能跨越旋转或离开页面，迟到回调不能操作已经销毁的视图。
+                    if (!isAdded || this.view !== view) return@post
+                    recipeRow.isEnabled = true
                     renderRecipe(recipeValue)
-                    toast(
+                    if (!isHidden && isResumed) toast(
                         when (result) {
                             true -> "配方已更新"
                             false -> "配方已是最新"
@@ -91,17 +101,21 @@ class SettingsFragment : Fragment() {
 
     override fun onHiddenChanged(hidden: Boolean) {
         super.onHiddenChanged(hidden)
-        if (!hidden) refreshCacheSize()
+        if (!hidden) {
+            refreshCacheSize()
+            view?.findViewById<TextView>(R.id.recipe_value)?.let { renderRecipe(it) }
+        }
     }
 
     /** 统计缓存占用（后台线程，避免主线程遍历文件）。 */
     private fun refreshCacheSize() {
         val context = context ?: return
         val target = cacheSize ?: return
+        val owner = view ?: return
         Thread {
             val size = VideoCache.sizeBytes(context)
             activity?.runOnUiThread {
-                if (isAdded) target.text = VideoCache.format(size)
+                if (isAdded && view === owner) target.text = VideoCache.format(size)
             }
         }.start()
     }
@@ -130,26 +144,44 @@ class SettingsFragment : Fragment() {
     private fun inputCacheLimit() {
         val context = context ?: return
         val current = AppSettings.cacheLimitMb(context)
-        val input = android.widget.EditText(context).apply {
-            setText(String.format(java.util.Locale.US, "%.1f", current / 1024f))
+        val input = com.google.android.material.textfield.TextInputEditText(context).apply {
+            setText((current / 1024.0).toString())
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setSelectAllOnFocus(true)
-            setPadding(48, 32, 48, 32)
+            val density = resources.displayMetrics.density
+            minHeight = (56 * density).toInt()
+            setPadding((12 * density).toInt(), (14 * density).toInt(), (12 * density).toInt(), (14 * density).toInt())
+            background = null
         }
-        AlertDialog.Builder(context)
+        val field = com.google.android.material.textfield.TextInputLayout(context).apply {
+            val density = resources.displayMetrics.density
+            setPadding((24 * density).toInt(), (8 * density).toInt(), (24 * density).toInt(), 0)
+            // long: 弹框标题已包含单位，不再用浮动标签叠压数字；边框和错误文字由同一容器管理。
+            isHintEnabled = false
+            boxBackgroundMode = com.google.android.material.textfield.TextInputLayout.BOX_BACKGROUND_OUTLINE
+            isErrorEnabled = true
+            addView(input)
+        }
+        val dialog = AlertDialog.Builder(context)
             .setTitle("自定义上限（GB）")
-            .setView(input)
-            .setPositiveButton("确定") { _, _ ->
-                val gb = input.text.toString().trim().toDoubleOrNull()
-                if (gb == null || gb <= 0) {
-                    toast("请输入有效数字")
-                    return@setPositiveButton
-                }
-                val mb = (gb * 1024).toInt().coerceAtLeast(AppSettings.MIN_CACHE_LIMIT_MB)
-                applyCacheLimit(mb)
-            }
+            .setView(field)
+            .setPositiveButton("确定", null)
             .setNegativeButton("取消", null)
-            .show()
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                // long: 非法输入保留原值和弹框，避免默认确定按钮自动关闭，让用户重新从菜单开始。
+                val mb = AppSettings.parseCacheLimitGb(input.text.toString())
+                if (mb == null) {
+                    // long: 错误留在输入框下方，原生 EditText 错误气泡会遮住弹框的取消/确定按钮。
+                    field.error = "请输入不小于 0.125 GB 的有效数值"
+                } else {
+                    applyCacheLimit(mb)
+                    dialog.dismiss()
+                }
+            }
+        }
+        dialog.show()
     }
 
     /** 写入上限后立即按新阈值清理一次，并刷新占用显示。 */
@@ -197,15 +229,23 @@ class SettingsFragment : Fragment() {
 
     /** 点击版本行手动检查更新：有新版本弹窗，没有则提示已是最新。 */
     private fun checkUpdate(version: TextView) {
-        if (!isAdded) return
+        if (!isAdded || updateChecking) return
+        val owner = view ?: return
+        val row = owner.findViewById<View>(R.id.row_version)
+        updateChecking = true
+        row.isEnabled = false
         val label = "v${BuildConfig.VERSION_NAME}"
         version.text = "检查中…"
-        Thread {
-            val release = UpdateChecker.fetchLatest()
+        updateThread = Thread {
+            val release = runCatching { fetchUpdate() }.getOrNull()
             val context = context ?: return@Thread
             activity?.runOnUiThread {
-                if (!isAdded) return@runOnUiThread
+                if (!isAdded || view !== owner) return@runOnUiThread
+                updateChecking = false
+                row.isEnabled = true
                 version.text = label
+                // long: 设置页用 hide/show 保留，后台检查结束时不能在首页或历史页突然弹出更新对话框。
+                if (isHidden || !isResumed) return@runOnUiThread
                 when {
                     release == null -> AlertDialog.Builder(context)
                         .setTitle("检查更新失败")
@@ -224,7 +264,7 @@ class SettingsFragment : Fragment() {
                         .show()
                 }
             }
-        }.start()
+        }.also { it.start() }
     }
 
     private fun renderSpeed(target: TextView) {
@@ -258,5 +298,13 @@ class SettingsFragment : Fragment() {
             }
             .setNegativeButton("取消", null)
             .show()
+    }
+
+    override fun onDestroyView() {
+        cacheSize = null
+        cacheLimit = null
+        themeValue = null
+        updateChecking = false
+        super.onDestroyView()
     }
 }

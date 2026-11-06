@@ -21,7 +21,7 @@ object RecipeUpdater {
     private const val TAG = "RecipeUpdater"
     /**
      * 多源兜底：GitHub Release → jsDelivr（国内通常可达）→ raw。
-     * 任意一个源拿到「JSON + 验签通过」就采用；全部失败则保留现有配方。
+     * long: 比较全部验签且兼容的来源，采用最高版本，避免旧镜像遮住新配置；全部失败保留现有配方。
      */
     private val SOURCES = listOf(
         // 手机网络通常直连不了 GitHub，加速地址放最前。
@@ -37,13 +37,22 @@ object RecipeUpdater {
             "WxJSZbay1bdOFCKYh5pt/OxXCkZ5PxIv8+vjtRpW8g=="
 
     /** 结果：null 表示失败；true 表示已更新；false 表示已是最新。 */
-    fun refresh(): Boolean? {
-        for (base in SOURCES) {
+    fun refresh(): Boolean? = refreshFrom(SOURCES, ::fetch)
+
+    internal fun refreshFrom(
+        sources: List<String>,
+        fetcher: (String) -> ByteArray?,
+        verify: (ByteArray, ByteArray) -> Boolean = ::verifyBytes
+    ): Boolean? {
+        var validSource = false
+        var bestText: String? = null
+        var bestVersion = RecipeStore.recipe().version
+        for (base in sources) {
             // 带时间戳绕过 CDN 边缘缓存：Release 资产覆盖后旧版本可能仍被缓存。
             val bust = System.currentTimeMillis()
-            val json = runCatching { fetch("$base/recipe.json?ts=$bust") }.getOrNull() ?: continue
-            val sig = runCatching { fetch("$base/recipe.json.sig?ts=$bust") }.getOrNull() ?: continue
-            if (!verifyBytes(json, sig)) {
+            val json = runCatching { fetcher("$base/recipe.json?ts=$bust") }.getOrNull() ?: continue
+            val sig = runCatching { fetcher("$base/recipe.json.sig?ts=$bust") }.getOrNull() ?: continue
+            if (!runCatching { verify(json, sig) }.getOrDefault(false)) {
                 Log.w(TAG, "签名校验失败，跳过源: $base")
                 continue
             }
@@ -52,12 +61,20 @@ object RecipeUpdater {
                 Log.w(TAG, "配方解析失败，跳过源: $base")
                 continue
             }
+            validSource = true
             Log.d(TAG, "命中配方源: $base (v${incoming.version})")
-            if (incoming.version <= RecipeStore.recipe().version) return false
-            if (!RecipeStore.saveOverride(String(json, Charsets.UTF_8))) return null
-            Log.d(TAG, "配方已更新到 v${incoming.version} (${incoming.updated})")
-            return true
+            // long: 镜像可能缓存旧文件；比较所有可用源，不能用一个旧版本遮住后面的新版本。
+            if (incoming.version > bestVersion) {
+                bestVersion = incoming.version
+                bestText = String(json, Charsets.UTF_8)
+            }
         }
+        bestText?.let { text ->
+            if (RecipeStore.saveOverride(text)) return true
+            // long: 并发检查可能已经先保存了更新版本，这时应报告当前已更新而不是覆盖它。
+            return if (RecipeStore.recipe().version >= bestVersion) false else null
+        }
+        if (validSource) return false
         Log.d(TAG, "所有配方源均不可用，继续使用本地版本")
         return null
     }
@@ -77,19 +94,29 @@ object RecipeUpdater {
         }
         return try {
             if (conn.responseCode != 200) return null
-            conn.inputStream.use { it.readBytes() }.takeIf { it.isNotEmpty() }
+            conn.inputStream.use { input ->
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val count = input.read(buffer)
+                    if (count < 0) break
+                    if (output.size() + count > 512 * 1024) return null
+                    output.write(buffer, 0, count)
+                }
+                output.toByteArray().takeIf { it.isNotEmpty() }
+            }
         } finally {
             conn.disconnect()
         }
     }
 
-    internal fun verifyBytes(json: ByteArray, signature: ByteArray): Boolean {
+    internal fun verifyBytes(json: ByteArray, signature: ByteArray): Boolean = runCatching {
         val keyBytes = Base64.getDecoder().decode(PUBLIC_KEY_B64)
         val publicKey = KeyFactory.getInstance("EC").generatePublic(X509EncodedKeySpec(keyBytes))
         val verifier = Signature.getInstance("SHA256withECDSA").apply {
             initVerify(publicKey)
             update(json)
         }
-        return verifier.verify(signature)
-    }
+        verifier.verify(signature)
+    }.getOrDefault(false)
 }

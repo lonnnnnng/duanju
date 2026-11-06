@@ -13,7 +13,7 @@
     <color name="app_surface_disabled">#FFDDDAD4</color>
     <color name="app_on_bg">#FF1F1E26</color>
     <color name="app_on_surface_variant">#FF6E6C78</color>
-    <color name="app_text_tertiary">#FF98959F</color>
+    <color name="app_text_tertiary">#FF73707C</color>
     <color name="app_text_hint">#FFB4B1BB</color>
     <color name="app_outline">#FFDDDAD4</color>
     <color name="app_stroke">#FFE5E3DE</color>
@@ -32,4 +32,18 @@
     <color name="on_cover_badge">#FFFFFFFF</color>
     <color name="player_glass_bg">#59000000</color>
     <color name="player_icon">#FFFFFFFF</color>
+    <!-- long: 首页筛选与详情/播放选集共享选择态，避免同一类选择操作出现渐变白字和浅底深字两套语言。 -->
+    <color name="choice_background">#FFECE7EB</color>
+    <color name="choice_foreground">#FF37343E</color>
+    <color name="choice_outline">#FFC8BFC8</color>
+    <color name="choice_selected_background">#FFFBE6EB</color>
+    <color name="choice_selected_foreground">#FFA51E3A</color>
+    <color name="choice_selected_outline">#FFDFA0B0</color>
+    <color name="home_filter_background">#FFF4F3F1</color>
+    <color name="home_filter_foreground">@color/choice_foreground</color>
+    <color name="home_filter_selected_background">@color/choice_selected_background</color>
+    <color name="home_filter_selected_foreground">@color/choice_selected_foreground</color>
+    <color name="home_filter_group_background">#FFF8F7F5</color>
+    <color name="home_card_outline">#FFDCD6DA</color>
+    <color name="home_card_score">#FFAE481B</color>
 </resources>

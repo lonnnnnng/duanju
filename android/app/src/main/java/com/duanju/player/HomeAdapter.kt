@@ -6,18 +6,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
-import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
 import com.duanju.player.core.DirectClient.HomeDrama
 import java.util.Locale
 
-/** 首页瀑布流：卡片 + 底部状态行（加载中 / 没有更多了）。 */
+/** long: 首页卡片与列表结束提示；分页加载反馈由页面固定显示在悬浮导航上方。 */
 class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
     RecyclerView.Adapter<RecyclerView.ViewHolder>() {
 
     private val items = ArrayList<HomeDrama>()
-    private var footerLoading = false
     private var footerEnd = false
     private var showRank = false
 
@@ -44,17 +42,13 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
         return fresh.size
     }
 
-    fun setFooter(loading: Boolean, end: Boolean) {
-        val hadFooter = footerLoading || footerEnd
-        val changed = footerLoading != loading || footerEnd != end
-        footerLoading = loading
+    fun setFooter(end: Boolean) {
+        val hadFooter = footerEnd
         footerEnd = end
-        val hasFooter = footerLoading || footerEnd
         // long: footer 会改变条目数量，必须发结构通知，不能把新增/移除误报为内容刷新。
         when {
-            !hadFooter && hasFooter -> notifyItemInserted(items.size)
-            hadFooter && !hasFooter -> notifyItemRemoved(items.size)
-            changed && hasFooter -> notifyItemChanged(items.size)
+            !hadFooter && end -> notifyItemInserted(items.size)
+            hadFooter && !end -> notifyItemRemoved(items.size)
         }
     }
 
@@ -68,7 +62,7 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
 
     fun isFooter(position: Int): Boolean = position >= items.size
 
-    override fun getItemCount(): Int = items.size + if (footerEnd || footerLoading) 1 else 0
+    override fun getItemCount(): Int = items.size + if (footerEnd) 1 else 0
 
     override fun getItemViewType(position: Int): Int = if (position >= items.size) TYPE_FOOTER else TYPE_CARD
 
@@ -79,8 +73,9 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
         } else {
             val holder = CardHolder(inflater.inflate(R.layout.item_home_drama, parent, false))
             val margin = (4 * holder.itemView.resources.displayMetrics.density).toInt()
+            // long: 每张卡片占满自己的网格列，描边和信息底色才能保持整齐，避免按标题长度收缩。
             holder.itemView.layoutParams = androidx.recyclerview.widget.GridLayoutManager.LayoutParams(
-                androidx.recyclerview.widget.GridLayoutManager.LayoutParams.WRAP_CONTENT,
+                androidx.recyclerview.widget.GridLayoutManager.LayoutParams.MATCH_PARENT,
                 androidx.recyclerview.widget.GridLayoutManager.LayoutParams.WRAP_CONTENT
             ).apply { setMargins(margin, margin, margin, margin + margin / 2) }
             holder
@@ -88,11 +83,7 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
     }
 
     override fun onBindViewHolder(holder: RecyclerView.ViewHolder, position: Int) {
-        if (holder is FooterHolder) {
-            holder.progress.visibility = if (footerLoading) View.VISIBLE else View.GONE
-            holder.text.visibility = if (footerLoading) View.GONE else View.VISIBLE
-            return
-        }
+        if (holder is FooterHolder) return
         holder as CardHolder
         val item = items[position]
         holder.title.text = item.title
@@ -168,10 +159,7 @@ class HomeAdapter(private val onClick: (HomeDrama) -> Unit) :
         val plays: TextView = view.findViewById(R.id.plays)
     }
 
-    private class FooterHolder(view: View) : RecyclerView.ViewHolder(view) {
-        val progress: ProgressBar = view.findViewById(R.id.footer_progress)
-        val text: TextView = view.findViewById(R.id.footer_text)
-    }
+    private class FooterHolder(view: View) : RecyclerView.ViewHolder(view)
 
     companion object {
         private const val TYPE_CARD = 0

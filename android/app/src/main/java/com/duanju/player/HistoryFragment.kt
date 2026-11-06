@@ -22,6 +22,7 @@ class HistoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         val empty = view.findViewById<View>(R.id.history_empty)
         val list = view.findViewById<RecyclerView>(R.id.history_list)
+        view.findViewById<View>(R.id.history_home).setOnClickListener { (activity as? MainActivity)?.showHome() }
         list.layoutManager = LinearLayoutManager(requireContext())
         adapter = HistoryAdapter(
             onPick = { entry -> openPlayer(entry) },

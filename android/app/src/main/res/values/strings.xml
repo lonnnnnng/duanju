@@ -1,4 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">短剧</string>
+    <string name="home_filter">筛选</string>
+    <string name="home_filter_clear">清除筛选</string>
+    <string name="home_filter_current_default">当前：推荐</string>
+    <string name="home_filter_current">当前：%1$s（单选）</string>
+    <string name="playback_unavailable">本集暂时无法播放</string>
+    <string name="playback_retry">重试本集</string>
+    <string name="exit_fullscreen">退出全屏</string>
+    <string name="search_retry">重新搜索</string>
+    <string name="history_home">去首页看看</string>
+    <string name="setting_auto_next">自动连播下一集</string>
+    <string name="setting_prefetch_next">预加载下一集</string>
 </resources>

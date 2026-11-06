@@ -13,6 +13,8 @@ import android.widget.ProgressBar
 import android.widget.Switch
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.activity.OnBackPressedCallback
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -43,6 +45,8 @@ class PlayerActivity : AppCompatActivity() {
     private lateinit var videoContainer: View
     private lateinit var statusView: TextView
     private lateinit var loading: ProgressBar
+    private lateinit var playbackError: View
+    private var failureMessage: String? = null
     private lateinit var episodeAdapter: EpisodeAdapter
     private lateinit var groupsBox: android.widget.LinearLayout
     private lateinit var groupScroll: View
@@ -101,6 +105,9 @@ class PlayerActivity : AppCompatActivity() {
     private val speeds = listOf(1f, 1.25f, 1.5f, 1.75f, 2f, 3f, 4f)
 
     private val executor = Executors.newSingleThreadExecutor()
+    internal var prepareEpisode: (Int, Long, Long, TaskCancellation) -> Unit = { episode, startMs, generation, cancellation ->
+        playDirect(episode, startMs, generation, cancellation)
+    }
     private val prefetchExecutor = Executors.newSingleThreadExecutor()
     private val main = Handler(Looper.getMainLooper())
     @Volatile private var prefetchTarget = -1
@@ -220,7 +227,12 @@ class PlayerActivity : AppCompatActivity() {
             }
 
             override fun onPlayerError(error: PlaybackException) {
-                main.post { status("播放错误：${error.message}") }
+                val generation = playGeneration
+                val mediaId = player.currentMediaItem?.mediaId
+                main.post {
+                    if (isDestroyed || generation != playGeneration || mediaId != "$generation:$selectedEpisode") return@post
+                    showPlaybackError("播放错误：${error.message}")
+                }
             }
 
             // 首帧真正上屏后才收起 loading：切集时容器高度可能瞬间变化，
@@ -229,7 +241,7 @@ class PlayerActivity : AppCompatActivity() {
                 val generation = playGeneration
                 main.post {
                     // long: 首帧可能先于 READY 到达，按媒体身份验真，不能因历史尚未就绪而漏掉唯一首帧。
-                    if (isDestroyed || generation != playGeneration || player.currentMediaItem?.mediaId != "$generation:$selectedEpisode") return@post
+                    if (isDestroyed || failureMessage != null || generation != playGeneration || player.currentMediaItem?.mediaId != "$generation:$selectedEpisode") return@post
                     loading.visibility = View.GONE
                     // 真正出画面了，第一行才切到「播放进度」，之前显示的是解析/下载过程。
                     stageReady = true
@@ -247,6 +259,7 @@ class PlayerActivity : AppCompatActivity() {
                     rememberAspectRatio(aspectRatio)
                 }
                 applyVideoAspect()
+                if (fullscreen && videoWidth > 0 && videoHeight > 0) syncFullscreenOrientation()
             }
         })
 
@@ -263,6 +276,25 @@ class PlayerActivity : AppCompatActivity() {
         initialPadding = intArrayOf(root.paddingLeft, root.paddingTop, root.paddingRight, root.paddingBottom)
         fullscreenTopBar = findViewById(R.id.fullscreen_top_bar)
         fullscreenTitle = findViewById(R.id.fullscreen_title)
+        ViewCompat.setOnApplyWindowInsetsListener(root) { _, insets ->
+            val safe = insets.getInsets(WindowInsetsCompat.Type.displayCutout() or WindowInsetsCompat.Type.systemBars())
+            fullscreenTopBar.setPadding(dp(6) + safe.left, dp(10) + safe.top, dp(6) + safe.right, dp(10))
+            playerView.findViewById<View>(androidx.media3.ui.R.id.exo_bottom_bar)?.let { controls ->
+                controls.setPadding(dp(6) + if (fullscreen) safe.left else 0, 0,
+                    dp(6) + if (fullscreen) safe.right else 0, 0)
+                (controls.layoutParams as? ViewGroup.MarginLayoutParams)?.let { params ->
+                    val bottom = if (fullscreen) safe.bottom else 0
+                    if (params.bottomMargin != bottom) { params.bottomMargin = bottom; controls.layoutParams = params }
+                }
+            }
+            insets
+        }
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                // long: 全屏是一层播放状态，系统返回先退出全屏，避免直接丢失当前播放页面。
+                if (fullscreen) toggleFullscreen() else finish()
+            }
+        })
         topBar = findViewById<TopBar>(R.id.player_top_bar).apply {
             setTitle(title)
             setOnBackClickListener { finish() }
@@ -273,12 +305,18 @@ class PlayerActivity : AppCompatActivity() {
             if (fullscreen) fullscreenTopBar.visibility = visibility
         })
 
-statusView = findViewById(R.id.status)
+        statusView = findViewById(R.id.status)
         loading = findViewById(R.id.loading)
+        playbackError = findViewById(R.id.playback_error)
+        findViewById<View>(R.id.playback_retry).setOnClickListener {
+            val position = if (pendingSeekMs > 0) pendingSeekMs else player.currentPosition.coerceAtLeast(0)
+            play(selectedEpisode, position)
+        }
         speedButton = playerView.findViewById(R.id.custom_speed)
         muteButton = playerView.findViewById(R.id.custom_mute)
         fullscreenButton = playerView.findViewById(R.id.custom_fullscreen)
         speedButton.text = speedLabel(currentSpeed)
+        speedButton.contentDescription = "播放倍速 ${speedLabel(currentSpeed)}，点击切换"
         findViewById<Switch>(R.id.auto_next).apply {
             isChecked = autoNext
             setOnCheckedChangeListener { _, checked ->
@@ -294,6 +332,7 @@ statusView = findViewById(R.id.status)
             muted = !muted
             player.volume = if (muted) 0f else 1f
             muteButton.setImageResource(if (muted) R.drawable.ic_volume_off else R.drawable.ic_volume_on)
+            muteButton.contentDescription = if (muted) "取消静音" else "静音"
         }
         fullscreenButton.setOnClickListener { toggleFullscreen() }
 
@@ -303,6 +342,7 @@ statusView = findViewById(R.id.status)
         tabRelatedIndicator = findViewById(R.id.tab_related_indicator)
         relatedList = findViewById(R.id.related_list)
         relatedStatus = findViewById(R.id.related_status)
+        relatedStatus.setOnClickListener { if (!relatedLoaded && !relatedLoading) loadRelated() }
         relatedAdapter = RelatedAdapter(dramaId.substringAfter(':')) { season -> openSeason(season) }
         relatedList.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
         relatedList.adapter = relatedAdapter
@@ -311,7 +351,7 @@ statusView = findViewById(R.id.status)
 
         episodeList = findViewById(R.id.episode_list)
         val list = episodeList
-        list.layoutManager = GridLayoutManager(this, 6)
+        list.layoutManager = GridLayoutManager(this, EpisodeGroups.columns(resources.configuration.screenWidthDp, resources.configuration.fontScale))
         groupsBox = findViewById(R.id.episode_groups)
         groupScroll = findViewById(R.id.group_scroll)
         episodeAdapter = EpisodeAdapter { episode -> play(episode, 0L) }
@@ -374,7 +414,7 @@ statusView = findViewById(R.id.status)
         ranges.forEach { range ->
             val chip = layoutInflater.inflate(R.layout.item_group_chip, groupsBox, false) as TextView
             chip.text = EpisodeGroups.label(range)
-            chip.setOnClickListener { selectGroup(range, selected) }
+            chip.setOnClickListener { selectGroup(range, selectedEpisode) }
             groupsBox.addView(chip)
         }
         selectGroup(EpisodeGroups.groupOf(selected, episodes) ?: ranges.first(), selected)
@@ -385,10 +425,14 @@ statusView = findViewById(R.id.status)
         for (i in 0 until groupsBox.childCount) {
             val chip = groupsBox.getChildAt(i) as TextView
             val isSelected = chip.text.toString() == EpisodeGroups.label(range)
-            chip.setBackgroundResource(if (isSelected) R.drawable.bg_chip_selected else R.drawable.bg_chip_normal)
+            // long: 播放时切换分组延续首页/详情的选择态，避免换页后选中含义和颜色发生变化。
+            chip.isSelected = isSelected
+            chip.setBackgroundResource(if (isSelected) R.drawable.bg_group_chip_selected else R.drawable.bg_group_chip_normal)
+            // long: 背景内缩只改变可见高度，切换选择态后仍保留原胶囊的文字留白。
+            chip.setPadding(dp(13), 0, dp(13), 0)
             chip.setTextColor(
-                if (isSelected) 0xFFFFFFFF.toInt()
-                else androidx.core.content.ContextCompat.getColor(this, R.color.app_on_surface_variant)
+                androidx.core.content.ContextCompat.getColor(this,
+                    if (isSelected) R.color.choice_selected_foreground else R.color.choice_foreground)
             )
         }
         episodeAdapter.submit(range.toList(), selected)
@@ -437,6 +481,8 @@ statusView = findViewById(R.id.status)
         if (!::playerView.isInitialized) return
         playerView.findViewById<View>(R.id.custom_prev)?.alpha = if (selectedEpisode > 1) 1f else 0.35f
         playerView.findViewById<View>(R.id.custom_next)?.alpha = if (selectedEpisode < episodes) 1f else 0.35f
+        playerView.findViewById<View>(R.id.custom_prev)?.isEnabled = selectedEpisode > 1
+        playerView.findViewById<View>(R.id.custom_next)?.isEnabled = selectedEpisode < episodes
     }
 
     private fun cycleSpeed() {
@@ -444,6 +490,7 @@ statusView = findViewById(R.id.status)
         currentSpeed = speeds[next]
         player.setPlaybackSpeed(currentSpeed)
         speedButton.text = speedLabel(currentSpeed)
+        speedButton.contentDescription = "播放倍速 ${speedLabel(currentSpeed)}，点击切换"
         AppSettings.setSpeed(this, currentSpeed)
     }
 
@@ -532,11 +579,7 @@ statusView = findViewById(R.id.status)
         if (fullscreen) {
             root.setPadding(0, 0, 0, 0)
             WindowCompat.setDecorFitsSystemWindows(window, false)
-            requestedOrientation = if (isLandscapeVideo()) {
-                ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
-            } else {
-                ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-            }
+            syncFullscreenOrientation()
             WindowCompat.getInsetsController(window, window.decorView).apply {
                 hide(WindowInsetsCompat.Type.systemBars())
                 systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
@@ -556,6 +599,8 @@ statusView = findViewById(R.id.status)
             WindowCompat.getInsetsController(window, window.decorView).show(WindowInsetsCompat.Type.systemBars())
         }
         fullscreenButton.setImageResource(if (fullscreen) R.drawable.ic_fullscreen_exit else R.drawable.ic_fullscreen_enter)
+        fullscreenButton.contentDescription = if (fullscreen) "退出全屏" else "全屏"
+        ViewCompat.requestApplyInsets(root)
         applyVideoAspect()
         if (!fullscreen) {
             // 退出全屏后旋转/insets 恢复需要多轮布局才能稳定；只算一次拿到的 root.height
@@ -570,6 +615,11 @@ statusView = findViewById(R.id.status)
                 root.addOnLayoutChangeListener(aspectLayoutListener)
             }
         }
+    }
+
+    private fun syncFullscreenOrientation() {
+        val orientation = if (isLandscapeVideo()) ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE else ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        if (requestedOrientation != orientation) requestedOrientation = orientation
     }
 
     private fun isLandscapeVideo(): Boolean {
@@ -600,6 +650,8 @@ statusView = findViewById(R.id.status)
 
     private fun play(episode: Int, startMs: Long) {
         if (episode !in 1..episodes) return
+        // long: 真机复现跳集竞态需要准确的事件顺序，Debug 日志只记录集号，不输出取流地址或密钥。
+        if (BuildConfig.DEBUG) android.util.Log.d("PlaybackTrace", "选择播放 episode=$episode prefetch=$prefetchTarget")
         // long: 先保存实际媒体，再停止旧集；准备新集期间不能拿旧进度配新集号。
         saveProgress()
         playCancellation?.cancel()
@@ -620,6 +672,8 @@ statusView = findViewById(R.id.status)
         syncGroup(episode)
         updateEpisodeButtons()
         pendingSeekMs = startMs
+        failureMessage = null
+        playbackError.visibility = View.GONE
         currentVideoId = null
         loading.visibility = View.VISIBLE
         mediaQuality = 0
@@ -639,19 +693,26 @@ statusView = findViewById(R.id.status)
                     try { waiting.get() } catch (_: CancellationException) { cancellation.check() }
                 }
                 cancellation.check()
-                playDirect(episode, startMs, generation, cancellation)
+                prepareEpisode(episode, startMs, generation, cancellation)
             } catch (e: Exception) {
                 if (!cancellation.isCancelled) {
                     android.util.Log.d("PlayerActivity", "第${episode}集播放失败：${e.message}")
                     postPlayback(episode, generation, cancellation) {
-                        main.removeCallbacks(stageTicker)
-                        stageTmp = null
-                        loading.visibility = View.GONE
-                        status("失败：${e.message}")
+                        showPlaybackError("失败：${e.message}")
                     }
                 }
             }
         }
+    }
+
+    private fun showPlaybackError(message: String) {
+        // long: 失败态必须停止转圈并持久显示，预取/进度轮询不能把失败原因覆盖成“准备播放”。
+        main.removeCallbacks(stageTicker)
+        stageTmp = null
+        loading.visibility = View.GONE
+        failureMessage = message
+        playbackError.visibility = View.VISIBLE
+        renderStatus()
     }
 
     private fun postPlayback(episode: Int, generation: Long, cancellation: TaskCancellation, block: () -> Unit) {
@@ -774,27 +835,21 @@ statusView = findViewById(R.id.status)
         val context = applicationContext
         prefetchTarget = next
         resetPrefetchProgress()
+        if (BuildConfig.DEBUG) android.util.Log.d("PlaybackTrace", "开始预取 episode=$next playing=$episode")
         prefetchFuture = prefetchExecutor.submit {
             val startedAt = System.currentTimeMillis()
-            var lastError = "未知错误"
-            // 预取失败多数是上游间歇 0 字节（限流）：整任务再试 2 次，仍失败才标记。
-            for (attempt in 1..3) {
+            val retryable = try {
                 cancellation.check()
-                try {
-                    prefetchEpisode(seriesId, next, context, knownChapters, startedAt, cancellation)
-                    return@submit
-                } catch (e: Exception) {
-                    if (cancellation.isCancelled) return@submit
-                    lastError = e.message ?: e.toString()
-                    android.util.Log.d("PlayerActivity", "预取第${next}集失败($attempt/3)：$lastError")
-                    if (attempt < 3) {
-                        postPrefetch(cancellation) { resetPrefetchProgress() }
-                        try {
-                            Thread.sleep(3000L * attempt)
-                        } catch (interrupted: InterruptedException) {
-                            return@submit
-                        }
-                    }
+                prefetchEpisode(seriesId, next, context, knownChapters, startedAt, cancellation)
+                return@submit
+            } catch (e: Exception) {
+                if (cancellation.isCancelled || Thread.currentThread().isInterrupted) return@submit
+                android.util.Log.d("PlayerActivity", "预取第${next}集失败：${e.message}")
+                // long: 接口层已消耗本轮重试预算；仅临时网络/服务故障延迟再试，永久错误不能循环下载。
+                when (e) {
+                    is DirectClient.DirectException -> e.retryable
+                    is java.io.IOException -> true
+                    else -> false
                 }
             }
             postPrefetch(cancellation) {
@@ -803,8 +858,8 @@ statusView = findViewById(R.id.status)
                 prefetchTmp = null
                 main.removeCallbacks(prefetchTicker)
                 renderStatus()
-                // 上游限流通常几十秒后恢复：继续停留在本集时后台再试，避免切集时冷启动。
-                if (retryRound < 3) {
+                // long: 原因尚未确定的空响应也使用冷却窗口，避免把签名失配误当限流而连续请求。
+                if (retryable && retryRound < 3) {
                     val retry = Runnable {
                         prefetchRetryRunnable = null
                         android.util.Log.d(
@@ -892,6 +947,7 @@ statusView = findViewById(R.id.status)
     }
 
     private fun cancelPrefetch() {
+        if (BuildConfig.DEBUG && prefetchTarget > 0) android.util.Log.d("PlaybackTrace", "取消预取 episode=$prefetchTarget")
         prefetchRetryRunnable?.let { main.removeCallbacks(it) }
         prefetchRetryRunnable = null
         prefetchCancellation?.cancel()
@@ -948,7 +1004,7 @@ statusView = findViewById(R.id.status)
         } else {
             SectionTabs.apply(tabEpisodes, tabEpisodesIndicator, tabRelated, tabRelatedIndicator)
         }
-        groupScroll.visibility = if (show) View.GONE else View.VISIBLE
+        groupScroll.visibility = if (!show && episodes > EpisodeGroups.SIZE) View.VISIBLE else View.GONE
         episodeList.visibility = if (show) View.GONE else View.VISIBLE
         relatedList.visibility = if (show) View.VISIBLE else View.GONE
         if (!show) {
@@ -973,22 +1029,26 @@ statusView = findViewById(R.id.status)
         relatedLoading = true
         val current = title
         relatedStatus.text = "加载中…"
+        relatedStatus.isClickable = false
         relatedStatus.visibility = View.VISIBLE
         relatedList.visibility = View.GONE
         Thread {
-            val seasons = runCatching {
+            val result = runCatching {
                 val (deviceId, installId) = DirectClient.identity(this)
                 DirectClient.relatedSeasons(
                     dramaId.substringAfter(':'), currentVideoId, deviceId, installId, current,
                     cover.ifBlank { null }
                 )
-            }.getOrElse { emptyList() }
+            }
             runOnUiThread {
                 if (isFinishing || isDestroyed) return@runOnUiThread
                 relatedLoading = false
-                relatedLoaded = true
+                relatedLoaded = result.isSuccess
+                val seasons = result.getOrDefault(emptyList())
+                relatedStatus.isClickable = result.isFailure
+                relatedStatus.isFocusable = result.isFailure
                 relatedAdapter.submit(seasons)
-                relatedStatus.text = "未找到相关剧集"
+                relatedStatus.text = if (result.isFailure) "加载失败，点击重试" else "未找到相关剧集"
                 // long: 在途结果可以缓存，但不能抢回用户已离开的相关 Tab。
                 relatedStatus.visibility = if (showingRelated && seasons.isEmpty()) View.VISIBLE else View.GONE
                 relatedList.visibility = if (showingRelated && seasons.isNotEmpty()) View.VISIBLE else View.GONE
@@ -1024,6 +1084,7 @@ statusView = findViewById(R.id.status)
      * 起播后展示播放进度，这样"有没有缓存、卡在哪一步"一眼可见。
      */
     private fun firstLine(): String {
+        failureMessage?.let { return "第${selectedEpisode}集 · $it" }
         val text = StringBuilder("第${selectedEpisode}集")
         if (mediaQuality > 0) text.append(" · ${mediaQuality}p")
         if (playingBytes > 0L) text.append(" · ${VideoCache.formatSize(playingBytes)}")
@@ -1102,4 +1163,6 @@ statusView = findViewById(R.id.status)
     private fun startPositionTicker() {
         main.postDelayed(ticker, 1000)
     }
+
+    private fun dp(value: Int): Int = (value * resources.displayMetrics.density).toInt()
 }

@@ -1,8 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="vertical">
+    android:clickable="true"
+    android:focusable="true"
+    android:clipToOutline="true"
+    app:cardBackgroundColor="@color/app_surface"
+    app:cardCornerRadius="12dp"
+    app:cardElevation="0dp"
+    app:cardUseCompatPadding="false"
+    app:cardPreventCornerOverlap="false"
+    app:strokeColor="@color/home_card_outline"
+    app:strokeWidth="1dp">
+
+    <!-- long: 封面与文字共享一张卡片底色和外轮廓，三列密集信息也能明确区分每部剧。 -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical">
 
     <FrameLayout
         android:layout_width="match_parent"
@@ -12,8 +28,7 @@
             android:id="@+id/cover"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@drawable/bg_cover_rounded"
-            android:clipToOutline="true"
+            android:background="@color/cover_placeholder"
             android:scaleType="centerCrop" />
 
         <!-- 封面底部渐变遮罩（衬托集数徽章） -->
@@ -65,12 +80,18 @@
             android:visibility="gone" />
     </FrameLayout>
 
+    <LinearLayout
+        android:id="@+id/home_card_info"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="84dp"
+        android:orientation="vertical"
+        android:padding="8dp">
+
     <TextView
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="2dp"
-        android:layout_marginTop="6dp"
         android:ellipsize="end"
         android:fontFamily="sans-serif-medium"
         android:maxLines="2"
@@ -81,8 +102,8 @@
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="2dp"
-        android:layout_marginTop="3dp"
+        android:layout_marginTop="4dp"
+        android:baselineAligned="false"
         android:orientation="horizontal">
 
         <TextView
@@ -91,7 +112,7 @@
             android:layout_height="wrap_content"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/accent_warm"
+            android:textColor="@color/home_card_score"
             android:textSize="10sp"
             android:visibility="gone" />
 
@@ -102,7 +123,7 @@
             android:layout_marginStart="6dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/nav_icon_inactive"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="10sp" />
     </LinearLayout>
 
@@ -110,11 +131,12 @@
         android:id="@+id/meta"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginHorizontal="2dp"
-        android:layout_marginTop="2dp"
+        android:layout_marginTop="3dp"
         android:ellipsize="end"
         android:maxLines="1"
-        android:textColor="@color/app_text_tertiary"
+        android:textColor="@color/app_on_surface_variant"
         android:textSize="10sp"
         android:visibility="gone" />
-</LinearLayout>
+    </LinearLayout>
+    </LinearLayout>
+</com.google.android.material.card.MaterialCardView>

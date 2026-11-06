@@ -12,7 +12,7 @@
     <color name="app_surface_disabled">#FF2A2A38</color>
     <color name="app_on_bg">#FFEAEAF0</color>
     <color name="app_on_surface_variant">#FF8A8A9A</color>
-    <color name="app_text_tertiary">#FF5A5A6C</color>
+    <color name="app_text_tertiary">#FF9895A7</color>
     <color name="app_text_hint">#FF4A4A5E</color>
     <color name="app_outline">#FF2A2A38</color>
     <color name="app_stroke">#FF23232F</color>
@@ -27,5 +27,18 @@
     <color name="tag_badge">#E6FF3B5C</color>
     <color name="toast_bg">#F01E1E2A</color>
     <color name="cover_placeholder">#FF14141C</color>
+    <color name="choice_background">#FF1A1A25</color>
+    <color name="choice_foreground">#FFD5D3DD</color>
+    <color name="choice_outline">#FF383844</color>
+    <color name="choice_selected_background">#FF512131</color>
+    <color name="choice_selected_foreground">#FFFFC0CD</color>
+    <color name="choice_selected_outline">#FF9F5065</color>
+    <color name="home_filter_background">#FF1A1A25</color>
+    <color name="home_filter_foreground">@color/choice_foreground</color>
+    <color name="home_filter_selected_background">@color/choice_selected_background</color>
+    <color name="home_filter_selected_foreground">@color/choice_selected_foreground</color>
+    <color name="home_filter_group_background">#FF16161F</color>
+    <color name="home_card_outline">#FF30303C</color>
+    <color name="home_card_score">#FFFF976A</color>
     <color name="on_cover_badge">#FFFFFFFF</color>
 </resources>

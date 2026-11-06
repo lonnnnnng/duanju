@@ -34,12 +34,15 @@ class EpisodeAdapter(
         val episode = numbers[position]
         val selected = episode == current
         holder.number.text = episode.toString()
+        // long: 当前集沿用分组胶囊的选择配色，换成浅色背景后必须同步切换文字色。
+        holder.itemView.isSelected = selected
+        holder.itemView.contentDescription = "第${episode}集" + if (selected) "，当前集" else "，播放"
         holder.itemView.setBackgroundResource(
             if (selected) R.drawable.bg_episode_selected else R.drawable.bg_episode_cell
         )
         holder.number.setTextColor(
-            if (selected) 0xFFFFFFFF.toInt()
-            else ContextCompat.getColor(holder.itemView.context, R.color.app_on_bg)
+            ContextCompat.getColor(holder.itemView.context,
+                if (selected) R.color.choice_selected_foreground else R.color.app_on_bg)
         )
         holder.itemView.setOnClickListener { onPick(episode) }
     }

@@ -1,0 +1,694 @@
+{
+  "case": "cate_739",
+  "directory": "005-cate_739",
+  "selectedItems": "cate_739",
+  "offset": 0,
+  "httpStatus": 200,
+  "error": null,
+  "businessCode": 0,
+  "message": "SUCCESS",
+  "items": 9,
+  "seriesIds": [
+    "7694113790018718745",
+    "7701328280862854168",
+    "7700862621431385113",
+    "7689495318844427326",
+    "7687506916150365208",
+    "7471528693521730622",
+    "7691647607470312473",
+    "7654507907920170009",
+    "7690494161551625241"
+  ],
+  "selectedIds": [
+    "cate_739"
+  ],
+  "nextOffset": 1,
+  "hasMoreField": false,
+  "sessionId": "20261106235613B05D87EDBCFE6F96B0A5",
+  "selectors": [
+    {
+      "outer_row": {
+        "items": [
+          {
+            "show_name": "推荐榜",
+            "selector_item_id": "ranklist_hot",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "新剧",
+            "selector_item_id": "firstonlinetime_new",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "现代",
+            "selector_item_id": "cate_757",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "逆袭",
+            "selector_item_id": "cate_739",
+            "is_selected": true,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "都市",
+            "selector_item_id": "cate_1",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "打脸虐渣",
+            "selector_item_id": "cate_1051",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "都市日常",
+            "selector_item_id": "cate_261",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "剧情",
+            "selector_item_id": "cate_316",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "总裁",
+            "selector_item_id": "cate_29",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          },
+          {
+            "show_name": "都市爱情",
+            "selector_item_id": "cate_1021",
+            "is_selected": false,
+            "recommend_group_id": "",
+            "recommend_info": "",
+            "selector_item_type": "",
+            "show_type": 0
+          }
+        ],
+        "row_name": "",
+        "type": "outer_row",
+        "selection_type": 1,
+        "multi_selection_bound": 10
+      },
+      "inner_rows": [
+        {
+          "items": [
+            {
+              "show_name": "推荐榜",
+              "selector_item_id": "ranklist_hot",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "新剧",
+              "selector_item_id": "firstonlinetime_new",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            }
+          ],
+          "row_name": "综合",
+          "type": "other",
+          "selection_type": 1
+        },
+        {
+          "items": [
+            {
+              "show_name": "校园",
+              "selector_item_id": "cate_4",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "乡村",
+              "selector_item_id": "cate_11",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "职场",
+              "selector_item_id": "cate_127",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "历史古代",
+              "selector_item_id": "cate_273",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "古装",
+              "selector_item_id": "cate_308",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "民国",
+              "selector_item_id": "cate_390",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            }
+          ],
+          "row_name": "时代背景",
+          "type": "history_background",
+          "selection_type": 1
+        },
+        {
+          "items": [
+            {
+              "show_name": "现代言情",
+              "selector_item_id": "cate_3",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "系统",
+              "selector_item_id": "cate_19",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "重生",
+              "selector_item_id": "cate_36",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "穿越",
+              "selector_item_id": "cate_37",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "娱乐圈",
+              "selector_item_id": "cate_43",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "悬疑推理",
+              "selector_item_id": "cate_165",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "都市日常",
+              "selector_item_id": "cate_261",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "马甲",
+              "selector_item_id": "cate_266",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "喜剧",
+              "selector_item_id": "cate_303",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "剧情",
+              "selector_item_id": "cate_316",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "穿书",
+              "selector_item_id": "cate_382",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "现言甜宠",
+              "selector_item_id": "cate_395",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "古风爱情",
+              "selector_item_id": "cate_439",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "闪婚",
+              "selector_item_id": "cate_466",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "破镜重圆",
+              "selector_item_id": "cate_475",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "异能",
+              "selector_item_id": "cate_598",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "逆袭",
+              "selector_item_id": "cate_739",
+              "is_selected": true,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "追妻",
+              "selector_item_id": "cate_842",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "传承觉醒",
+              "selector_item_id": "cate_1007",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "虐恋",
+              "selector_item_id": "cate_1008",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "玄幻仙侠",
+              "selector_item_id": "cate_1013",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "奇幻爱情",
+              "selector_item_id": "cate_1020",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "年代爱情",
+              "selector_item_id": "cate_1022",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "家庭伦理",
+              "selector_item_id": "cate_1024",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "战神归来",
+              "selector_item_id": "cate_1038",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "亲情",
+              "selector_item_id": "cate_1040",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "奇幻脑洞",
+              "selector_item_id": "cate_1041",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "无敌神医",
+              "selector_item_id": "cate_1043",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "赘婿逆袭",
+              "selector_item_id": "cate_1044",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "古风权谋",
+              "selector_item_id": "cate_1047",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "女性成长",
+              "selector_item_id": "cate_1048",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "暗恋成真",
+              "selector_item_id": "cate_1050",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "打脸虐渣",
+              "selector_item_id": "cate_1051",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "豪门恩怨",
+              "selector_item_id": "cate_1053",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            }
+          ],
+          "row_name": "主题情节",
+          "type": "theme_plot",
+          "selection_type": 1
+        },
+        {
+          "items": [
+            {
+              "show_name": "神豪",
+              "selector_item_id": "cate_20",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "萌宝",
+              "selector_item_id": "cate_28",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "皇后",
+              "selector_item_id": "cate_84",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "王妃",
+              "selector_item_id": "cate_85",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "团宠",
+              "selector_item_id": "cate_94",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "女帝",
+              "selector_item_id": "cate_378",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "青梅竹马",
+              "selector_item_id": "cate_387",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "替身",
+              "selector_item_id": "cate_470",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "大叔",
+              "selector_item_id": "cate_737",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "大女主",
+              "selector_item_id": "cate_760",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "真假千金",
+              "selector_item_id": "cate_844",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "龙王",
+              "selector_item_id": "cate_901",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "小人物",
+              "selector_item_id": "cate_1010",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "强者回归",
+              "selector_item_id": "cate_1045",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "天下无敌",
+              "selector_item_id": "cate_1046",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "强强联合",
+              "selector_item_id": "cate_1049",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            },
+            {
+              "show_name": "欢喜冤家",
+              "selector_item_id": "cate_1052",
+              "is_selected": false,
+              "recommend_group_id": "",
+              "recommend_info": "",
+              "selector_item_type": "",
+              "show_type": 0
+            }
+          ],
+          "row_name": "角色设定",
+          "type": "character_setting",
+          "selection_type": 1
+        }
+      ],
+      "inner_title": "筛选",
+      "global_single": true,
+      "show_style": 0
+    }
+  ]
+}

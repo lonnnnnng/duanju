@@ -8,11 +8,12 @@
     android:orientation="vertical">
 
     <!-- 顶栏 -->
+    <!-- long: 返回栏延续系统状态栏的页面底色，避免浅色白条、深色灰条割裂顶部。 -->
     <com.duanju.player.TopBar
         android:id="@+id/detail_top_bar"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:background="@color/app_bg_elevated"
+        android:background="@color/app_bg"
         android:paddingHorizontal="6dp" />
 
     <FrameLayout
@@ -66,12 +67,12 @@
                             android:textColor="?android:attr/textColorPrimary"
                             android:textSize="17sp" />
 
-                        <LinearLayout
+                        <com.google.android.flexbox.FlexboxLayout
                             android:id="@+id/detail_subtitles"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
                             android:layout_marginTop="8dp"
-                            android:orientation="horizontal" />
+                            app:flexWrap="wrap" />
 
                         <TextView
                             android:id="@+id/detail_meta"
@@ -81,22 +82,27 @@
                             android:textColor="@color/app_on_surface_variant"
                             android:textSize="11sp" />
 
-                        <Button
+                        <!-- long: 显式提供 Material 的底色/描边，避免主题再次把浅色播放按钮染成纯红。 -->
+                        <com.google.android.material.button.MaterialButton
                             android:id="@+id/detail_play"
                             android:layout_width="wrap_content"
-                            android:layout_height="38dp"
+                            android:layout_height="wrap_content"
+                            android:minHeight="48dp"
                             android:layout_marginTop="14dp"
-                            android:background="@drawable/bg_play_button"
-                            android:backgroundTint="@null"
                             android:fontFamily="sans-serif-medium"
-                            android:insetTop="0dp"
-                            android:insetBottom="0dp"
+                            android:insetTop="5dp"
+                            android:insetBottom="5dp"
                             android:minWidth="0dp"
                             android:paddingHorizontal="22dp"
                             android:stateListAnimator="@null"
                             android:text="播放第 1 集"
-                            android:textColor="@color/app_on_bg"
-                            android:textSize="13sp" />
+                            android:textColor="@color/choice_selected_foreground"
+                            android:textSize="13sp"
+                            app:backgroundTint="@color/choice_selected_background"
+                            app:cornerRadius="999dp"
+                            app:rippleColor="@color/choice_selected_outline"
+                            app:strokeColor="@color/choice_selected_outline"
+                            app:strokeWidth="1dp" />
                     </LinearLayout>
                 </LinearLayout>
 
@@ -123,8 +129,11 @@
                     android:background="?attr/selectableItemBackground"
                     android:paddingHorizontal="4dp"
                     android:paddingVertical="3dp"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:gravity="center"
                     android:text="展开"
-                    android:textColor="@color/accent_warm"
+                    android:textColor="@color/choice_selected_foreground"
                     android:textSize="12sp"
                     android:visibility="gone" />
 
@@ -150,6 +159,9 @@
                             android:fontFamily="sans-serif-medium"
                             android:paddingHorizontal="2dp"
                             android:paddingVertical="3dp"
+                            android:minHeight="48dp"
+                            android:minWidth="48dp"
+                            android:gravity="center"
                             android:text="选集"
                             android:textColor="@color/app_on_bg"
                             android:textSize="15sp" />
@@ -175,6 +187,9 @@
                             android:layout_height="wrap_content"
                             android:paddingHorizontal="2dp"
                             android:paddingVertical="3dp"
+                            android:minHeight="48dp"
+                            android:minWidth="48dp"
+                            android:gravity="center"
                             android:text="相关"
                             android:textColor="@color/app_on_surface_variant"
                             android:textSize="15sp" />

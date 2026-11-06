@@ -17,8 +17,8 @@
         <LinearLayout
             android:id="@+id/search_pill"
             android:layout_width="match_parent"
-            android:layout_height="40dp"
-            android:background="@drawable/bg_pill"
+            android:layout_height="48dp"
+            android:background="@drawable/bg_home_search_pill"
             android:clickable="true"
             android:focusable="true"
             android:gravity="center_vertical"
@@ -41,23 +41,53 @@
         </LinearLayout>
     </LinearLayout>
 
-    <!-- 快捷筛选 -->
-    <HorizontalScrollView
-        android:id="@+id/filter_scroll"
+    <!-- long: 完整筛选入口独立于横向滚动，快捷分类再多也不会把入口挤出屏幕。 -->
+    <LinearLayout
+        android:id="@+id/filter_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:paddingHorizontal="0dp"
-        android:scrollbars="none"
+        android:gravity="center_vertical"
+        android:baselineAligned="false"
+        android:orientation="horizontal"
+        android:paddingStart="0dp"
+        android:paddingEnd="14dp"
         android:visibility="gone">
 
-        <LinearLayout
-            android:id="@+id/filter_chips"
-            android:layout_width="wrap_content"
+        <HorizontalScrollView
+            android:id="@+id/filter_scroll"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:paddingHorizontal="14dp"
-            android:paddingVertical="4dp" />
-    </HorizontalScrollView>
+            android:layout_weight="1"
+            android:scrollbars="none">
+
+            <LinearLayout
+                android:id="@+id/filter_chips"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:paddingStart="14dp"
+                android:paddingEnd="6dp"
+                android:paddingVertical="0dp" />
+        </HorizontalScrollView>
+
+        <TextView
+            android:id="@+id/filter_entry"
+            android:layout_width="wrap_content"
+            android:layout_height="48dp"
+            android:layout_marginStart="6dp"
+            android:background="@drawable/bg_home_filter_chip"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center"
+            android:maxWidth="160dp"
+            android:maxLines="1"
+            android:ellipsize="end"
+            android:minWidth="64dp"
+            android:paddingHorizontal="12dp"
+            android:text="@string/home_filter"
+            android:textColor="@color/home_filter_foreground"
+            android:textSize="13sp" />
+    </LinearLayout>
 
     <!-- 内容区 -->
     <FrameLayout
@@ -75,9 +105,44 @@
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
                 android:clipToPadding="false"
-                android:padding="12dp"
+                android:paddingHorizontal="12dp"
+                android:paddingTop="12dp"
+                android:paddingBottom="@dimen/home_bottom_clearance"
                 android:scrollbars="none" />
         </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
+
+        <!-- long: 分页反馈独立于列表滚动，始终显示在悬浮导航上方，避免页脚动画被菜单盖住。 -->
+        <LinearLayout
+            android:id="@+id/home_pagination_status"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="bottom|center_horizontal"
+            android:layout_marginBottom="@dimen/home_bottom_clearance"
+            android:accessibilityLiveRegion="polite"
+            android:background="@drawable/bg_footer_hint"
+            android:elevation="4dp"
+            android:gravity="center"
+            android:minHeight="48dp"
+            android:orientation="horizontal"
+            android:paddingHorizontal="16dp"
+            android:paddingVertical="8dp"
+            android:visibility="gone">
+
+            <ProgressBar
+                android:id="@+id/home_pagination_progress"
+                android:layout_width="20dp"
+                android:layout_height="20dp"
+                android:layout_marginEnd="10dp"
+                android:indeterminateTint="@color/accent" />
+
+            <TextView
+                android:id="@+id/home_pagination_text"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="正在加载更多…"
+                android:textColor="@color/app_on_bg"
+                android:textSize="12sp" />
+        </LinearLayout>
 
         <ProgressBar
             android:id="@+id/home_loading"

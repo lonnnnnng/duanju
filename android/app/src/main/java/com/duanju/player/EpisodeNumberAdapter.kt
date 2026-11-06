@@ -37,13 +37,16 @@ class EpisodeNumberAdapter(
             cornerRadius = 8 * density
             setColor(
                 when {
-                    ep.disabled -> 0x14FFFFFF
+                    ep.disabled -> resolve(context = ctx, res = R.color.app_surface_disabled)
                     else -> resolve(context = ctx, res = R.color.app_surface_variant)
                 }
             )
         }
         holder.itemView.background = bg
-        holder.itemView.alpha = if (ep.disabled) 0.45f else 1f
+        holder.itemView.alpha = 1f
+        holder.itemView.isEnabled = !ep.disabled
+        holder.num.setTextColor(resolve(ctx, if (ep.disabled) R.color.app_on_surface_variant else R.color.app_on_bg))
+        holder.itemView.contentDescription = "第${ep.index}集" + if (ep.disabled) "，暂不可播放" else "，播放"
         holder.itemView.setOnClickListener { if (!ep.disabled) onPick(ep) }
     }
 

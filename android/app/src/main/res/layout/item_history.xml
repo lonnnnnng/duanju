@@ -62,20 +62,20 @@
             android:textColor="@color/app_on_surface_variant"
             android:textSize="11.5sp" />
 
-        <!-- 播放进度条：底槽 divider + 渐变前景（宽度代码里按百分比设置） -->
-        <FrameLayout
+        <!-- long: 原生进度控件按当前集数/总集数裁剪渐变前景，无需等待卡片布局或手算填充宽度。 -->
+        <ProgressBar
+            android:id="@+id/progress"
+            style="?android:attr/progressBarStyleHorizontal"
             android:layout_width="match_parent"
             android:layout_height="3dp"
             android:layout_marginTop="8dp"
             android:layout_marginEnd="6dp"
-            android:background="@drawable/bg_history_bar">
-
-            <View
-                android:id="@+id/progress"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:background="@drawable/bg_tab_indicator" />
-        </FrameLayout>
+            android:indeterminate="false"
+            android:minHeight="0dp"
+            android:padding="0dp"
+            android:progressBackgroundTint="@null"
+            android:progressTint="@null"
+            android:progressDrawable="@drawable/progress_history" />
 
         <TextView
             android:id="@+id/updated"

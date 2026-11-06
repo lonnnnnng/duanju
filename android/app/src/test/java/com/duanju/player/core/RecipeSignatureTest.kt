@@ -27,4 +27,10 @@ class RecipeSignatureTest {
         val broken = signature.copyOf().also { it[it.size / 2] = (it[it.size / 2] + 1).toByte() }
         assertFalse(RecipeUpdater.verifyBytes("duanju-recipe-test".toByteArray(), broken))
     }
+
+    @Test
+    fun malformedSignatureIsRejectedWithoutThrowing() {
+        assertFalse(RecipeUpdater.verifyBytes("duanju-recipe-test".toByteArray(), "<html>error</html>".toByteArray()))
+        assertFalse(RecipeUpdater.verifyBytes(byteArrayOf(1), byteArrayOf()))
+    }
 }

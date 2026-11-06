@@ -4,6 +4,10 @@ package com.duanju.player
 object EpisodeGroups {
     const val SIZE = 30
 
+    /** long: 小屏或大字体时减少列数，为集号和手指保留足够宽度，常规屏仍沿用六列。 */
+    fun columns(widthDp: Int, fontScale: Float): Int =
+        ((widthDp - 32) / (54f * fontScale.coerceAtLeast(1f))).toInt().coerceIn(3, 6)
+
     fun ranges(total: Int): List<IntRange> {
         if (total <= 0) return emptyList()
         val out = ArrayList<IntRange>((total + SIZE - 1) / SIZE)

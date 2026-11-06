@@ -1,13 +1,9 @@
 name: 发布接口配方
 
-# 配方变化时自动签名并发布到固定的 `recipe` Release（预发布，不会成为 latest，
-# 因此不会干扰 App 的版本检查）。App 启动时拉取并验签，无需发新版 APK。
+# long: 普通推送只保存代码，明确发布配方时再手动更新 `recipe` 预发布资产，
+# 避免提交验证中的配方时顺带覆盖远程 Release；配方发布不会修改应用 latest。
 
 on:
-  push:
-    paths:
-      - android/app/src/main/assets/recipes/hongguo.json
-      - .github/workflows/recipe.yml
   workflow_dispatch:
 
 permissions:

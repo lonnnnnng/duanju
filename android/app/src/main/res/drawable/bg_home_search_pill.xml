@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- long: 首页搜索入口保持原 40dp 可见尺寸，额外的透明区域用于手指命中。 -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:insetTop="4dp" android:insetBottom="4dp" android:drawable="@drawable/bg_pill" />

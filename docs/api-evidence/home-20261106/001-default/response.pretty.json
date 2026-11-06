@@ -1,0 +1,1558 @@
+{
+  "data": {
+    "tab_index": 0,
+    "tab_item": [
+      {
+        "tab_type": 8,
+        "client_tab_type": 0,
+        "title": "找剧",
+        "cell_data": [
+          {
+            "cell_id": 6952850996422770718,
+            "show_type": 401,
+            "cell_name": "",
+            "cell_operation_type": 1,
+            "use_recommend": true,
+            "cell_abstract": "",
+            "cell_id_str": "6952850996422770718",
+            "cell_data": [
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7694117511490440216",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/9f61512edee0f43c55de4b42aba461de~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=EMb7CZccdG5%2BDEKkRIHZSoPvlsw%3D",
+                    "duration": 3058,
+                    "title": "装穷回家，考验俩儿子的孝心",
+                    "video_desc": "二十多年前，周振山因车祸失忆，与妻儿失散。多年后，他已成为集团董事长，带着一份“两个儿子各继承一半家产”的遗嘱装穷回家认亲。但这份遗嘱还没有签字——谁真心认这个穷爹、谁真正孝顺母亲，谁才有资格继承；谁把父母当累赘，谁就可能一分钱都拿不到。一个住洋楼却连药费都不肯出，一个穷得揭不开锅却坚持养爹娘。随着一次次考验，原本五五开的继承权悄然改变。真正能继承财富的人，先要守得住亲情、孝心与担当。",
+                    "series_id": "7694113790018718745",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"1\",\"queue_names\":\"shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7694113790018718745\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"staytime_stream\\\":2.286759376525879,\\\"like\\\":0.08269734680652618,\\\"absolute_staytime\\\":0.2910165786743164,\\\"stream_ctr\\\":0.047137510031461716,\\\"finish\\\":0.08882028609514236,\\\"normalized_duration\\\":0.7416868805885315,\\\"collect\\\":0.050330642610788345}\"}",
+                    "recommend_group_id": "7694113790018718745",
+                    "play_cnt": 7693762,
+                    "book_exist": false,
+                    "copyright": "杭州萧山破格出品文化创意工作室个体工商户",
+                    "sub_title": "家庭·全48集",
+                    "score": "8.1",
+                    "use_video_model": true,
+                    "episode_cnt": 48,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5468,\"name\":\"家庭\",\"schema\":\"dragon8662://categorySearch?categoryId=5468&categoryName=家庭&genreType=130&gender=1&source=detail\"},{\"category_id\":5509,\"name\":\"家庭伦理\",\"schema\":\"dragon8662://categorySearch?categoryId=5509&categoryName=家庭伦理&genreType=130&gender=1&source=detail\"},{\"category_id\":5672,\"name\":\"隐藏大佬\",\"schema\":\"dragon8662://categorySearch?categoryId=5672&categoryName=隐藏大佬&genreType=130&gender=1&source=detail\"},{\"category_id\":5734,\"name\":\"打脸反派\",\"schema\":\"dragon8662://categorySearch?categoryId=5734&categoryName=打脸反派&genreType=130&gender=1&source=detail\"},{\"category_id\":5777,\"name\":\"总裁\",\"schema\":\"dragon8662://categorySearch?categoryId=5777&categoryName=总裁&genreType=130&gender=1&source=detail\"},{\"category_id\":5756,\"name\":\"大男主\",\"schema\":\"dragon8662://categorySearch?categoryId=5756&categoryName=大男主&genreType=130&gender=1&source=detail\"},{\"category_id\":5852,\"name\":\"乡村\",\"schema\":\"dragon8662://categorySearch?categoryId=5852&categoryName=乡村&genreType=130&gender=1&source=detail\"},{\"category_id\":5845,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5845&categoryName=现代&genreType=130&gender=1&source=detail\"},{\"category_id\":5606,\"name\":\"家长里短\",\"schema\":\"dragon8662://categorySearch?categoryId=5606&categoryName=家长里短&genreType=130&gender=1&source=detail\"}]",
+                    "color_dominate": "#a89898",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "4668万",
+                        "data_type": 27,
+                        "rec_icon_url": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png",
+                        "rec_icon_url_dark": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png"
+                      },
+                      {
+                        "content": "家庭",
+                        "data_type": 3
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "爆剧",
+                      "bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "dark_bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": true,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"爆剧\",\"bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"dark_bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"4668万\",\"data_type\":27,\"rec_icon_url\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png\",\"rec_icon_url_dark\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png\"},{\"content\":\"家庭\",\"data_type\":3}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7671977925326949400",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/3edbd9c6ab15ebff3fd0853ec74a4f27~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=%2Bp5crjmmbRV4NTyjUw254b1Z%2Bcw%3D",
+                    "duration": 9260,
+                    "title": "持械入宋：第一季",
+                    "video_desc": "宋末年，烽火连天。一支执行任务的现代五人小队，意外坠入时空隧道，全员携械穿越到大宋。队长林昭京片子冷静果决，统帅全局。狙击手谢长风、军械师马振邦-一口东北大碴子，战力拉满。通信兵王浩川-广东仔，情报组网，眼观六路。湘妹子医官陈素--妙手回春，战地玫瑰。以现代人的视角看大宋，这将是一场现代与古代的文化冲突，将是一场科技的降维碾压。大宋注定将不再平凡。",
+                    "series_id": "7671966197985856536",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"2\",\"queue_names\":\"aigc\",\"final_queue_name\":\"heji\",\"gid\":\"7671966197985856536\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"absolute_staytime\\\":0.20636165142059326,\\\"staytime_stream\\\":1.7722808122634888,\\\"finish\\\":0.003273065434768796,\\\"normalized_duration\\\":0.6953908205032349,\\\"collect\\\":0.10087861120700836,\\\"stream_ctr\\\":0.07164990156888962,\\\"like\\\":0.06754669547080994}\"}",
+                    "recommend_group_id": "7671966197985856536",
+                    "play_cnt": 16108339,
+                    "book_exist": false,
+                    "copyright": "瑾叶剧场",
+                    "sub_title": "古装·全100集",
+                    "score": "8.3",
+                    "use_video_model": true,
+                    "episode_cnt": 100,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5475,\"name\":\"古装\",\"schema\":\"dragon8662://categorySearch?categoryId=5475&categoryName=古装&genreType=130&gender=2&source=detail\"},{\"category_id\":5682,\"name\":\"穿越\",\"schema\":\"dragon8662://categorySearch?categoryId=5682&categoryName=穿越&genreType=130&gender=2&source=detail\"},{\"category_id\":5760,\"name\":\"群像\",\"schema\":\"dragon8662://categorySearch?categoryId=5760&categoryName=群像&genreType=130&gender=2&source=detail\"},{\"category_id\":5852,\"name\":\"乡村\",\"schema\":\"dragon8662://categorySearch?categoryId=5852&categoryName=乡村&genreType=130&gender=2&source=detail\"},{\"category_id\":5846,\"name\":\"古代\",\"schema\":\"dragon8662://categorySearch?categoryId=5846&categoryName=古代&genreType=130&gender=2&source=detail\"}]",
+                    "color_dominate": "#201808",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "5640万",
+                        "data_type": 27,
+                        "rec_icon_url": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png",
+                        "rec_icon_url_dark": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png"
+                      },
+                      {
+                        "content": "古装",
+                        "data_type": 3
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "爆剧",
+                      "bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "dark_bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": true,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"爆剧\",\"bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"dark_bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"5640万\",\"data_type\":27,\"rec_icon_url\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png\",\"rec_icon_url_dark\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png\"},{\"content\":\"古装\",\"data_type\":3}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7701328426518465561",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/dd47bf8f4357b931ef542a2f91478aed~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=Uel6AGN%2BElQQaQvPnS%2Bfk6jrXr4%3D",
+                    "duration": 12551,
+                    "title": "装穷提亲，娶到全家嫌弃的她",
+                    "video_desc": "顾承川装穷提亲，本想退掉爷爷定下的婚约，却被林家塞来不受待见的长女林小满。她不嫌他穷，甚至愿卖掉母亲遗镯替他还债。他被真心打动，决意护她一生。婚礼当天，百万彩礼、千万豪宅接连送到，嫌贫爱富的林家彻底傻眼！",
+                    "series_id": "7701328280862854168",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"3\",\"queue_names\":\"aigc,shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7701328280862854168\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"absolute_staytime\\\":0.27125728130340576,\\\"collect\\\":0.046724967658519745,\\\"staytime_stream\\\":2.3180344104766846,\\\"normalized_duration\\\":0.6913281679153442,\\\"like\\\":0.07696083933115005,\\\"stream_ctr\\\":0.09924743324518204,\\\"finish\\\":0.001810210756957531}\"}",
+                    "recommend_group_id": "7701328280862854168",
+                    "play_cnt": 17375571,
+                    "book_exist": false,
+                    "copyright": "新美九天深圳数字科技有限公司",
+                    "sub_title": "爱情·全80集",
+                    "score": "8.1",
+                    "use_video_model": true,
+                    "episode_cnt": 80,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5463,\"name\":\"爱情\",\"schema\":\"dragon8662://categorySearch?categoryId=5463&categoryName=爱情&genreType=130&gender=1&source=detail\"},{\"category_id\":5491,\"name\":\"都市爱情\",\"schema\":\"dragon8662://categorySearch?categoryId=5491&categoryName=都市爱情&genreType=130&gender=1&source=detail\"},{\"category_id\":5669,\"name\":\"替嫁\",\"schema\":\"dragon8662://categorySearch?categoryId=5669&categoryName=替嫁&genreType=130&gender=1&source=detail\"},{\"category_id\":5672,\"name\":\"隐藏大佬\",\"schema\":\"dragon8662://categorySearch?categoryId=5672&categoryName=隐藏大佬&genreType=130&gender=1&source=detail\"},{\"category_id\":5663,\"name\":\"先婚后爱\",\"schema\":\"dragon8662://categorySearch?categoryId=5663&categoryName=先婚后爱&genreType=130&gender=1&source=detail\"},{\"category_id\":5777,\"name\":\"总裁\",\"schema\":\"dragon8662://categorySearch?categoryId=5777&categoryName=总裁&genreType=130&gender=1&source=detail\"},{\"category_id\":5826,\"name\":\"灰姑娘\",\"schema\":\"dragon8662://categorySearch?categoryId=5826&categoryName=灰姑娘&genreType=130&gender=1&source=detail\"},{\"category_id\":5843,\"name\":\"极品亲戚\",\"schema\":\"dragon8662://categorySearch?categoryId=5843&categoryName=极品亲戚&genreType=130&gender=1&source=detail\"},{\"category_id\":5845,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5845&categoryName=现代&genreType=130&gender=1&source=detail\"}]",
+                    "color_dominate": "#301818",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "6518万",
+                        "data_type": 27,
+                        "rec_icon_url": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png",
+                        "rec_icon_url_dark": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png"
+                      },
+                      {
+                        "content": "爱情",
+                        "data_type": 3
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "爆剧",
+                      "bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "dark_bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": true,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"爆剧\",\"bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"dark_bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"6518万\",\"data_type\":27,\"rec_icon_url\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png\",\"rec_icon_url_dark\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png\"},{\"content\":\"爱情\",\"data_type\":3}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7700943522404240409",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/c15172543c91990298f0de1b39512434~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=UTTlxMcreBbV09H4hIADH4n1DxQ%3D",
+                    "duration": 7367,
+                    "title": "重生螳螂，觉醒无限吞噬进化",
+                    "video_desc": "史克螂意外重生，变成蛮荒丛林里一只弱小螳螂。身处弱肉强食的残酷世界，毒虫凶兽遍布四周，步步危机。所幸觉醒“无限吞噬进化”天赋！吞噬血肉，掠夺基因，不断蜕变外骨骼，解锁各类神通。猎杀猛兽，吞噬异种，持续进化变强。从底层小虫起步，挥动锋利镰刃，踏过无尽凶险，以吞噬之道，一步步成长为震慑万族的虫族至尊。",
+                    "series_id": "7700941738487073817",
+                    "episode": true,
+                    "vertical": false,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"4\",\"queue_names\":\"comics,shortplay\",\"final_queue_name\":\"comic\",\"gid\":\"7700941738487073817\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"stream_ctr\\\":0.04728325456380844,\\\"finish\\\":0.004198795184493065,\\\"absolute_staytime\\\":0.23021309077739716,\\\"collect\\\":0.05749328434467316,\\\"staytime_stream\\\":1.892871618270874,\\\"normalized_duration\\\":0.6713682413101196,\\\"like\\\":0.06187598779797554}\"}",
+                    "recommend_group_id": "7700941738487073817",
+                    "play_cnt": 30904008,
+                    "book_exist": false,
+                    "copyright": "陆尤器",
+                    "sub_title": "奇幻·全96集",
+                    "score": "8.3",
+                    "use_video_model": true,
+                    "episode_cnt": 96,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5975,\"name\":\"奇幻\",\"schema\":\"dragon8662://categorySearch?categoryId=5975&categoryName=奇幻&genreType=130&gender=1&source=detail\"},{\"category_id\":5415,\"name\":\"3D\",\"schema\":\"dragon8662://categorySearch?categoryId=5415&categoryName=3D&genreType=130&gender=1&source=detail\"},{\"category_id\":5976,\"name\":\"奇幻脑洞\",\"schema\":\"dragon8662://categorySearch?categoryId=5976&categoryName=奇幻脑洞&genreType=130&gender=1&source=detail\"},{\"category_id\":6090,\"name\":\"穿越\",\"schema\":\"dragon8662://categorySearch?categoryId=6090&categoryName=穿越&genreType=130&gender=1&source=detail\"},{\"category_id\":6099,\"name\":\"系统\",\"schema\":\"dragon8662://categorySearch?categoryId=6099&categoryName=系统&genreType=130&gender=1&source=detail\"},{\"category_id\":6112,\"name\":\"升级流\",\"schema\":\"dragon8662://categorySearch?categoryId=6112&categoryName=升级流&genreType=130&gender=1&source=detail\"},{\"category_id\":6299,\"name\":\"异界\",\"schema\":\"dragon8662://categorySearch?categoryId=6299&categoryName=异界&genreType=130&gender=1&source=detail\"}]",
+                    "color_dominate": "#301018",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "6216万",
+                        "data_type": 27,
+                        "rec_icon_url": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png",
+                        "rec_icon_url_dark": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png"
+                      },
+                      {
+                        "content": "奇幻",
+                        "data_type": 3
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "爆剧",
+                      "bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "dark_bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": true,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"爆剧\",\"bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"dark_bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"6216万\",\"data_type\":27,\"rec_icon_url\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png\",\"rec_icon_url_dark\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png\"},{\"content\":\"奇幻\",\"data_type\":3}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7575197731212250136",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/bebe009ee3120aef71007d3ae1719748~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=%2B8ynV4Rra17SnV3SG5qV99Nhjnc%3D",
+                    "duration": 2746,
+                    "title": "金屋难藏娇",
+                    "video_desc": "江旅集团总裁姜南，出差期间，未婚夫许墨言冒充她总裁的身份，将她价值十亿的别墅，借给小三宋媛菲举办闺蜜聚会派对，将别墅弄得一团糟，闺蜜为了炫耀，将这一幕悄悄直播了出去。在外出差的姜南刷到了这场直播。姜南怀着怒火回到别墅，宋媛菲却将她误认成是小三，直到管家到来，拿出别墅房本证明姜南的身份，宋媛菲才知，许墨言只是个吃软饭的渣男，小三竟是她自己。",
+                    "series_id": "7575194897678863385",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"5\",\"queue_names\":\"shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7575194897678863385\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"normalized_duration\\\":0.6160821318626404,\\\"like\\\":0.05582313612103462,\\\"absolute_staytime\\\":0.1474800407886505,\\\"stream_ctr\\\":0.03357873484492302,\\\"staytime_stream\\\":1.3895516395568848,\\\"collect\\\":0.03161877393722534,\\\"finish\\\":0.06278920918703079}\"}",
+                    "recommend_group_id": "7575194897678863385",
+                    "play_cnt": 10537,
+                    "book_exist": false,
+                    "copyright": "长沙古言",
+                    "sub_title": "都市·女性成长",
+                    "score": "8.0",
+                    "use_video_model": true,
+                    "episode_cnt": 39,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5022,\"name\":\"都市\",\"schema\":\"dragon8662://categorySearch?categoryId=5022&categoryName=都市&genreType=130&gender=0&source=detail\"},{\"category_id\":5045,\"name\":\"女性成长\",\"schema\":\"dragon8662://categorySearch?categoryId=5045&categoryName=女性成长&genreType=130&gender=0&source=detail\"},{\"category_id\":5176,\"name\":\"虐渣\",\"schema\":\"dragon8662://categorySearch?categoryId=5176&categoryName=虐渣&genreType=130&gender=0&source=detail\"},{\"category_id\":5103,\"name\":\"暗恋成真\",\"schema\":\"dragon8662://categorySearch?categoryId=5103&categoryName=暗恋成真&genreType=130&gender=0&source=detail\"},{\"category_id\":5163,\"name\":\"马甲文\",\"schema\":\"dragon8662://categorySearch?categoryId=5163&categoryName=马甲文&genreType=130&gender=0&source=detail\"},{\"category_id\":5260,\"name\":\"大女主\",\"schema\":\"dragon8662://categorySearch?categoryId=5260&categoryName=大女主&genreType=130&gender=0&source=detail\"},{\"category_id\":5206,\"name\":\"总裁\",\"schema\":\"dragon8662://categorySearch?categoryId=5206&categoryName=总裁&genreType=130&gender=0&source=detail\"},{\"category_id\":5338,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5338&categoryName=现代&genreType=130&gender=0&source=detail\"}]",
+                    "color_dominate": "#c0a898",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "都市",
+                        "data_type": 3
+                      },
+                      {
+                        "content": "1518万热度",
+                        "data_type": 27
+                      }
+                    ],
+                    "pay_info": {},
+                    "support_listen": false,
+                    "recommend_reason_list": "{\"sub_title_list\":[{\"content\":\"都市\",\"data_type\":3},{\"content\":\"1518万热度\",\"data_type\":27}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7467591654224972825",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/68645a496eac27ff47fbcdf5cb93815d~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=Q4h2ctlqvlIVIowNljvVenkcb70%3D",
+                    "duration": 5000,
+                    "title": "缚心",
+                    "video_desc": "顾玥岚乃是京都首富顾家大小姐，她善良坚韧，敢爱敢恨，与司晨结婚6年，却没想到司晨狼子野心，为了得到顾家财产，不但设计害死了顾玥岚父母，还让情人楚歌取代了她的人生。顾玥岚得知竟然是自己的丈夫谋害自己，震惊又愤怒。",
+                    "series_id": "7466393282210188312",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"6\",\"queue_names\":\"shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7466393282210188312\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"normalized_duration\\\":0.618493378162384,\\\"like\\\":0.05108273774385452,\\\"absolute_staytime\\\":0.12131377309560776,\\\"collect\\\":0.03308597579598427,\\\"staytime_stream\\\":1.1352572441101074,\\\"finish\\\":0.00690383929759264,\\\"stream_ctr\\\":0.040496885776519775}\"}",
+                    "recommend_group_id": "7466393282210188312",
+                    "play_cnt": 68774,
+                    "book_exist": false,
+                    "copyright": "树下的椰子",
+                    "sub_title": "都市·逆袭翻身",
+                    "score": "8.1",
+                    "use_video_model": true,
+                    "episode_cnt": 62,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5022,\"name\":\"都市\",\"schema\":\"dragon8662://categorySearch?categoryId=5022&categoryName=都市&genreType=130&gender=0&source=detail\"},{\"category_id\":5070,\"name\":\"逆袭翻身\",\"schema\":\"dragon8662://categorySearch?categoryId=5070&categoryName=逆袭翻身&genreType=130&gender=0&source=detail\"},{\"category_id\":5168,\"name\":\"错位人生\",\"schema\":\"dragon8662://categorySearch?categoryId=5168&categoryName=错位人生&genreType=130&gender=0&source=detail\"},{\"category_id\":5151,\"name\":\"财产争夺\",\"schema\":\"dragon8662://categorySearch?categoryId=5151&categoryName=财产争夺&genreType=130&gender=0&source=detail\"},{\"category_id\":5254,\"name\":\"揭露阴谋\",\"schema\":\"dragon8662://categorySearch?categoryId=5254&categoryName=揭露阴谋&genreType=130&gender=0&source=detail\"},{\"category_id\":5142,\"name\":\"强取豪夺\",\"schema\":\"dragon8662://categorySearch?categoryId=5142&categoryName=强取豪夺&genreType=130&gender=0&source=detail\"},{\"category_id\":5338,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5338&categoryName=现代&genreType=130&gender=0&source=detail\"}]",
+                    "color_dominate": "#301808",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "都市",
+                        "data_type": 3
+                      },
+                      {
+                        "content": "1853万热度",
+                        "data_type": 27
+                      }
+                    ],
+                    "pay_info": {},
+                    "support_listen": false,
+                    "recommend_reason_list": "{\"sub_title_list\":[{\"content\":\"都市\",\"data_type\":3},{\"content\":\"1853万热度\",\"data_type\":27}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7677804745699888153",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/596f73a90e0c4cff2d95ee3b1afd4268~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=YrvzfQk4%2B6NeDWYfzU9aXw6ZPy4%3D",
+                    "duration": 3794,
+                    "title": "糯糯下山，师兄们都慌了",
+                    "video_desc": "青云剑宗漏雨的山门里，藏着位即将飞升的老神仙，和刚满六岁的关门弟子云糯糯。她背着玄铁重剑、揣着当糖豆的九品神丹，奉师命到修仙界寻回五位师兄。她先在天剑宗闹尽笑话，认回九天仙尊大师兄；又用神丹救下太古吞天犼，一剑劈退万兽门，骑兽硬闯九幽魔界，把众魔跪拜的幽冥帝君当成落魄二师兄心疼。丹道圣人三师兄现身，她才发现师父口中的穷师兄一个比一个显赫，名册上却还剩两个名字，等着她去掀风起浪。",
+                    "series_id": "7677801492920667198",
+                    "episode": true,
+                    "vertical": false,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"7\",\"queue_names\":\"comics\",\"final_queue_name\":\"comic\",\"gid\":\"7677801492920667198\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"absolute_staytime\\\":0.20636165142059326,\\\"collect\\\":0.07263670861721039,\\\"finish\\\":0.03210071101784706,\\\"normalized_duration\\\":0.7359150052070618,\\\"like\\\":0.058345843106508255,\\\"stream_ctr\\\":0.034333739429712296,\\\"staytime_stream\\\":1.6164840459823608}\"}",
+                    "recommend_group_id": "7677801492920667198",
+                    "play_cnt": 10630545,
+                    "book_exist": false,
+                    "copyright": "青椒剪辑",
+                    "sub_title": "玄幻·全63集",
+                    "score": "8.3",
+                    "use_video_model": true,
+                    "episode_cnt": 63,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5967,\"name\":\"玄幻\",\"schema\":\"dragon8662://categorySearch?categoryId=5967&categoryName=玄幻&genreType=130&gender=0&source=detail\"},{\"category_id\":5415,\"name\":\"3D\",\"schema\":\"dragon8662://categorySearch?categoryId=5415&categoryName=3D&genreType=130&gender=0&source=detail\"},{\"category_id\":5968,\"name\":\"玄幻仙侠\",\"schema\":\"dragon8662://categorySearch?categoryId=5968&categoryName=玄幻仙侠&genreType=130&gender=0&source=detail\"},{\"category_id\":6031,\"name\":\"轻松搞笑\",\"schema\":\"dragon8662://categorySearch?categoryId=6031&categoryName=轻松搞笑&genreType=130&gender=0&source=detail\"},{\"category_id\":6227,\"name\":\"萌宠\",\"schema\":\"dragon8662://categorySearch?categoryId=6227&categoryName=萌宠&genreType=130&gender=0&source=detail\"},{\"category_id\":6299,\"name\":\"异界\",\"schema\":\"dragon8662://categorySearch?categoryId=6299&categoryName=异界&genreType=130&gender=0&source=detail\"}]",
+                    "color_dominate": "#282828",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "4756万",
+                        "data_type": 27,
+                        "rec_icon_url": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png",
+                        "rec_icon_url_dark": "https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png"
+                      },
+                      {
+                        "content": "玄幻",
+                        "data_type": 3
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "爆剧",
+                      "bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "dark_bg_color": [
+                        "#FF6868",
+                        "#FF4C6D",
+                        "#EFB662"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": true,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"爆剧\",\"bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"dark_bg_color\":[\"#FF6868\",\"#FF4C6D\",\"#EFB662\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"4756万\",\"data_type\":27,\"rec_icon_url\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_icon.png\",\"rec_icon_url_dark\":\"https://lf3-reading.fqnovelstatic.com/obj/novel-common/img_hot_value_flame_dark_icon.png\"},{\"content\":\"玄幻\",\"data_type\":3}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7701937936731737112",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/84a71f1a5d7ef5c9c16a73b74011ef75~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=JsUMHBv0r%2BAirlRNU04f30O%2FENw%3D",
+                    "duration": 7686,
+                    "title": "十八岁太奶奶驾到，重整家族荣耀第五部",
+                    "video_desc": "纪家大少爷那个势利前妻突然回来，非要跟女儿朵朵认亲！太奶奶容遇带领纪家全体，扮穷测试前妻真心，最后却发现真相跟他们想的不一样。而后，新孙子大东又认亲回归纪家，他这个黄毛魔丸竟大闹纪家，最后反转又至！！！",
+                    "series_id": "7701935931787316286",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"8\",\"queue_names\":\"shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7701935931787316286\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"absolute_staytime\\\":0.17377392947673798,\\\"collect\\\":0.06853749603033066,\\\"stream_ctr\\\":0.07051555067300797,\\\"normalized_duration\\\":0.7489653825759888,\\\"like\\\":0.06656919419765472,\\\"staytime_stream\\\":1.5845863819122314,\\\"finish\\\":0.004468384198844433}\"}",
+                    "recommend_group_id": "7701935931787316286",
+                    "play_cnt": 37608359,
+                    "book_exist": false,
+                    "copyright": "浙江东阳小团圆文化传媒有限公司",
+                    "sub_title": "家族·家族振兴",
+                    "score": "8.1",
+                    "use_video_model": true,
+                    "episode_cnt": 102,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5002,\"name\":\"家族\",\"schema\":\"dragon8662://categorySearch?categoryId=5002&categoryName=家族&genreType=130&gender=0&source=detail\"},{\"category_id\":5050,\"name\":\"家族振兴\",\"schema\":\"dragon8662://categorySearch?categoryId=5050&categoryName=家族振兴&genreType=130&gender=0&source=detail\"},{\"category_id\":5123,\"name\":\"穿越\",\"schema\":\"dragon8662://categorySearch?categoryId=5123&categoryName=穿越&genreType=130&gender=0&source=detail\"},{\"category_id\":5177,\"name\":\"扮猪吃虎\",\"schema\":\"dragon8662://categorySearch?categoryId=5177&categoryName=扮猪吃虎&genreType=130&gender=0&source=detail\"},{\"category_id\":5221,\"name\":\"女强\",\"schema\":\"dragon8662://categorySearch?categoryId=5221&categoryName=女强&genreType=130&gender=0&source=detail\"},{\"category_id\":5206,\"name\":\"总裁\",\"schema\":\"dragon8662://categorySearch?categoryId=5206&categoryName=总裁&genreType=130&gender=0&source=detail\"},{\"category_id\":5319,\"name\":\"世家\",\"schema\":\"dragon8662://categorySearch?categoryId=5319&categoryName=世家&genreType=130&gender=0&source=detail\"},{\"category_id\":5338,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5338&categoryName=现代&genreType=130&gender=0&source=detail\"}]",
+                    "color_dominate": "#401010",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "家族",
+                        "data_type": 3
+                      },
+                      {
+                        "content": "8339万热度",
+                        "data_type": 27
+                      }
+                    ],
+                    "pay_info": {},
+                    "tag_info": {
+                      "text": "新剧",
+                      "bg_color": [
+                        "#00AE83"
+                      ],
+                      "dark_bg_color": [
+                        "#008060"
+                      ],
+                      "position": 2,
+                      "is_align_to_edge": false
+                    },
+                    "support_listen": false,
+                    "recommend_reason_list": "{\"tag_info\":{\"text\":\"新剧\",\"bg_color\":[\"#00AE83\"],\"dark_bg_color\":[\"#008060\"],\"position\":2,\"is_align_to_edge\":false},\"sub_title_list\":[{\"content\":\"家族\",\"data_type\":3},{\"content\":\"8339万热度\",\"data_type\":27}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              },
+              {
+                "cell_id": 6952850996422770718,
+                "show_type": 402,
+                "cell_name": "小卡",
+                "cell_operation_type": 0,
+                "use_recommend": false,
+                "video_data": [
+                  {
+                    "vid": "7508692084409289790",
+                    "cover": "https://p3-reading-sign.fqnovelpic.com/novel-pic/ddb7fde15f69625460e5e3d92e8c88c8~tplv-81nmtwyey9-superreso-aifit:400:0.image?lk3s=ae45642e&x-expires=1799163009&x-signature=UomPdXL%2B8irKaODLknqJ7yp58T8%3D",
+                    "duration": 7806,
+                    "title": "今天也没能辞职",
+                    "video_desc": "周聪在出租屋中，穿着随意，一边挠腿一边看着质量不佳的小说，对小说中穷人写有钱人的离谱情节深感不满。突然床断裂，他手中冰红茶饮料瓶飞起砸晕自己，随后穿越。在这个世界设定中冰红茶极为稀有珍贵。女主谭妍儿遭遇商战，出价500万购买周聪手中的冰红茶，周聪看着自己系统空间中的一卡车冰红茶陷入了沉思。",
+                    "series_id": "7508683815187909694",
+                    "episode": true,
+                    "vertical": true,
+                    "content_type": 1,
+                    "recommend_info": "{\"channel_id\":\"94349560332\",\"request_id\":\"2026110623300881CC692F4616B58B12CF\",\"rank\":\"9\",\"queue_names\":\"shortplay\",\"final_queue_name\":\"heji\",\"gid\":\"7508683815187909694\",\"plan_id\":\"1\",\"is_show_ad_flag\":\"0\",\"series_pred_score\":\"{\\\"normalized_duration\\\":0.5742517113685608,\\\"like\\\":0.047425877302885056,\\\"collect\\\":0.026759283617138863,\\\"stream_ctr\\\":0.06763875484466553,\\\"absolute_staytime\\\":0.08737902343273163,\\\"staytime_stream\\\":0.8405590057373047,\\\"finish\\\":0.0009399441769346595}\"}",
+                    "recommend_group_id": "7508683815187909694",
+                    "play_cnt": 23834,
+                    "book_exist": false,
+                    "copyright": "花生短剧",
+                    "sub_title": "都市·逆袭翻身",
+                    "score": "8.3",
+                    "use_video_model": true,
+                    "episode_cnt": 56,
+                    "video_platform": 3,
+                    "disable_play": false,
+                    "category_schema": "[{\"category_id\":5022,\"name\":\"都市\",\"schema\":\"dragon8662://categorySearch?categoryId=5022&categoryName=都市&genreType=130&gender=1&source=detail\"},{\"category_id\":5070,\"name\":\"逆袭翻身\",\"schema\":\"dragon8662://categorySearch?categoryId=5070&categoryName=逆袭翻身&genreType=130&gender=1&source=detail\"},{\"category_id\":5170,\"name\":\"穿书\",\"schema\":\"dragon8662://categorySearch?categoryId=5170&categoryName=穿书&genreType=130&gender=1&source=detail\"},{\"category_id\":5130,\"name\":\"系统\",\"schema\":\"dragon8662://categorySearch?categoryId=5130&categoryName=系统&genreType=130&gender=1&source=detail\"},{\"category_id\":5104,\"name\":\"日久生情\",\"schema\":\"dragon8662://categorySearch?categoryId=5104&categoryName=日久生情&genreType=130&gender=1&source=detail\"},{\"category_id\":5224,\"name\":\"大男主\",\"schema\":\"dragon8662://categorySearch?categoryId=5224&categoryName=大男主&genreType=130&gender=1&source=detail\"},{\"category_id\":5338,\"name\":\"现代\",\"schema\":\"dragon8662://categorySearch?categoryId=5338&categoryName=现代&genreType=130&gender=1&source=detail\"},{\"category_id\":5360,\"name\":\"都市脑洞\",\"schema\":\"dragon8662://categorySearch?categoryId=5360&categoryName=都市脑洞&genreType=130&gender=1&source=detail\"}]",
+                    "color_dominate": "#201818",
+                    "horiz_cover": "",
+                    "sub_title_list": [
+                      {
+                        "content": "都市",
+                        "data_type": 3
+                      },
+                      {
+                        "content": "1955万热度",
+                        "data_type": 27
+                      }
+                    ],
+                    "pay_info": {},
+                    "support_listen": false,
+                    "recommend_reason_list": "{\"sub_title_list\":[{\"content\":\"都市\",\"data_type\":3},{\"content\":\"1955万热度\",\"data_type\":27}]}"
+                  }
+                ],
+                "category_tag_ids": null,
+                "style": {
+                  "cover_size": 0,
+                  "interval_type": 0,
+                  "use_wide_item_space": false,
+                  "use_new_booklist_style": false,
+                  "with_favorite_button": false,
+                  "show_more_book_abstract": false,
+                  "candidate_postion": 0,
+                  "jump_to_page": 0,
+                  "topic_square_with_book": false,
+                  "use_aweme_sdk": false,
+                  "use_new_one_to_one_point_four_ratio_style": false,
+                  "hide_tab_selector": false,
+                  "audio_both_jump_player": false,
+                  "show_username": false,
+                  "use_selector_v2": false,
+                  "video_inner_next_item": 0
+                },
+                "group_id_type": 9,
+                "cell_long_press_action": {
+                  "type": 0
+                },
+                "cell_item_source_info": {
+                  "item_source": 1
+                },
+                "ai_search_placeholder": null,
+                "push_start_info": null,
+                "book_hot_content_data": null
+              }
+            ],
+            "category_tag_ids": null,
+            "style": {
+              "cover_size": 0,
+              "interval_type": 0,
+              "use_wide_item_space": false,
+              "use_new_booklist_style": false,
+              "with_favorite_button": false,
+              "show_more_book_abstract": false,
+              "candidate_postion": 0,
+              "jump_to_page": 0,
+              "topic_square_with_book": false,
+              "use_aweme_sdk": false,
+              "use_new_one_to_one_point_four_ratio_style": false,
+              "hide_tab_selector": false,
+              "use_new_video_feed_style": true,
+              "audio_both_jump_player": false,
+              "show_username": false,
+              "use_selector_v2": false
+            },
+            "cell_selector": {
+              "outer_row": {
+                "items": [
+                  {
+                    "show_name": "推荐榜",
+                    "selector_item_id": "ranklist_hot",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "新剧",
+                    "selector_item_id": "firstonlinetime_new",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "现代",
+                    "selector_item_id": "cate_757",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "逆袭",
+                    "selector_item_id": "cate_739",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "都市",
+                    "selector_item_id": "cate_1",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "打脸虐渣",
+                    "selector_item_id": "cate_1051",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "都市日常",
+                    "selector_item_id": "cate_261",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "剧情",
+                    "selector_item_id": "cate_316",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "总裁",
+                    "selector_item_id": "cate_29",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  },
+                  {
+                    "show_name": "都市爱情",
+                    "selector_item_id": "cate_1021",
+                    "is_selected": false,
+                    "recommend_group_id": "",
+                    "recommend_info": "",
+                    "selector_item_type": "",
+                    "show_type": 0
+                  }
+                ],
+                "row_name": "",
+                "type": "outer_row",
+                "selection_type": 1,
+                "multi_selection_bound": 10
+              },
+              "inner_rows": [
+                {
+                  "items": [
+                    {
+                      "show_name": "推荐榜",
+                      "selector_item_id": "ranklist_hot",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "新剧",
+                      "selector_item_id": "firstonlinetime_new",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    }
+                  ],
+                  "row_name": "综合",
+                  "type": "other",
+                  "selection_type": 1
+                },
+                {
+                  "items": [
+                    {
+                      "show_name": "校园",
+                      "selector_item_id": "cate_4",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "乡村",
+                      "selector_item_id": "cate_11",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "职场",
+                      "selector_item_id": "cate_127",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "历史古代",
+                      "selector_item_id": "cate_273",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "古装",
+                      "selector_item_id": "cate_308",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "民国",
+                      "selector_item_id": "cate_390",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    }
+                  ],
+                  "row_name": "时代背景",
+                  "type": "history_background",
+                  "selection_type": 1
+                },
+                {
+                  "items": [
+                    {
+                      "show_name": "现代言情",
+                      "selector_item_id": "cate_3",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "系统",
+                      "selector_item_id": "cate_19",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "重生",
+                      "selector_item_id": "cate_36",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "穿越",
+                      "selector_item_id": "cate_37",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "娱乐圈",
+                      "selector_item_id": "cate_43",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "悬疑推理",
+                      "selector_item_id": "cate_165",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "都市日常",
+                      "selector_item_id": "cate_261",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "马甲",
+                      "selector_item_id": "cate_266",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "喜剧",
+                      "selector_item_id": "cate_303",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "剧情",
+                      "selector_item_id": "cate_316",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "穿书",
+                      "selector_item_id": "cate_382",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "现言甜宠",
+                      "selector_item_id": "cate_395",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "古风爱情",
+                      "selector_item_id": "cate_439",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "闪婚",
+                      "selector_item_id": "cate_466",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "破镜重圆",
+                      "selector_item_id": "cate_475",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "异能",
+                      "selector_item_id": "cate_598",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "逆袭",
+                      "selector_item_id": "cate_739",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "追妻",
+                      "selector_item_id": "cate_842",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "传承觉醒",
+                      "selector_item_id": "cate_1007",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "虐恋",
+                      "selector_item_id": "cate_1008",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "玄幻仙侠",
+                      "selector_item_id": "cate_1013",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "奇幻爱情",
+                      "selector_item_id": "cate_1020",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "年代爱情",
+                      "selector_item_id": "cate_1022",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "家庭伦理",
+                      "selector_item_id": "cate_1024",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "战神归来",
+                      "selector_item_id": "cate_1038",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "亲情",
+                      "selector_item_id": "cate_1040",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "奇幻脑洞",
+                      "selector_item_id": "cate_1041",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "无敌神医",
+                      "selector_item_id": "cate_1043",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "赘婿逆袭",
+                      "selector_item_id": "cate_1044",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "古风权谋",
+                      "selector_item_id": "cate_1047",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "女性成长",
+                      "selector_item_id": "cate_1048",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "暗恋成真",
+                      "selector_item_id": "cate_1050",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "打脸虐渣",
+                      "selector_item_id": "cate_1051",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "豪门恩怨",
+                      "selector_item_id": "cate_1053",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    }
+                  ],
+                  "row_name": "主题情节",
+                  "type": "theme_plot",
+                  "selection_type": 1
+                },
+                {
+                  "items": [
+                    {
+                      "show_name": "神豪",
+                      "selector_item_id": "cate_20",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "萌宝",
+                      "selector_item_id": "cate_28",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "皇后",
+                      "selector_item_id": "cate_84",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "王妃",
+                      "selector_item_id": "cate_85",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "团宠",
+                      "selector_item_id": "cate_94",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "女帝",
+                      "selector_item_id": "cate_378",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "青梅竹马",
+                      "selector_item_id": "cate_387",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "替身",
+                      "selector_item_id": "cate_470",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "大叔",
+                      "selector_item_id": "cate_737",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "大女主",
+                      "selector_item_id": "cate_760",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "真假千金",
+                      "selector_item_id": "cate_844",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "龙王",
+                      "selector_item_id": "cate_901",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "小人物",
+                      "selector_item_id": "cate_1010",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "强者回归",
+                      "selector_item_id": "cate_1045",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "天下无敌",
+                      "selector_item_id": "cate_1046",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "强强联合",
+                      "selector_item_id": "cate_1049",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    },
+                    {
+                      "show_name": "欢喜冤家",
+                      "selector_item_id": "cate_1052",
+                      "is_selected": false,
+                      "recommend_group_id": "",
+                      "recommend_info": "",
+                      "selector_item_type": "",
+                      "show_type": 0
+                    }
+                  ],
+                  "row_name": "角色设定",
+                  "type": "character_setting",
+                  "selection_type": 1
+                }
+              ],
+              "inner_title": "筛选",
+              "global_single": true,
+              "show_style": 0
+            },
+            "ai_search_placeholder": null,
+            "push_start_info": null,
+            "book_hot_content_data": null
+          }
+        ],
+        "bottom_unlimited": true,
+        "bookstore_id": 7231099321918160954,
+        "session_id": "2026110623300881CC692F4616B58B12CF",
+        "next_offset": 1,
+        "has_more": false,
+        "client_template": 2,
+        "extra": {
+          "tab_content_type": "4"
+        },
+        "version_tag": "video_feed_refactor",
+        "tab_version": "default",
+        "nps_insert_rank": {
+          "2": 3,
+          "4": 3,
+          "1": 3,
+          "3": 3
+        }
+      },
+      {
+        "tab_type": 14,
+        "client_tab_type": 0,
+        "title": "电影",
+        "client_template": 2
+      },
+      {
+        "tab_type": 5,
+        "client_tab_type": 0,
+        "title": "听书",
+        "client_template": 0
+      },
+      {
+        "tab_type": 2,
+        "client_tab_type": 0,
+        "title": "小说",
+        "client_template": 0
+      },
+      {
+        "tab_type": 9,
+        "client_tab_type": 0,
+        "title": "漫画",
+        "client_template": 4
+      },
+      {
+        "tab_type": 11,
+        "client_tab_type": 0,
+        "title": "经典",
+        "client_template": 0
+      },
+      {
+        "tab_type": 12,
+        "client_tab_type": 0,
+        "title": "知识",
+        "client_template": 0
+      }
+    ],
+    "order_data": {
+      "enable_self_sort": false
+    },
+    "cold_start_info": {
+      "cold_start_attributes_user_tag": [],
+      "book_id": "",
+      "start_type": "",
+      "operation": "",
+      "kol_words_info": "",
+      "cold_start_strategy": ""
+    }
+  },
+  "log_id": "2026110623300881CC692F4616B58B12CF",
+  "code": 0,
+  "message": "SUCCESS"
+}

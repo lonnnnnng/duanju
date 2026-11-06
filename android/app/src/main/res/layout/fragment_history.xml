@@ -63,13 +63,16 @@
                 android:textColor="@color/app_on_surface_variant"
                 android:textSize="13sp" />
 
-            <TextView
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/history_home"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
-                android:text="去首页挑一部短剧吧"
-                android:textColor="@color/app_text_tertiary"
-                android:textSize="12sp" />
+                android:minHeight="48dp"
+                android:text="@string/history_home"
+                android:textColor="@color/choice_selected_foreground"
+                android:textSize="13sp" />
         </LinearLayout>
     </FrameLayout>
 </LinearLayout>

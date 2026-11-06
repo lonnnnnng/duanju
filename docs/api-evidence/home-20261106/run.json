@@ -1,0 +1,10 @@
+{
+  "startedAt": "2026-11-06T23:30:08.227442+08:00",
+  "recipeVersion": 5,
+  "recipeSha256": "c4a2b2d163b1680d4ed5b0bd7126de89c2318b5abc3369cb4ae42f07813b5fe5",
+  "commonParamsSource": "android/app/src/main/java/com/duanju/player/core/RecipeHttp.kt",
+  "transport": "Python urllib 3.14.10; 非手机 HTTP 栈",
+  "identity": "本轮随机生成，非用户身份；每次 request.json 均完整保留",
+  "sign": "none",
+  "automaticRetries": false
+}

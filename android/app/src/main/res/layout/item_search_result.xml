@@ -80,7 +80,7 @@
                 android:layout_marginStart="6dp"
                 android:ellipsize="end"
                 android:maxLines="1"
-                android:textColor="@color/accent_warm"
+                android:textColor="@color/home_card_score"
                 android:textSize="12sp"
                 android:textStyle="bold"
                 android:visibility="gone" />
@@ -90,7 +90,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:textColor="@color/nav_icon_inactive"
+                android:textColor="@color/app_on_surface_variant"
                 android:textSize="12sp"
                 android:visibility="gone" />
         </LinearLayout>
@@ -112,7 +112,7 @@
             android:layout_marginTop="6dp"
             android:ellipsize="end"
             android:maxLines="1"
-            android:textColor="@color/nav_icon_inactive"
+            android:textColor="@color/app_on_surface_variant"
             android:textSize="11sp" />
     </LinearLayout>
 

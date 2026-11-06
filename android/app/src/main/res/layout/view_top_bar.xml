@@ -5,11 +5,11 @@
 
     <ImageButton
         android:id="@+id/bar_back"
-        android:layout_width="38dp"
-        android:layout_height="38dp"
-        android:background="@drawable/bg_glass_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:background="@drawable/bg_back_button"
         android:contentDescription="返回"
-        android:padding="9dp"
+        android:padding="14dp"
         android:src="@drawable/ic_back" />
 
     <TextView

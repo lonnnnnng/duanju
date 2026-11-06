@@ -10,7 +10,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingBottom="28dp">
+        android:paddingBottom="@dimen/home_bottom_clearance">
 
         <TextView
             android:layout_width="wrap_content"
@@ -50,8 +50,11 @@
             android:orientation="vertical">
 
             <LinearLayout
+                android:id="@+id/row_auto_next"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="14dp">
@@ -60,15 +63,16 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="自动连播下一集"
+                    android:text="@string/setting_auto_next"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="13.5sp" />
 
                 <Switch
                     android:id="@+id/auto_next"
+                    android:contentDescription="@string/setting_auto_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minHeight="0dp"
+                    android:minHeight="48dp"
                     android:thumb="@drawable/switch_thumb"
                     android:track="@drawable/switch_track" />
             </LinearLayout>
@@ -80,8 +84,11 @@
                 android:background="@color/divider" />
 
             <LinearLayout
+                android:id="@+id/row_prefetch"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="2dp"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
                 android:paddingHorizontal="14dp">
@@ -90,15 +97,16 @@
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
-                    android:text="预加载下一集"
+                    android:text="@string/setting_prefetch_next"
                     android:textColor="?android:attr/textColorPrimary"
                     android:textSize="13.5sp" />
 
                 <Switch
                     android:id="@+id/prefetch_next"
+                    android:contentDescription="@string/setting_prefetch_next"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minHeight="0dp"
+                    android:minHeight="48dp"
                     android:thumb="@drawable/switch_thumb"
                     android:track="@drawable/switch_track" />
             </LinearLayout>
@@ -112,7 +120,9 @@
             <LinearLayout
                 android:id="@+id/row_speed"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -130,7 +140,7 @@
                     android:id="@+id/speed_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView
@@ -149,7 +159,9 @@
             <LinearLayout
                 android:id="@+id/row_cache"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -167,7 +179,7 @@
                     android:id="@+id/cache_size"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView
@@ -187,7 +199,9 @@
             <LinearLayout
                 android:id="@+id/row_cache_limit"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -205,7 +219,7 @@
                     android:id="@+id/cache_limit_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView
@@ -225,7 +239,9 @@
             <LinearLayout
                 android:id="@+id/row_theme"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -243,7 +259,7 @@
                     android:id="@+id/theme_value"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView
@@ -275,7 +291,9 @@
             <LinearLayout
                 android:id="@+id/row_version"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -293,7 +311,7 @@
                     android:id="@+id/version"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView
@@ -313,7 +331,9 @@
             <LinearLayout
                 android:id="@+id/row_recipe"
                 android:layout_width="match_parent"
-                android:layout_height="52dp"
+                android:layout_height="wrap_content"
+                android:minHeight="52dp"
+                android:paddingVertical="8dp"
                 android:background="?attr/selectableItemBackground"
                 android:gravity="center_vertical"
                 android:orientation="horizontal"
@@ -329,9 +349,12 @@
 
                 <TextView
                     android:id="@+id/recipe_value"
+                    android:maxWidth="180dp"
+                    android:maxLines="2"
+                    android:gravity="end"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:textColor="@color/nav_icon_inactive"
+                    android:textColor="@color/app_on_surface_variant"
                     android:textSize="12sp" />
 
                 <ImageView

@@ -7,12 +7,12 @@
     android:background="?android:attr/colorBackground"
     android:orientation="vertical">
 
-    <!-- 顶栏：返回 + 剧名（全屏时隐藏，改用播放器内的悬浮返回栏） -->
+    <!-- long: 普通播放返回栏与状态栏共用页面底色；全屏时由视频内悬浮返回栏接管。 -->
     <com.duanju.player.TopBar
         android:id="@+id/player_top_bar"
         android:layout_width="match_parent"
         android:layout_height="50dp"
-        android:background="@color/app_bg_elevated"
+        android:background="@color/app_bg"
         android:paddingHorizontal="6dp" />
 
     <FrameLayout
@@ -21,10 +21,12 @@
         android:layout_height="wrap_content"
         android:background="#FF000000">
 
+        <!-- long: 关闭分两阶段的显隐，按钮与进度条随同一个控制器同时收起，小窗和全屏行为一致。 -->
         <androidx.media3.ui.PlayerView
             android:id="@+id/player_view"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            app:animation_enabled="false"
             app:controller_layout_id="@layout/duanju_controller"
             app:resize_mode="fit" />
 
@@ -36,6 +38,37 @@
             android:indeterminateTint="@color/accent"
             android:visibility="gone" />
 
+        <!-- long: 取流或解码失败时在视频内保留恢复入口，全屏也能直接重试本集。 -->
+        <LinearLayout
+            android:id="@+id/playback_error"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:layout_margin="16dp"
+            android:background="@drawable/bg_playback_error"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:visibility="gone">
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/playback_unavailable"
+                android:textColor="@color/player_icon"
+                android:textSize="13sp" />
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/playback_retry"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:minHeight="48dp"
+                android:text="@string/playback_retry"
+                android:textSize="13sp"
+                android:textColor="@color/choice_selected_foreground"
+                app:backgroundTint="@color/choice_selected_background"
+                app:cornerRadius="999dp" />
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/fullscreen_top_bar"
             android:layout_width="match_parent"
@@ -44,22 +77,23 @@
             android:background="@drawable/bg_bottom_scrim"
             android:gravity="center_vertical"
             android:orientation="horizontal"
-            android:paddingTop="24dp"
+            android:paddingTop="10dp"
             android:paddingBottom="10dp"
             android:paddingHorizontal="6dp"
             android:visibility="gone">
 
             <ImageButton
                 android:id="@+id/fullscreen_back"
-                android:layout_width="38dp"
-                android:layout_height="38dp"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
                 android:layout_marginStart="6dp"
                 android:background="@drawable/bg_player_glass"
-                android:contentDescription="返回"
-                android:padding="9dp"
+                android:contentDescription="@string/exit_fullscreen"
+                android:padding="14dp"
                 android:src="@drawable/ic_back"
                 app:tint="@color/player_icon" />
 
+            <!-- long: 全屏顶栏覆盖在视频与黑色遮罩上，文字固定白色，避免浅色主题的深色正文在此不可读。 -->
             <TextView
                 android:id="@+id/fullscreen_title"
                 android:layout_width="0dp"
@@ -70,7 +104,7 @@
                 android:ellipsize="end"
                 android:fontFamily="sans-serif-medium"
                 android:maxLines="1"
-                android:textColor="@color/app_on_bg"
+                android:textColor="@color/player_icon"
                 android:textSize="15sp" />
         </LinearLayout>
     </FrameLayout>
@@ -103,7 +137,7 @@
                 android:maxLines="2"
                 android:minLines="2"
                 android:text="准备播放"
-                android:textColor="@color/nav_icon_inactive"
+                android:textColor="@color/app_on_surface_variant"
                 android:textSize="11sp" />
         </LinearLayout>
     </LinearLayout>
@@ -136,6 +170,9 @@
                     android:fontFamily="sans-serif-medium"
                     android:paddingHorizontal="2dp"
                     android:paddingVertical="3dp"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:gravity="center"
                     android:text="选集"
                     android:textColor="@color/app_on_bg"
                     android:textSize="15sp" />
@@ -161,6 +198,9 @@
                     android:layout_height="wrap_content"
                     android:paddingHorizontal="2dp"
                     android:paddingVertical="3dp"
+                    android:minHeight="48dp"
+                    android:minWidth="48dp"
+                    android:gravity="center"
                     android:text="相关"
                     android:textColor="@color/app_on_surface_variant"
                     android:textSize="15sp" />
@@ -185,9 +225,9 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:checked="true"
-                android:minHeight="0dp"
+                android:minHeight="48dp"
                 android:text="自动连播"
-                android:textColor="@color/nav_icon_inactive"
+                android:textColor="@color/app_on_surface_variant"
                 android:textSize="11sp"
                 android:thumb="@drawable/switch_thumb"
                 android:track="@drawable/switch_track" />

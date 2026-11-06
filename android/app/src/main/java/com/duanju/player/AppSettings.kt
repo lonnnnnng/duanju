@@ -22,6 +22,13 @@ object AppSettings {
     const val DEFAULT_CACHE_LIMIT_MB = 2048
     const val MIN_CACHE_LIMIT_MB = 128
 
+    /** long: 自定义 GB 不能静默钳制或溢出成 Int.MAX_VALUE，保存前统一验证实际 MB 范围。 */
+    internal fun parseCacheLimitGb(value: String): Int? {
+        val gb = value.trim().toDoubleOrNull() ?: return null
+        val mb = gb * 1024
+        return if (gb.isFinite() && mb >= MIN_CACHE_LIMIT_MB && mb <= Int.MAX_VALUE) mb.toInt() else null
+    }
+
     /** 主题模式：0 跟随系统 / 1 深色 / 2 浅色。 */
     const val THEME_FOLLOW_SYSTEM = 0
     const val THEME_DARK = 1

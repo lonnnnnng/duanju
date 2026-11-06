@@ -1,0 +1,106 @@
+{
+  "status": 200,
+  "reason": "OK",
+  "headers": [
+    [
+      "Content-Type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "Content-Length",
+      "46117"
+    ],
+    [
+      "Connection",
+      "close"
+    ],
+    [
+      "X-Dynamic-Status",
+      "MISS from KS-CLOUD-JN-UN-09-06"
+    ],
+    [
+      "Date",
+      "Fri, 06 Nov 2026 15:30:22 GMT"
+    ],
+    [
+      "Vary",
+      "Accept-Encoding"
+    ],
+    [
+      "tt_stable",
+      "1"
+    ],
+    [
+      "inner_dur",
+      "1494"
+    ],
+    [
+      "receive_interval",
+      "1793979021204"
+    ],
+    [
+      "rsp_send_interval",
+      "1793979022698"
+    ],
+    [
+      "s-trace-info",
+      "bookstore_after_recommend_dur=142;before_bookstore_dur=649;bookstore_before_recommend_dur=144"
+    ],
+    [
+      "bookstore_dur",
+      "838"
+    ],
+    [
+      "recommend_dur",
+      "551"
+    ],
+    [
+      "X-Tt-Agw-Login",
+      "0"
+    ],
+    [
+      "X-Agw-Info",
+      "<redacted>"
+    ],
+    [
+      "X-Tt-Logid",
+      "20261106233021D5A83ACCC4E1D3A2F8C6"
+    ],
+    [
+      "Server-Timing",
+      "inner; dur=1548,tt_agw; dur=1542"
+    ],
+    [
+      "tt-idc-switch",
+      "10000@20260923113030"
+    ],
+    [
+      "x-tt-trace-host",
+      "01b234d3853aeaad057b3e8bcc8845daf4043b1d7367793d0e6467fff32020838fbfe106e255d786717206688d21bc31af708162b8ac2ac7d874debe815c7ad9efac9bd560b4d2fb0c28dcdda28ce7b36fda829e2088ec904b33ab47b3cf20cae384a008efe550b3068b2ade279980ee4a327024465bd18863a556a2b465cdbe6c0b45340085ea8f4d39b2481f9da27177"
+    ],
+    [
+      "x-tt-trace-tag",
+      "id=06;cdn-cache=miss;type=dyn"
+    ],
+    [
+      "x-tt-trace-id",
+      "00-261106233021D5A83ACCC4E1D3A2F8C6-3EC5AA1A31E0C550-00"
+    ],
+    [
+      "Server",
+      "TLB"
+    ],
+    [
+      "X-Cdn-Request-ID",
+      "edc52bf433aca6bb2c32d0154ca81b40"
+    ],
+    [
+      "x-link-via",
+      "jnun09:443"
+    ]
+  ],
+  "bytes": 46117,
+  "sha256": "af1b5f65f9d38df70c8d0eb966240f9a234eb1414a239a2263a77c2945688239",
+  "finishedAt": "2026-11-06T23:30:22.733428+08:00",
+  "elapsedMs": 1721
+}

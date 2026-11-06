@@ -4,8 +4,11 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.recyclerview.widget.RecyclerView
+import androidx.core.view.ViewCompat
+import androidx.core.view.accessibility.AccessibilityNodeInfoCompat
 
 class HistoryAdapter(
     private val onPick: (HistoryEntry) -> Unit,
@@ -41,23 +44,23 @@ class HistoryAdapter(
             onDelete(entry)
             true
         }
+        ViewCompat.replaceAccessibilityAction(holder.itemView,
+            AccessibilityNodeInfoCompat.AccessibilityActionCompat.ACTION_LONG_CLICK, "删除播放记录") { _, _ ->
+            onDelete(entry)
+            true
+        }
     }
 
-    /** 单集播放进度条：有时长才展示（原型 hbar）。布局完成后再量宽度，否则 itemView.width 为 0。 */
+    /** long: 历史卡片展示看到第几集占全剧的比例，与本集播放秒数无关。 */
     private fun renderProgress(holder: Holder, entry: HistoryEntry) {
-        if (entry.positionMs > 0 && entry.durationMs > entry.positionMs) {
-            holder.progress.visibility = View.VISIBLE
-            holder.itemView.post {
-                if (holder.itemView.width > 0) {
-                    val params = holder.progress.layoutParams
-                    val fraction = entry.positionMs.toFloat() / entry.durationMs
-                    params.width = (holder.itemView.width * fraction).toInt()
-                    holder.progress.layoutParams = params
-                }
-            }
-        } else {
-            holder.progress.visibility = View.GONE
-        }
+        val knownTotal = entry.episodes > 0
+        holder.progress.visibility = if (knownTotal) View.VISIBLE else View.GONE
+        // long: 由进度控件按自身底槽宽度裁剪，避免整卡宽度造成比例放大，也避免复用后旧异步回调覆盖新集数。
+        holder.progress.max = entry.episodes.coerceAtLeast(1)
+        holder.progress.progress = if (knownTotal) entry.episode.coerceIn(0, entry.episodes) else 0
+        holder.progress.contentDescription = if (knownTotal) {
+            "剧集进度：第${holder.progress.progress}集，共${entry.episodes}集"
+        } else null
     }
 
     override fun getItemCount(): Int = items.size
@@ -88,6 +91,6 @@ class HistoryAdapter(
         val title: TextView = view.findViewById(R.id.title)
         val subtitle: TextView = view.findViewById(R.id.subtitle)
         val updated: TextView = view.findViewById(R.id.updated)
-        val progress: View = view.findViewById(R.id.progress)
+        val progress: ProgressBar = view.findViewById(R.id.progress)
     }
 }

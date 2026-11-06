@@ -1,0 +1,110 @@
+{
+  "status": 200,
+  "reason": "OK",
+  "headers": [
+    [
+      "Server",
+      "volc-dcdn"
+    ],
+    [
+      "Content-Type",
+      "application/json; charset=utf-8"
+    ],
+    [
+      "Content-Length",
+      "47955"
+    ],
+    [
+      "Connection",
+      "close"
+    ],
+    [
+      "Date",
+      "Fri, 06 Nov 2026 15:56:26 GMT"
+    ],
+    [
+      "Vary",
+      "Accept-Encoding"
+    ],
+    [
+      "bookstore_dur",
+      "857"
+    ],
+    [
+      "recommend_dur",
+      "522"
+    ],
+    [
+      "s-trace-info",
+      "bookstore_before_recommend_dur=176;bookstore_after_recommend_dur=158;before_bookstore_dur=465"
+    ],
+    [
+      "tt_stable",
+      "1"
+    ],
+    [
+      "inner_dur",
+      "1328"
+    ],
+    [
+      "receive_interval",
+      "1793980585512"
+    ],
+    [
+      "rsp_send_interval",
+      "1793980586840"
+    ],
+    [
+      "X-Tt-Agw-Login",
+      "0"
+    ],
+    [
+      "X-Agw-Info",
+      "<redacted>"
+    ],
+    [
+      "X-Tt-Logid",
+      "20261106235625BB70925D24D0B98FB72A"
+    ],
+    [
+      "Server-Timing",
+      "inner; dur=1374, cdn-cache;desc=MISS, origin;dur=1459, edge;dur=0, tt_agw; dur=1371"
+    ],
+    [
+      "tt-idc-switch",
+      "10000@20260923113030"
+    ],
+    [
+      "x-tt-trace-host",
+      "01a55e9a8f92c8f2eb7b361ca12f68b846748b4c26c936e8f6979f354f5ae30b7dbac88dc925dec7a851f6c79237ae458a8cc816725bfa14041d4a3d29bcf2875ee2305a150def6832ab945bff35590ae39ab887615808f2fd89b1d193770047f2fb50559cf30ba71b876995db06d8f941175ad003345b7526f736160b275e5333fa61c7f1d616a39628e6ca54d43de7d5"
+    ],
+    [
+      "x-tt-trace-tag",
+      "id=5"
+    ],
+    [
+      "x-tt-trace-id",
+      "00-261106235625BB70925D24D0B98FB72A-50D9F3BA4886D40B-00"
+    ],
+    [
+      "via",
+      "n63-244-075.zjhuzhou-mp01-cu.Creative"
+    ],
+    [
+      "x-request-ip",
+      "<redacted>"
+    ],
+    [
+      "x-dsa-trace-id",
+      "1793980585e5ae313b3e51bcd95ff98c5ab5b5db73"
+    ],
+    [
+      "X-Dsa-Origin-Status",
+      "200"
+    ]
+  ],
+  "bytes": 47955,
+  "sha256": "ed6eee5d00ebfadf0984344c7a488f18c15d1b2d7944cfc37f8cb0c450269b6f",
+  "finishedAt": "2026-11-06T23:56:26.887291+08:00",
+  "elapsedMs": 1558
+}

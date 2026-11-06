@@ -3,4 +3,10 @@
     <!-- long: 48dp 为 34dp 底栏按钮保留约 7dp 上下留白，减少底栏占用的画面高度。 -->
     <dimen name="exo_styled_bottom_bar_height">48dp</dimen>
     <dimen name="exo_styled_bottom_bar_margin_top">6dp</dimen>
+    <!-- long: Media3 每次尺寸变化都会重设进度条底部偏移；单行底栏不再为另一排按钮预留高度。 -->
+    <dimen name="exo_styled_progress_margin_bottom">0dp</dimen>
+    <dimen name="floating_nav_height">60dp</dimen>
+    <dimen name="floating_nav_bottom_margin">14dp</dimen>
+    <!-- long: 60dp 导航 + 14dp 底距 + 12dp 间隔，列表末尾和分页提示必须停在悬浮菜单上方。 -->
+    <dimen name="home_bottom_clearance">86dp</dimen>
 </resources>

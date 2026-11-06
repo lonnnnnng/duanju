@@ -1,6 +1,7 @@
 package com.duanju.player.core
 
 import android.content.Context
+import android.util.AtomicFile
 import java.io.File
 
 /**
@@ -22,7 +23,9 @@ object RecipeStore {
     @Volatile private var current: Recipe? = null
     @Volatile private var source: String = "none"
 
+    @Synchronized
     fun init(context: Context) {
+        current = null
         appContext = context.applicationContext
         reload()
     }
@@ -35,9 +38,9 @@ object RecipeStore {
         }.getOrNull()?.let { runCatching { RecipeParser.parse(it) }.getOrNull() }
 
         val overrideFile = File(context.filesDir, "$OVERRIDE_DIR/$OVERRIDE_FILE")
-        val override = if (overrideFile.isFile) {
-            runCatching { RecipeParser.parse(overrideFile.readText()) }.getOrNull()
-        } else null
+        val override = runCatching {
+            AtomicFile(overrideFile).openRead().bufferedReader(Charsets.UTF_8).use { RecipeParser.parse(it.readText()) }
+        }.getOrNull()
 
         val chosen = when {
             bundled == null && override == null -> null
@@ -45,6 +48,8 @@ object RecipeStore {
             else -> bundled
         } ?: return
 
+        // long: 重载磁盘不能让已激活的新版本回退；启动时 current 为空，仍能回退到有效内置配置。
+        if (chosen.version < (current?.version ?: 0)) return
         current = chosen
         source = if (chosen === override) "override" else "bundled"
     }
@@ -70,19 +75,26 @@ object RecipeStore {
     }
 
     /** 保存外部下发的配方（后续远程更新用），版本号必须不倒退。 */
+    @Synchronized
     fun saveOverride(text: String): Boolean {
         val context = appContext ?: return false
         val incoming = runCatching { RecipeParser.parse(text) }.getOrNull() ?: return false
-        if (incoming.version < recipe().version) return false
+        if (incoming.version <= recipe().version) return false
         val dir = File(context.filesDir, OVERRIDE_DIR).apply { mkdirs() }
         val file = File(dir, OVERRIDE_FILE)
-        val tmp = File(dir, "$OVERRIDE_FILE.tmp")
-        tmp.writeText(text)
-        if (!tmp.renameTo(file)) {
-            file.delete()
-            if (!tmp.renameTo(file)) return false
+        val atomic = AtomicFile(file)
+        var output: java.io.FileOutputStream? = null
+        return try {
+            // long: 版本检查、写盘和内存激活共用锁；失败保留旧文件，不先删除可用配方。
+            output = atomic.startWrite()
+            output.write(text.toByteArray(Charsets.UTF_8))
+            atomic.finishWrite(output)
+            current = incoming
+            source = "override"
+            true
+        } catch (_: Exception) {
+            atomic.failWrite(output)
+            false
         }
-        reload()
-        return true
     }
 }

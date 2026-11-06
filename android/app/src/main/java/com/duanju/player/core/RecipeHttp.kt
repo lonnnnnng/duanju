@@ -1,23 +1,21 @@
 package com.duanju.player.core
 
 import org.json.JSONArray
+import org.json.JSONException
 import org.json.JSONObject
+import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
+import java.util.concurrent.CancellationException
 
 /**
- * 配方执行器（L1）+ 具名签名原语（L2）。
- *
- * 流程：拼 URL → 按 `sign` 顺序尝试签名档位 → 每档按 `retry` 重试 → 返回正文。
- * 「200 + 0 字节」视为网关拦截，直接切下一档（这正是上游在签名/免签之间摆动时的形态）。
+ * long: 普通 JSON 与流式搜索共用同一请求状态机，避免两个入口的签名和重试策略漂移。
  */
 internal object RecipeHttp {
+    internal var openConnection: (URL) -> HttpURLConnection = { it.openConnection() as HttpURLConnection }
 
-    class Prepared(val url: String, val headers: Map<String, String>)
-
-    class GatewayEmptyException(message: String) : Exception(message)
-    class HttpStatusException(val code: Int) : Exception("HTTP $code")
+    class ResponseFailure(val kind: String, message: String) : IOException(message)
 
     // ==================== 公共参数（稳定，留在代码里） ====================
 
@@ -49,21 +47,23 @@ internal object RecipeHttp {
         installId: String
     ): String {
         val host = recipe.hosts[endpoint.host] ?: endpoint.host
-        val query = StringBuilder(commonParams(deviceId, installId, endpoint.versionCode))
+        val query = LinkedHashMap<String, String>()
+        commonParams(deviceId, installId, endpoint.versionCode).split('&').forEach {
+            query[it.substringBefore('=')] = it.substringAfter('=')
+        }
         for ((key, value) in endpoint.params) {
             val resolved = render(value, vars)
-            // 变量型参数为空时整项省略（如首页首次加载没有 session_id / selected_items）。
+            // long: 配方可覆盖公共参数；重复拼接 version_name 等字段会让上游取值产生歧义。
             if (value.startsWith("$") && resolved.isEmpty()) continue
-            query.append('&').append(key).append('=').append(urlEncode(resolved))
+            query[key] = urlEncode(resolved)
         }
-        return host + endpoint.path + "?" + query
+        return host.trimEnd('/') + endpoint.path + "?" + query.entries.joinToString("&") { "${it.key}=${it.value}" }
     }
 
     fun render(template: String, vars: Map<String, String>): String {
-        if (!template.contains('$')) return template
-        var out = template
-        for ((k, v) in vars) out = out.replace("\$$k", v)
-        return out
+        return Regex("\\$([A-Za-z_][A-Za-z0-9_]*)").replace(template) {
+            vars[it.groupValues[1]] ?: throw IllegalArgumentException("缺少配方变量: ${it.value}")
+        }
     }
 
     private fun urlEncode(value: String): String =
@@ -79,7 +79,6 @@ internal object RecipeHttp {
                     ?: headers.put("User-Agent", HongguoSign.UA_MODEL)
                 headers.putAll(HongguoSign.legacyHeaders(query))
             }
-            // 预留给「新版带随机数的 X-Gorgon」等 POST 场景；GET 暂不需要。
             else -> throw IllegalStateException("未知签名档位: $mode")
         }
     }
@@ -92,102 +91,156 @@ internal object RecipeHttp {
         deviceId: String,
         installId: String,
         cancellation: TaskCancellation? = null
-    ): String {
-        val recipe = RecipeStore.recipe()
-        val endpoint = recipe.endpoint(endpointId)
-        var last: Exception? = null
+    ): String = readJson(endpointId, vars, deviceId, installId, cancellation) { text, _ -> text }
 
-        for (mode in endpoint.signModes) {
-            val url = buildUrl(endpoint, recipe, vars, deviceId, installId)
-            val rawQuery = URL(url).query.orEmpty()
-            val headers = LinkedHashMap<String, String>()
-            applySign(mode, rawQuery, recipe, headers)
-
-            var attempt = 1
-            while (attempt <= endpoint.retry.attempts) {
-                cancellation?.check()
-                try {
-                    val body = get(url, headers, cancellation)
-                    if (body.isEmpty()) {
-                        // 空正文可能是瞬时抖动，也可能是网关拦截：
-                        // 先在同档内退避重试，仍为空再切下一个签名档位。
-                        last = GatewayEmptyException("空响应(HTTP 200) [$mode]")
-                        if (attempt < endpoint.retry.attempts) {
-                            sleep(endpoint.retry.backoffFor(attempt))
-                            attempt++
-                            continue
-                        }
-                        break
-                    }
-                    return body
-                } catch (e: GatewayEmptyException) {
-                    last = e
-                    break
-                } catch (e: HttpStatusException) {
-                    last = e
-                    val retryable = e.code >= 500 && "http5xx" in endpoint.retry.on
-                    if (retryable && attempt < endpoint.retry.attempts) {
-                        sleep(endpoint.retry.backoffFor(attempt))
-                        attempt++
-                        continue
-                    }
-                    if (retryable) break
-                    throw DirectClient.DirectException("HTTP ${e.code}")
-                } catch (e: Exception) {
-                    cancellation?.check()
-                    last = e
-                    if ("network" in endpoint.retry.on && attempt < endpoint.retry.attempts) {
-                        sleep(endpoint.retry.backoffFor(attempt))
-                        attempt++
-                        continue
-                    }
-                    throw DirectClient.DirectException(e.message ?: e.toString())
-                }
-            }
-        }
-        throw DirectClient.DirectException(last?.message ?: "接口失败")
-    }
-
-    /** 给需要自行流式读取的调用方（搜索）准备 URL 与头。 */
-    fun prepare(
+    fun <T> readJson(
         endpointId: String,
         vars: Map<String, String>,
         deviceId: String,
         installId: String,
-        signMode: String? = null
-    ): Prepared {
+        cancellation: TaskCancellation? = null,
+        parse: (String, Endpoint) -> T
+    ): T = exchange(endpointId, vars, deviceId, installId, cancellation) { conn, endpoint ->
+        val text = conn.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
+        if (text.isBlank()) throw ResponseFailure("empty", "空响应(HTTP ${conn.responseCode})")
+        checkCode(JSONObject(text))
+        parse(text, endpoint)
+    }
+
+    fun checkCode(root: JSONObject) {
+        if (root.has("code") && root.optInt("code", -1) != 0) {
+            val code = root.optInt("code", -1)
+            throw ResponseFailure("code:$code", "接口业务错误(code=$code)")
+        }
+    }
+
+    fun <T> exchange(
+        endpointId: String,
+        vars: Map<String, String>,
+        deviceId: String,
+        installId: String,
+        cancellation: TaskCancellation? = null,
+        read: (HttpURLConnection, Endpoint) -> T
+    ): T {
+        // long: 更新可能与请求并行；URL、签名和解析路径必须属于同一份配方。
         val recipe = RecipeStore.recipe()
         val endpoint = recipe.endpoint(endpointId)
         val url = buildUrl(endpoint, recipe, vars, deviceId, installId)
-        val mode = signMode ?: endpoint.signModes.first()
-        val headers = LinkedHashMap<String, String>()
-        applySign(mode, URL(url).query.orEmpty(), recipe, headers)
-        return Prepared(url, headers)
+        val body = endpoint.body?.let { renderBody(it, vars).toByteArray(Charsets.UTF_8) }
+        var last: ResponseFailure? = null
+        for (mode in endpoint.signModes) {
+            for (attempt in 1..endpoint.retry.attempts) {
+                checkCancellation(cancellation)
+                val startedAt = System.nanoTime()
+                try {
+                    return request(url, endpoint, recipe, mode, body, vars, cancellation, read).also {
+                        trace("endpoint=$endpointId mode=$mode attempt=$attempt result=ok elapsedMs=${(System.nanoTime() - startedAt) / 1000000}")
+                    }
+                } catch (e: Exception) {
+                    checkCancellation(cancellation)
+                    if (e is CancellationException) throw e
+                    val failure = when (e) {
+                        is ResponseFailure -> e
+                        is JSONException -> ResponseFailure("nonJson", "响应 JSON 无效")
+                        is IOException -> ResponseFailure("network", e.message ?: "网络请求失败")
+                        else -> throw e
+                    }
+                    last = failure
+                    trace("endpoint=$endpointId mode=$mode attempt=$attempt result=${failure.kind} elapsedMs=${(System.nanoTime() - startedAt) / 1000000}")
+                    if (failure.kind !in endpoint.retry.on) {
+                        throw DirectClient.DirectException(failure.message ?: "接口失败")
+                    }
+                    // long: 空正文与格式错误也先在当前档位退避；用尽预算后才换下一档。
+                    if (attempt < endpoint.retry.attempts) pause(endpoint.retry.backoffFor(attempt), cancellation)
+                }
+            }
+        }
+        throw DirectClient.DirectException(last?.message ?: "接口失败", retryable = true)
     }
 
-    private fun get(url: String, headers: Map<String, String>, cancellation: TaskCancellation?): String {
-        val conn = (URL(url).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
+    private fun trace(message: String) {
+        // long: 仅 Debug 输出端点、档位和耗时，便于区分上游空响应与取消竞态，禁止记录请求身份和签名。
+        if (com.duanju.player.BuildConfig.DEBUG) android.util.Log.d("RecipeHttp", message)
+    }
+
+    private fun <T> request(
+        url: String,
+        endpoint: Endpoint,
+        recipe: Recipe,
+        mode: String,
+        body: ByteArray?,
+        vars: Map<String, String>,
+        cancellation: TaskCancellation?,
+        read: (HttpURLConnection, Endpoint) -> T
+    ): T {
+        val headers = LinkedHashMap<String, String>()
+        endpoint.headers.forEach { (key, value) ->
+            headers[key] = render(value, vars).also { require(!it.contains('\r') && !it.contains('\n')) }
+        }
+        // long: 每次实际发送都重新生成时间戳和随机数，退避后不能重放旧签名。
+        applySign(mode, URL(url).query.orEmpty(), recipe, headers)
+        val conn = openConnection(URL(url)).apply {
+            requestMethod = endpoint.method
             connectTimeout = 15000
             readTimeout = 30000
+            instanceFollowRedirects = false
+            if (body != null) {
+                doOutput = true
+                setRequestProperty("Content-Type", "application/json; charset=utf-8")
+                setFixedLengthStreamingMode(body.size)
+            }
             headers.forEach { (k, v) -> setRequestProperty(k, v) }
         }
         val registration = cancellation?.onCancel { conn.disconnect() }
         return try {
-            cancellation?.check()
+            checkCancellation(cancellation)
+            if (body != null) conn.outputStream.use { it.write(body) }
             val code = conn.responseCode
-            if (code !in 200..299) throw HttpStatusException(code)
-            val text = conn.inputStream?.bufferedReader()?.use { it.readText() }.orEmpty()
-            cancellation?.check()
-            if (text.isEmpty()) throw GatewayEmptyException("空响应(HTTP $code)")
-            text
+            if (code !in 200..299) {
+                val kind = when {
+                    code >= 500 -> "http5xx"
+                    code == 429 -> "http429"
+                    else -> "http"
+                }
+                throw ResponseFailure(kind, "HTTP $code")
+            }
+            read(conn, endpoint).also { checkCancellation(cancellation) }
         } finally {
             registration?.close()
             conn.disconnect()
         }
     }
 
-    private fun sleep(ms: Long) = Thread.sleep(ms)
+    private fun checkCancellation(cancellation: TaskCancellation?) {
+        cancellation?.check()
+        if (Thread.currentThread().isInterrupted) throw CancellationException("任务已取消")
+    }
+
+    private fun pause(ms: Long, cancellation: TaskCancellation?) {
+        // long: 取消无需等完整退避窗口，快速切集时也不能继续发出旧请求。
+        var remaining = ms
+        while (remaining > 0) {
+            checkCancellation(cancellation)
+            val step = minOf(remaining, 100L)
+            try { Thread.sleep(step) } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+                throw CancellationException("任务已取消")
+            }
+            remaining -= step
+        }
+        checkCancellation(cancellation)
+    }
+
+    private fun renderBody(template: String, vars: Map<String, String>): String {
+        fun substitute(value: Any): Any = when (value) {
+            is String -> render(value, vars)
+            is JSONObject -> JSONObject().also { out -> value.keys().forEach { key -> out.put(key, substitute(value.get(key))) } }
+            is JSONArray -> JSONArray().also { out -> for (i in 0 until value.length()) out.put(substitute(value.get(i))) }
+            else -> value
+        }
+        // long: 按 JSON 值替换模板，关键词中的引号不能逃逸成请求体字段。
+        return substitute(JSONObject(template)).toString()
+    }
 
     // ==================== 取值 ====================
 
