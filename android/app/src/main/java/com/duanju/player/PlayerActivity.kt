@@ -23,7 +23,6 @@ import androidx.media3.common.VideoSize
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerControlView
 import androidx.media3.ui.PlayerView
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
@@ -269,10 +268,8 @@ class PlayerActivity : AppCompatActivity() {
         }
         updateFullscreenEpisode()
         findViewById<View>(R.id.fullscreen_back).setOnClickListener { toggleFullscreen() }
-        playerView.setControllerVisibilityListener(object : PlayerControlView.VisibilityListener {
-            override fun onVisibilityChange(visibility: Int) {
-                if (fullscreen) fullscreenTopBar.visibility = visibility
-            }
+        playerView.setControllerVisibilityListener(PlayerView.ControllerVisibilityListener { visibility ->
+            if (fullscreen) fullscreenTopBar.visibility = visibility
         })
 
 statusView = findViewById(R.id.status)

@@ -1,5 +1,5 @@
 {
-  "version": 3,
+  "version": 4,
   "updated": "2026-11-06",
   "hosts": {
     "open": "https://api5-normal-sinfonlinec.fqnovel.com",
@@ -142,10 +142,11 @@
         ]
       ],
       "retry": {
-        "attempts": 3,
+        "attempts": 4,
         "backoffMs": [
-          600,
-          1200
+          1000,
+          2000,
+          3000
         ],
         "on": [
           "network",
