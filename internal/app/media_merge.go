@@ -141,7 +141,7 @@ func mergeMediaFiles(ctx context.Context, ffmpeg string, paths []string, output 
 			})
 		}
 		if err != nil {
-			return "", fmt.Errorf("处理 %s 失败：%w；原分集已保留，未将整剧转码", filepath.Base(paths[index]), err)
+			return "", fmt.Errorf("处理 %s 失败：%w；原分集已保留，未将整剧转码；如该剧分集编码不一致，请重新下载后再合并", filepath.Base(paths[index]), err)
 		}
 		processed += metadata[index].duration
 		inputs[index] = temporary
