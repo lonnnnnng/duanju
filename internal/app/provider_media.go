@@ -59,7 +59,7 @@ func (d *Downloader) providerURLCandidates(raw string) []string {
 		return candidates
 	}
 	add(raw)
-	return candidates
+	return d.hostHealth.order(candidates)
 }
 
 func (d *Downloader) resolveProviderMedia(ctx context.Context, task Task) (providerMedia, error) {

@@ -25,10 +25,14 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	if err != nil {
 		return providerMedia{}, err
 	}
-	return parseHongguoAppPreloadMedia(result, videoID)
+	return parseHongguoAppPreloadMediaOrdered(result, videoID, downloader.hostHealth)
 }
 
 func parseHongguoAppPreloadMedia(result map[string]any, videoID string) (providerMedia, error) {
+	return parseHongguoAppPreloadMediaOrdered(result, videoID, nil)
+}
+
+func parseHongguoAppPreloadMediaOrdered(result map[string]any, videoID string, health *providerHostHealth) (providerMedia, error) {
 	if nestedMap(result, "data") == nil {
 		return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
 	}
@@ -56,10 +60,14 @@ func parseHongguoAppPreloadMedia(result map[string]any, videoID string) (provide
 			}
 		}
 	}
-	return selectHongguoAppMedia(model)
+	return selectHongguoAppMediaOrdered(model, health)
 }
 
 func selectHongguoAppMedia(model map[string]any) (providerMedia, error) {
+	return selectHongguoAppMediaOrdered(model, nil)
+}
+
+func selectHongguoAppMediaOrdered(model map[string]any, health *providerHostHealth) (providerMedia, error) {
 	variants := anyList(model["video_list"])
 	if rows, ok := model["video_list"].(map[string]any); ok && len(variants) == 0 {
 		keys := make([]string, 0, len(rows))
@@ -84,7 +92,11 @@ func selectHongguoAppMedia(model map[string]any) (providerMedia, error) {
 		if codec == "bytevc2" || strings.Contains(strings.ToLower(mapString(variant, "gear_des_key")), "bytevc2") {
 			continue
 		}
+		// long: 同一清晰度可能有多个备用 CDN 地址，按历史健康度排序，失败域名靠后。
 		addresses := hongguoMediaAddresses(variant)
+		if health != nil {
+			addresses = health.orderMediaAddresses(addresses)
+		}
 		if len(addresses) == 0 {
 			continue
 		}

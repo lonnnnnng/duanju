@@ -55,8 +55,10 @@ func (d *Downloader) fetchProviderText(ctx context.Context, rawURL, referer stri
 				req.Header.Set("Referer", referer)
 			}
 			req.Header.Set("Accept-Language", "zh-CN,zh;q=0.9")
+			started := time.Now()
 			resp, err := d.doCatalogRequestWithTimeout(req, timeout)
 			if err != nil {
+				d.hostHealth.report(candidate, false, 0)
 				lastErr = err
 				var backoff *requestBackoff
 				if errors.As(err, &backoff) {
@@ -67,6 +69,7 @@ func (d *Downloader) fetchProviderText(ctx context.Context, rawURL, referer stri
 			body, readErr := io.ReadAll(io.LimitReader(resp.Body, providerMaxBodyBytes+1))
 			closeErr := resp.Body.Close()
 			if readErr != nil {
+				d.hostHealth.report(candidate, false, 0)
 				lastErr = readErr
 				continue
 			}
@@ -79,12 +82,14 @@ func (d *Downloader) fetchProviderText(ctx context.Context, rawURL, referer stri
 				continue
 			}
 			if resp.StatusCode < 200 || resp.StatusCode >= 300 || catalogResponseBlockReason(resp, body) != "" {
+				d.hostHealth.report(candidate, false, 0)
 				lastErr = d.catalogResponseError(req, resp, body)
 				if catalogResponseBlockReason(resp, body) != "" || resp.StatusCode >= 400 && resp.StatusCode < 500 && resp.StatusCode != 408 {
 					break
 				}
 				continue
 			}
+			d.hostHealth.report(candidate, true, time.Since(started))
 			rememberPlaybackResponseURL(ctx, rawURL, resp)
 			if source := providerSourceForURL(rawURL); source != "" {
 				effectiveURL := req.URL

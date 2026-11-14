@@ -3,19 +3,21 @@ package app
 import (
 	"bytes"
 	"context"
+	"crypto/rand"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
+	"os"
+	"path/filepath"
 	"strconv"
 	"time"
-
-	"crypto/rand"
 )
 
 const (
 	hongguoDeviceRegisterURL   = "https://log.snssdk.com/service/2/device_register/"
+	hongguoDevicePoolFile      = "hongguo-devices.json"
 	hongguoDeviceRotations     = 3
 	hongguoDeviceRegisterPause = 10 * time.Minute
 )
@@ -40,21 +42,34 @@ func (downloader *Downloader) hongguoDevice() (string, string, bool) {
 	return client.state.DeviceID, client.state.InstallID, client.state.Registered
 }
 
-// ensureHongguoDevice 确保当前设备已向红果注册；rejected 为被上游判为无效的设备号。
+// ensureHongguoDevice 确保有一个可用的已注册设备。
+// rejected 是被上游判为无效的设备号：优先切换到设备池中的其它设备，池中没有时才注册新设备。
 func (downloader *Downloader) ensureHongguoDevice(ctx context.Context, rejected string) error {
 	client := downloader.hongguoClient()
-	settled := func() bool {
-		current, _, registered := downloader.hongguoDevice()
-		return rejected == "" && registered || rejected != "" && rejected != current
-	}
-	if settled() {
+	client.mu.Lock()
+	if rejected == "" && client.state.Registered {
+		client.mu.Unlock()
 		return nil
 	}
+	if useHongguoDeviceLocked(client, rejected) {
+		client.mu.Unlock()
+		return nil
+	}
+	client.mu.Unlock()
+
 	client.deviceMu.Lock()
 	defer client.deviceMu.Unlock()
-	if settled() {
+	// long: 并发请求可能已经注册好新设备，拿到锁后必须重新判断。
+	client.mu.Lock()
+	if rejected == "" && client.state.Registered {
+		client.mu.Unlock()
 		return nil
 	}
+	if useHongguoDeviceLocked(client, rejected) {
+		client.mu.Unlock()
+		return nil
+	}
+	client.mu.Unlock()
 	if time.Now().Before(client.registerPausedUntil) {
 		return fmt.Errorf("红果设备注册暂不可用：%v", client.registerPauseErr)
 	}
@@ -67,8 +82,9 @@ func (downloader *Downloader) ensureHongguoDevice(ctx context.Context, rejected 
 		return err
 	}
 	client.mu.Lock()
-	client.state.DeviceID, client.state.InstallID, client.state.Registered = deviceID, installID, true
+	addHongguoDeviceLocked(client, deviceID, installID)
 	client.mu.Unlock()
+	downloader.persistHongguoDevicePool()
 	return nil
 }
 
@@ -140,4 +156,98 @@ func uuidLike() string {
 	random[6] = random[6]&0x0f | 0x40
 	random[8] = random[8]&0x3f | 0x80
 	return fmt.Sprintf("%x-%x-%x-%x-%x", random[0:4], random[4:6], random[6:8], random[8:10], random[10:16])
+}
+
+// hongguoDevicePool 是设备池的持久化格式，独立成文件以便注册后立即落盘。
+type hongguoDevicePool struct {
+	Version    int             `json:"version"`
+	DeviceID   string          `json:"deviceId"`
+	InstallID  string          `json:"installId"`
+	Registered bool            `json:"registered"`
+	Devices    []hongguoDevice `json:"devices"`
+}
+
+func hongguoDevicePoolPath(directory string) string {
+	if directory == "" {
+		return ""
+	}
+	return filepath.Join(directory, hongguoDevicePoolFile)
+}
+
+func loadHongguoDevicePool(directory string) *hongguoDevicePool {
+	path := hongguoDevicePoolPath(directory)
+	if path == "" {
+		return nil
+	}
+	content, err := os.ReadFile(path)
+	if err != nil || len(content) > 64<<10 {
+		return nil
+	}
+	var pool hongguoDevicePool
+	if json.Unmarshal(content, &pool) != nil || pool.Version != 1 {
+		return nil
+	}
+	return &pool
+}
+
+func saveHongguoDevicePool(directory string, pool hongguoDevicePool) error {
+	path := hongguoDevicePoolPath(directory)
+	if path == "" {
+		return nil
+	}
+	content, err := json.Marshal(pool)
+	if err != nil {
+		return err
+	}
+	temp, err := os.CreateTemp(directory, hongguoDevicePoolFile+".*")
+	if err != nil {
+		return err
+	}
+	name := temp.Name()
+	if _, err := temp.Write(content); err != nil {
+		temp.Close()
+		os.Remove(name)
+		return err
+	}
+	if err := temp.Close(); err != nil {
+		os.Remove(name)
+		return err
+	}
+	if err := os.Rename(name, path); err != nil {
+		os.Remove(name)
+		return err
+	}
+	return nil
+}
+
+// persistHongguoDevicePool 把当前设备池写入数据目录；失败只记录日志，不影响本次请求。
+func (downloader *Downloader) persistHongguoDevicePool() {
+	directory := downloader.cfg.dataDirectory()
+	if directory == "" {
+		return
+	}
+	client := downloader.hongguoClient()
+	client.mu.Lock()
+	pool := hongguoDevicePool{
+		Version: 1, DeviceID: client.state.DeviceID, InstallID: client.state.InstallID,
+		Registered: client.state.Registered, Devices: append([]hongguoDevice(nil), client.state.Devices...),
+	}
+	client.mu.Unlock()
+	if err := saveHongguoDevicePool(directory, pool); err != nil {
+		downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.device_pool",
+			Source: sourceHongguo, Message: "设备池保存失败：" + publicError(err).Error()})
+	}
+}
+
+// restoreHongguoDevicePool 在首次使用 App 客户端时恢复设备池，避免每次启动都重新注册。
+func (downloader *Downloader) restoreHongguoDevicePool(client *hongguoAppClient) {
+	pool := loadHongguoDevicePool(downloader.cfg.dataDirectory())
+	if pool == nil || !pool.Registered || !hongguoNumericID.MatchString(pool.DeviceID) || !hongguoNumericID.MatchString(pool.InstallID) {
+		return
+	}
+	client.mu.Lock()
+	defer client.mu.Unlock()
+	client.state.DeviceID, client.state.InstallID, client.state.Registered = pool.DeviceID, pool.InstallID, true
+	client.state.Devices = append([]hongguoDevice(nil), pool.Devices...)
+	normalizeHongguoDevicesLocked(client)
 }

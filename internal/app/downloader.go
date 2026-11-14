@@ -18,6 +18,7 @@ type Downloader struct {
 	client          *http.Client
 	providerMu      sync.Mutex
 	providerHosts   map[string]string
+	hostHealth      *providerHostHealth
 	hongguoOnce     sync.Once
 	hongguo         *hongguoAppClient
 	rankings        rankingCache
@@ -60,7 +61,7 @@ func NewDownloader(cfg Config) *Downloader {
 	router := &proxyRouter{}
 	router.configure(cfg.ProxyURL)
 	transport.Proxy = router.proxy
-	downloader := &Downloader{cfg: cfg, client: &http.Client{Transport: newImageTransport(transport, transport), Timeout: 45 * time.Second}, providerHosts: map[string]string{}, limiter: newRequestLimiter(cfg.RequestConcurrency, time.Duration(cfg.RequestIntervalMS)*time.Millisecond), proxyRouter: router, diagnostics: newDiagnosticLog(cfg.dataDirectory())}
+	downloader := &Downloader{cfg: cfg, client: &http.Client{Transport: newImageTransport(transport, transport), Timeout: 45 * time.Second}, providerHosts: map[string]string{}, hostHealth: newProviderHostHealth(), limiter: newRequestLimiter(cfg.RequestConcurrency, time.Duration(cfg.RequestIntervalMS)*time.Millisecond), proxyRouter: router, diagnostics: newDiagnosticLog(cfg.dataDirectory())}
 	downloader.recordDiagnostic(diagnosticEvent{Level: "info", Event: "config.runtime_loaded",
 		Message: fmt.Sprintf("source=%s concurrency=%d requestConcurrency=%d requestIntervalMs=%d", firstNonEmpty(cfg.runtimeSettingsSource, "defaults"), cfg.Concurrency, cfg.RequestConcurrency, cfg.RequestIntervalMS)})
 	return downloader

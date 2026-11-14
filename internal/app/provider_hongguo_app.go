@@ -28,12 +28,78 @@ type hongguoCatalogCursor struct {
 	UpdatedAt     time.Time `json:"updatedAt"`
 }
 
+type hongguoDevice struct {
+	DeviceID  string `json:"deviceId"`
+	InstallID string `json:"installId"`
+}
+
 type hongguoCatalogState struct {
-	Version    int                             `json:"version"`
-	DeviceID   string                          `json:"deviceId"`
-	InstallID  string                          `json:"installId"`
-	Registered bool                            `json:"registered,omitempty"`
-	Feeds      map[string]hongguoCatalogCursor `json:"feeds"`
+	Version    int    `json:"version"`
+	DeviceID   string `json:"deviceId"`
+	InstallID  string `json:"installId"`
+	Registered bool   `json:"registered,omitempty"`
+	// Devices 是已注册设备池，限流或空正文时轮换使用，避免频繁重新注册。
+	Devices []hongguoDevice                 `json:"devices,omitempty"`
+	Feeds   map[string]hongguoCatalogCursor `json:"feeds"`
+}
+
+const hongguoMaxDevices = 3
+
+func validHongguoDevice(device hongguoDevice) bool {
+	return hongguoNumericID.MatchString(device.DeviceID) && hongguoNumericID.MatchString(device.InstallID) &&
+		device.DeviceID != "0" && device.InstallID != "0"
+}
+
+// normalizeHongguoDevicesLocked 去重、剔除无效项，并把当前活跃设备并入池中。
+func normalizeHongguoDevicesLocked(client *hongguoAppClient) {
+	if client.state.Registered {
+		current := hongguoDevice{DeviceID: client.state.DeviceID, InstallID: client.state.InstallID}
+		if validHongguoDevice(current) {
+			exists := false
+			for _, device := range client.state.Devices {
+				if device.DeviceID == current.DeviceID {
+					exists = true
+					break
+				}
+			}
+			if !exists {
+				client.state.Devices = append(client.state.Devices, current)
+			}
+		}
+	}
+	seen := map[string]bool{}
+	devices := make([]hongguoDevice, 0, len(client.state.Devices))
+	for _, device := range client.state.Devices {
+		if !validHongguoDevice(device) || seen[device.DeviceID] {
+			continue
+		}
+		seen[device.DeviceID] = true
+		devices = append(devices, device)
+	}
+	if len(devices) > hongguoMaxDevices {
+		devices = devices[len(devices)-hongguoMaxDevices:]
+	}
+	client.state.Devices = devices
+}
+
+// useHongguoDeviceLocked 切换到池中任意一个不是 rejected 的已注册设备。
+func useHongguoDeviceLocked(client *hongguoAppClient, rejected string) bool {
+	normalizeHongguoDevicesLocked(client)
+	for _, device := range client.state.Devices {
+		if rejected != "" && device.DeviceID == rejected {
+			continue
+		}
+		client.state.DeviceID, client.state.InstallID, client.state.Registered = device.DeviceID, device.InstallID, true
+		return true
+	}
+	return false
+}
+
+// addHongguoDeviceLocked 记录新注册设备并设为当前设备，超出上限时淘汰最早的一个。
+func addHongguoDeviceLocked(client *hongguoAppClient, deviceID, installID string) {
+	client.state.DeviceID, client.state.InstallID, client.state.Registered = deviceID, installID, true
+	client.state.Devices = append(client.state.Devices, hongguoDevice{DeviceID: deviceID, InstallID: installID})
+	normalizeHongguoDevicesLocked(client)
 }
 
 type hongguoAppClient struct {
@@ -42,14 +108,14 @@ type hongguoAppClient struct {
 	deviceMu            sync.Mutex
 	registerPausedUntil time.Time
 	registerPauseErr    error
-	baseURL        string
-	state          hongguoCatalogState
-	details        map[string]hongguoDetailEntry
-	pending        map[string]*hongguoDetailCall
-	searches       map[string]hongguoSearchEntry
-	searchPending  map[string]*hongguoSearchCall
-	danmaku        map[string]hongguoDanmakuCacheEntry
-	danmakuPending map[string]*hongguoDanmakuCall
+	baseURL             string
+	state               hongguoCatalogState
+	details             map[string]hongguoDetailEntry
+	pending             map[string]*hongguoDetailCall
+	searches            map[string]hongguoSearchEntry
+	searchPending       map[string]*hongguoSearchCall
+	danmaku             map[string]hongguoDanmakuCacheEntry
+	danmakuPending      map[string]*hongguoDanmakuCall
 }
 
 func (downloader *Downloader) hongguoClient() *hongguoAppClient {
@@ -60,6 +126,7 @@ func (downloader *Downloader) hongguoClient() *hongguoAppClient {
 			details: map[string]hongguoDetailEntry{}, pending: map[string]*hongguoDetailCall{},
 			searches: map[string]hongguoSearchEntry{}, searchPending: map[string]*hongguoSearchCall{},
 		}
+		downloader.restoreHongguoDevicePool(downloader.hongguo)
 	})
 	return downloader.hongguo
 }
@@ -90,6 +157,8 @@ func (downloader *Downloader) restoreHongguoCatalog(state *hongguoCatalogState) 
 	if !hongguoNumericID.MatchString(cloned.DeviceID) || !hongguoNumericID.MatchString(cloned.InstallID) {
 		return
 	}
+	client.state = *cloned
+	normalizeHongguoDevicesLocked(client)
 	for name, cursor := range cloned.Feeds {
 		known := false
 		for _, genre := range hongguoAppGenres {

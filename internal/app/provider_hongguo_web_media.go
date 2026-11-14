@@ -20,9 +20,28 @@ import (
 func (d *Downloader) resolveHongguoProtectedMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {
 	quality, _ := ctx.Value(playbackQualityKey{}).(int)
 	quality = preferredDownloadQuality(quality, []int{360, 480, 720})
+	// long: 使用已成功返回该分集页面的域名，避免自定义站点或域名迁移时把页面与播放请求发往不同服务；
+	// 候选顺序由主机健康度决定，上次失败的域名会排在后面。
+	candidates := d.providerURLCandidates(hongguoBaseURL + "/api/video/protected/play-info")
+	var lastErr error
+	for _, address := range candidates {
+		if err := ctx.Err(); err != nil {
+			return providerMedia{}, err
+		}
+		media, err := d.requestHongguoProtectedMedia(ctx, address, seriesID, videoID, quality)
+		if err == nil {
+			return media, nil
+		}
+		lastErr = err
+	}
+	if lastErr == nil {
+		lastErr = errors.New("网页播放接口地址无效")
+	}
+	return providerMedia{}, lastErr
+}
+
+func (d *Downloader) requestHongguoProtectedMedia(ctx context.Context, address, seriesID, videoID string, quality int) (providerMedia, error) {
 	payload, _ := json.Marshal(map[string]string{"series_id": seriesID, "item_id": videoID, "definition": strconv.Itoa(quality) + "p"})
-	// long: 使用已成功返回该分集页面的域名，避免自定义站点或域名迁移时把页面与播放请求发往不同服务。
-	address := d.providerURLCandidates(hongguoBaseURL + "/api/video/protected/play-info")[0]
 	origin, err := url.Parse(address)
 	if err != nil {
 		return providerMedia{}, errors.New("网页播放接口地址无效")
@@ -38,32 +57,41 @@ func (d *Downloader) resolveHongguoProtectedMedia(ctx context.Context, seriesID,
 	request.Header.Set("Referer", referer)
 	request.Header.Set("Origin", origin.Scheme+"://"+origin.Host)
 	request.Header.Set("X-Xs-From-Web", "1")
+	started := time.Now()
 	response, err := d.doCatalogRequestWithTimeout(request, 20*time.Second)
 	if err != nil {
+		d.hostHealth.report(address, false, 0)
 		return providerMedia{}, err
 	}
 	defer response.Body.Close()
 	const maxResponse = 256 * 1024
 	body, err := io.ReadAll(io.LimitReader(response.Body, maxResponse+1))
 	if err != nil {
+		d.hostHealth.report(address, false, 0)
 		return providerMedia{}, errors.New("读取网页播放信息失败")
 	}
 	if response.StatusCode != http.StatusOK {
+		d.hostHealth.report(address, false, 0)
 		return providerMedia{}, fmt.Errorf("网页播放接口 HTTP %d", response.StatusCode)
 	}
 	if len(body) == 0 || len(body) > maxResponse {
+		d.hostHealth.report(address, false, 0)
 		return providerMedia{}, errors.New("网页播放接口返回空数据或超出大小限制")
 	}
 	var result map[string]any
 	decoder := json.NewDecoder(bytes.NewReader(body))
 	decoder.UseNumber()
 	if err := decoder.Decode(&result); err != nil || decoder.Decode(new(any)) != io.EOF {
+		d.hostHealth.report(address, false, 0)
 		return providerMedia{}, errors.New("网页播放信息格式异常")
 	}
 	media, err := parseHongguoProtectedMedia(result, referer, time.Now())
 	level, message := "info", "网页播放信息已解析，音视频分离="+strconv.FormatBool(media.AudioURL != "")
 	if err != nil {
 		level, message = "warn", err.Error()
+		d.hostHealth.report(address, false, 0)
+	} else {
+		d.hostHealth.report(address, true, time.Since(started))
 	}
 	// long: 只记录请求结果和媒体结构，不把临时播放地址、密钥或响应正文写进诊断日志。
 	d.recordDiagnostic(diagnosticEvent{Level: level, Event: "provider.hongguo.web_playback", Source: sourceHongguo,

@@ -34,7 +34,7 @@ func (downloader *Downloader) resolveHongguoOpenMedia(ctx context.Context, video
 		"need_personal_recommend": {"1"}, "player_so_load": {"1"}, "is_android_pad_screen": {"0"},
 		"host_abi": {"arm64-v8a"}, "dragon_device_type": {"phone"},
 		"rom_version": {"BP4A.251205.006 release-keys"}, "compliance_status": {"0"},
-		"cdid": {"1f1d14b3-8c25-4733-9f6b-2fdc01640081"},
+		"cdid":     {"1f1d14b3-8c25-4733-9f6b-2fdc01640081"},
 		"video_id": {videoID}, "video_platform": {"1024"}, "need_all_video_definition": {"1"},
 	}
 	address := hongguoOpenMediaBaseURL + "/reading/bookapi/video_tab/multi_video_model/v/?" + query.Encode()
@@ -66,10 +66,12 @@ func (downloader *Downloader) resolveHongguoOpenMedia(ctx context.Context, video
 		if err != nil {
 			return providerMedia{}, errors.New("无法准备请求签名")
 		}
+		started := time.Now()
 		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, func(prepared *http.Request) {
 			signHongguoCommentRequest(prepared, nonce, time.Now())
 		})
 		if err != nil {
+			downloader.hostHealth.report(address, false, 0)
 			lastErr = err
 			if ctx.Err() != nil {
 				return providerMedia{}, err
@@ -83,6 +85,7 @@ func (downloader *Downloader) resolveHongguoOpenMedia(ctx context.Context, video
 			continue
 		}
 		if response.StatusCode != http.StatusOK {
+			downloader.hostHealth.report(address, false, 0)
 			lastErr = fmt.Errorf("开放取流接口 HTTP %d", response.StatusCode)
 			if response.StatusCode >= 400 && response.StatusCode < 500 {
 				return providerMedia{}, lastErr
@@ -90,12 +93,14 @@ func (downloader *Downloader) resolveHongguoOpenMedia(ctx context.Context, video
 			continue
 		}
 		if len(content) == 0 {
+			downloader.hostHealth.report(address, false, 0)
 			lastErr = errors.New("开放取流接口返回空正文（HTTP 200）")
 			continue
 		}
 		if len(content) > providerMaxBodyBytes {
 			return providerMedia{}, errors.New("开放取流接口响应超出大小限制")
 		}
+		downloader.hostHealth.report(address, true, time.Since(started))
 		var result map[string]any
 		decoder := json.NewDecoder(strings.NewReader(string(content)))
 		decoder.UseNumber()

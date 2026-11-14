@@ -40,6 +40,7 @@ type hlsProxy struct {
 	retries    int
 	host       string
 	diagnostic func(diagnosticEvent)
+	reportHost func(string, bool, time.Duration)
 	query      string
 	acquire    func(context.Context) (func(), error)
 }
@@ -72,6 +73,7 @@ func (d *Downloader) newHLSProxy(ctx context.Context, media providerMedia, key [
 		assetIDs:   map[string]string{},
 		retries:    d.cfg.Retries,
 		diagnostic: d.recordDiagnostic,
+		reportHost: d.hostHealth.report,
 	}
 	if remote, err := url.Parse(media.URL); err == nil {
 		proxy.host = remote.Hostname()
@@ -117,6 +119,13 @@ func (proxy *hlsProxy) Err() error {
 	proxy.mu.Lock()
 	defer proxy.mu.Unlock()
 	return proxy.failure
+}
+
+// report 把媒体主机的结果交给健康统计，供下次挑选备用地址时参考。
+func (proxy *hlsProxy) report(rawURL string, ok bool, elapsed time.Duration) {
+	if proxy.reportHost != nil {
+		proxy.reportHost(rawURL, ok, elapsed)
+	}
 }
 
 func (proxy *hlsProxy) recordError(err error) {
@@ -301,8 +310,10 @@ func (proxy *hlsProxy) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 				upstream.Header.Set(header, value)
 			}
 		}
+		started := time.Now()
 		response, err := proxy.fetch(upstream)
 		if err != nil {
+			proxy.report(upstream.URL.String(), false, 0)
 			proxy.fail(writer, request, err)
 			return
 		}
@@ -313,6 +324,7 @@ func (proxy *hlsProxy) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 				writer.WriteHeader(response.StatusCode)
 				return
 			}
+			proxy.report(upstream.URL.String(), false, 0)
 			if response.StatusCode == http.StatusUnauthorized || response.StatusCode == http.StatusForbidden || response.StatusCode == http.StatusNotFound || response.StatusCode == http.StatusGone {
 				proxy.recordError(fmt.Errorf("媒体源 HTTP %d", response.StatusCode))
 				writer.WriteHeader(response.StatusCode)
@@ -321,6 +333,7 @@ func (proxy *hlsProxy) ServeHTTP(writer http.ResponseWriter, request *http.Reque
 			proxy.fail(writer, request, fmt.Errorf("HLS 资源请求失败: %s HTTP %d", upstream.URL.Hostname(), response.StatusCode))
 			return
 		}
+		proxy.report(upstream.URL.String(), true, time.Since(started))
 		if asset.playlist || strings.Contains(response.Header.Get("Content-Type"), "mpegurl") {
 			defer response.Body.Close()
 			body, err = io.ReadAll(io.LimitReader(response.Body, providerMaxBodyBytes+1))
