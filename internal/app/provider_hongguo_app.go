@@ -204,7 +204,9 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 	var registerErr error
 	if signed {
 		// long: 红果要求设备先注册，未注册的随机设备号会被判为无效并返回空正文。
-		registerErr = downloader.ensureHongguoDevice(ctx, "")
+		if registerErr = downloader.ensureHongguoDevice(ctx, ""); registerErr != nil {
+			return nil, fmt.Errorf(" App 接口不可用（设备注册失败：%v）", registerErr)
+		}
 	}
 	client := downloader.hongguoClient()
 	client.mu.Lock()

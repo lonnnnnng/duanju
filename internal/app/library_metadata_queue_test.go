@@ -61,7 +61,7 @@ func TestPrimaryCatalogReturnsBeforeOptionalMetadata(t *testing.T) {
 			fresh := Drama{ID: providerDramaID(source, id), Source: source, Title: "列表标题", Heat: "20019", Views: "0", Cover: coverAddressFixture}
 			app := &UIApp{downloader: d, cfg: d.cfg, dramas: []Drama{old}, librarySources: map[string]librarySourceState{}, libraryLoading: make(chan struct{})}
 			t.Cleanup(app.stopSortMetadata)
-			app.acceptLibraryProgress(source, []Drama{old, fresh}, nil, false)
+			app.acceptLibraryProgressForGeneration(0, source, []Drama{old, fresh}, nil, false)
 			app.mu.Lock()
 			if calls.Load() != 0 || len(app.dramas) != 2 || app.dramas[1].Heat != fresh.Heat || app.dramas[1].Views != "0" {
 				t.Error("primary fields did not return before optional requests")
@@ -75,7 +75,7 @@ func TestPrimaryCatalogReturnsBeforeOptionalMetadata(t *testing.T) {
 				t.Fatal("new entry was not scheduled automatically")
 			}
 
-			app.acceptLibraryProgress(source, []Drama{fresh, old}, nil, true)
+			app.acceptLibraryProgressForGeneration(0, source, []Drama{fresh, old}, nil, true)
 			writer := httptest.NewRecorder()
 			app.handleDramas(writer, httptest.NewRequest("GET", "/api/ui/dramas", nil))
 			var snapshot struct {

@@ -101,10 +101,6 @@ func (a *UIApp) startLibraryLoadLocked(source string, mode libraryLoadMode, prio
 	}()
 }
 
-func (a *UIApp) acceptLibraryProgress(source string, items []Drama, loadErr error, done bool) {
-	a.acceptLibraryProgressForGeneration(0, source, items, loadErr, done)
-}
-
 func (a *UIApp) acceptLibraryProgressForGeneration(generation uint64, source string, items []Drama, loadErr error, done bool) {
 	if canonicalProviderSource(source) != sourceHongguo {
 		return

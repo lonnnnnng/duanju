@@ -28,10 +28,6 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	return parseHongguoAppPreloadMediaOrdered(result, videoID, downloader.hostHealth)
 }
 
-func parseHongguoAppPreloadMedia(result map[string]any, videoID string) (providerMedia, error) {
-	return parseHongguoAppPreloadMediaOrdered(result, videoID, nil)
-}
-
 func parseHongguoAppPreloadMediaOrdered(result map[string]any, videoID string, health *providerHostHealth) (providerMedia, error) {
 	if nestedMap(result, "data") == nil {
 		return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
@@ -61,10 +57,6 @@ func parseHongguoAppPreloadMediaOrdered(result map[string]any, videoID string, h
 		}
 	}
 	return selectHongguoAppMediaOrdered(model, health)
-}
-
-func selectHongguoAppMedia(model map[string]any) (providerMedia, error) {
-	return selectHongguoAppMediaOrdered(model, nil)
 }
 
 func selectHongguoAppMediaOrdered(model map[string]any, health *providerHostHealth) (providerMedia, error) {

@@ -19,6 +19,7 @@ go run .
 - [部署与运行](docs/deployment.md)：Linux systemd、Docker、反向代理和日志。
 - [配置与数据](docs/configuration.md)：启动参数、环境变量、数据目录和备份。
 - [播放、下载与合并](docs/playback-downloads.md)：播放选项、任务行为、自动合并和磁盘空间检查。
+- [红果接口说明](docs/hongguo-api.md)：取流顺序、接口参数、签名与故障判定。
 - [Emby 同步](docs/emby.md)：分集与全集同步模式、扫描通知和权限。
 - [常见问题](docs/troubleshooting.md)：网络、播放、下载和同步排查。
 - [发布流程](docs/releasing.md)：手动触发 Release 工作流。

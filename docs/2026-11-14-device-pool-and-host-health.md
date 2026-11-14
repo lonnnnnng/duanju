@@ -39,7 +39,6 @@
 | `providerURLCandidates` | 站点域名候选按健康度排序 |
 | `fetchProviderText` | 记录站点页面请求结果 |
 | `resolveHongguoProtectedMedia` | `play-info` 按候选域名依次尝试并记录 |
-| `resolveHongguoOpenMedia` | 记录开放接口请求结果 |
 | `selectHongguoAppMediaOrdered` | 同清晰度的多个 CDN 备用地址按健康度排序 |
 | `hlsProxy` | 记录媒体分片请求的成功/失败与耗时 |
 

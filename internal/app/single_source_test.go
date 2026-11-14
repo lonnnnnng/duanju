@@ -112,7 +112,7 @@ func TestHongguoOnlySearchAndRankingRegistration(t *testing.T) {
 	if writer.Code != 200 || json.Unmarshal(writer.Body.Bytes(), &result) != nil || len(result.Data) != 1 || len(app.dramas) != 1 {
 		t.Fatal("search registered unsupported data")
 	}
-	app.acceptLibraryProgress("huangdou", []Drama{foreign}, nil, true)
+	app.acceptLibraryProgressForGeneration(0, "huangdou", []Drama{foreign}, nil, true)
 	app.acceptRankingDramas(rankingPage{BoardID: "hongguo-hot", Page: 1, FetchedAt: time.Now(), Items: []rankingItem{
 		{Rank: 1, Drama: Drama{ID: "hongguo:700004", Source: sourceHongguo, Title: "榜单结果", SortMetadata: checked}},
 		{Rank: 2, Drama: foreign}, {Rank: 3, Drama: conflict},

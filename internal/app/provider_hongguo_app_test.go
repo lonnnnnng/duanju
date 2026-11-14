@@ -111,7 +111,7 @@ func TestHongguoAppDetailAndCompatibleMediaMetadata(t *testing.T) {
 		map[string]any{"main_url": "https://media.example.test/low.mp4", "video_meta": map[string]any{"codec_type": "h264", "definition": "720p"}},
 		map[string]any{"main_url": "https://media.example.test/compatible.mp4", "video_meta": map[string]any{"codec_type": "hevc", "definition": "1080p"}},
 	}}
-	media, err := selectHongguoAppMedia(model)
+	media, err := selectHongguoAppMediaOrdered(model, nil)
 	if err != nil || media.URL != "https://media.example.test/compatible.mp4" {
 		t.Fatalf("wrong compatible media choice: %v", err)
 	}

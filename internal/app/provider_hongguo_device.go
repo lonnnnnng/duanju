@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"crypto/rand"
+	"encoding/binary"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -33,6 +34,14 @@ func hongguoAppQuery(deviceID, installID string) url.Values {
 		"device_brand": {"Redmi"}, "language": {"zh"}, "os_api": {"36"}, "os_version": {"16"},
 		"resolution": {"1280*2772"}, "dpi": {"520"}, "ac": {"wifi"}, "device_id": {deviceID}, "iid": {installID},
 	}
+}
+
+func newHongguoDeviceID() string {
+	var random [8]byte
+	if _, err := rand.Read(random[:]); err != nil {
+		return strconv.FormatInt(time.Now().UnixNano(), 10)
+	}
+	return strconv.FormatUint(1_000_000_000_000_000_000+binary.BigEndian.Uint64(random[:])%8_000_000_000_000_000_000, 10)
 }
 
 func (downloader *Downloader) hongguoDevice() (string, string, bool) {

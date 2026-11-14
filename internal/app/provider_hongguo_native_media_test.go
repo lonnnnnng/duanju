@@ -57,7 +57,7 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 		{episode: map[string]any{"video_model": "null"}},
 		{"video_model": "not-json"},
 	} {
-		if _, err := parseHongguoAppPreloadMedia(map[string]any{"data": data}, episode); err == nil {
+		if _, err := parseHongguoAppPreloadMediaOrdered(map[string]any{"data": data}, episode, nil); err == nil {
 			t.Fatal("accepted mismatched episode or malformed model")
 		}
 	}

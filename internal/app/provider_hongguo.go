@@ -198,8 +198,7 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("章节 ID 无效，请重新获取章节")
 	}
-	// 首选站点受保护接口（play-info）：不依赖 App 签名，返回明文 h264+aac，
-	// 2026-11-11 实测是唯一稳定可用的一条，放在最前可避免无谓等待。
+	// 首选站点受保护接口（play-info）：不依赖 App 签名，返回 h264，浏览器可直接播放。
 	media, protectedErr := d.resolveHongguoProtectedMedia(ctx, seriesID, videoID)
 	if protectedErr == nil {
 		return media, nil
@@ -207,14 +206,7 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
-	// 其次是开放接口（旧版签名 GET），上游目前会间歇返回空正文，重试后可能恢复。
-	media, openErr := d.resolveHongguoOpenMedia(ctx, videoID)
-	if openErr == nil {
-		return media, nil
-	}
-	if err := ctx.Err(); err != nil {
-		return providerMedia{}, err
-	}
+	// 兜底使用 App 单集取流（播放器签名 + 已注册设备），返回 HEVC，需要硬件解码支持。
 	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
 	if nativeErr == nil {
 		return media, nil
@@ -222,18 +214,13 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
+	// 最后尝试站点播放页，仅在站点仍保留 SSR 数据时可用。
 	media, pageErr := d.resolveHongguoWebMedia(ctx, seriesID, videoID)
 	if pageErr == nil {
 		return media, nil
 	}
-	if err := ctx.Err(); err != nil {
-		return providerMedia{}, err
-	}
-	media, apiErr := d.resolveHongguoPlaybackAPI(ctx, seriesID, videoID)
-	if apiErr == nil {
-		return media, nil
-	}
-	return providerMedia{}, fmt.Errorf(" 开放取流失败：%v；站点取流失败：%v；App 取流失败：%v；网页取流失败：%v；备用取流失败：%w", publicError(openErr), publicError(protectedErr), publicError(nativeErr), publicError(pageErr), apiErr)
+	return providerMedia{}, fmt.Errorf("站点取流失败：%v；App 取流失败：%v；网页取流失败：%w",
+		publicError(protectedErr), publicError(nativeErr), publicError(pageErr))
 }
 
 func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {
