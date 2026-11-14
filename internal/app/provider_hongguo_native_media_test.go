@@ -22,17 +22,17 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 				var payload struct {
-					IDs map[string][]string `json:"mixed_video_id_map"`
-					Biz struct {
+					VideoID string `json:"video_id"`
+					Type    int    `json:"content_type"`
+					Biz     struct {
 						Platform int  `json:"video_platform"`
 						All      bool `json:"need_all_video_definition"`
 					} `json:"biz_param"`
 				}
-				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/multi_video_model/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
+				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/video_model/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
 					t.Fatal("incorrect model request")
 				}
-				ids := payload.IDs["1004"]
-				if len(payload.IDs) != 1 || len(ids) != 1 || ids[0] != episode || payload.Biz.Platform != 1024 || !payload.Biz.All {
+				if payload.VideoID != episode || payload.Type != 1 || payload.Biz.Platform != 3 || !payload.Biz.All {
 					t.Fatal("model request lost episode or required parameters")
 				}
 				if request.Header.Get("X-Gorgon") == "" || request.Header.Get("X-SS-STUB") == "" || request.Header.Get("X-Argus") == "" || request.Header.Get("X-Ladon") == "" {
@@ -42,9 +42,7 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 				if format == "string" {
 					value = string(encoded)
 				}
-				body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{
-					"800002": map[string]any{"video_model": map[string]any{}}, episode: map[string]any{"video_model": value},
-				}})
+				body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{"video_model": value}})
 				return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
 			})
 			media, err := d.resolveHongguoAppMedia(context.Background(), episode)
@@ -55,9 +53,9 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 	}
 	for _, data := range []map[string]any{
 		{"800002": map[string]any{"video_model": model}},
-		{"video_model": model},
 		{episode: map[string]any{"video_model": string(encoded) + " {}"}},
 		{episode: map[string]any{"video_model": "null"}},
+		{"video_model": "not-json"},
 	} {
 		if _, err := parseHongguoAppPreloadMedia(map[string]any{"data": data}, episode); err == nil {
 			t.Fatal("accepted mismatched episode or malformed model")

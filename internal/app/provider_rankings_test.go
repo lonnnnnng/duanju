@@ -97,6 +97,11 @@ func rankingTestDownloader(t *testing.T, transport rankingTransport) *Downloader
 	d := NewDownloader(cfg)
 	d.client = &http.Client{Transport: transport}
 	d.limiter = newRequestLimiter(8, time.Nanosecond)
+	// long: 测试用的假设备视为已完成注册，避免测试额外打设备注册接口。
+	client := d.hongguoClient()
+	client.mu.Lock()
+	client.state.Registered = true
+	client.mu.Unlock()
 	return d
 }
 
