@@ -2249,6 +2249,7 @@ func (a *UIApp) setMergeState(res uiMergeResult, status string, progress int, sk
 		CleanupPending: append([]string(nil), res.CleanupPending...), UpdatedAt: time.Now(),
 	}
 	a.mu.Lock()
+	previousState := a.merges[res.DramaID]
 	if job := a.mergeJobs[res.DramaID]; job != nil {
 		state.Automatic = job.autoGeneration != 0
 		if job.userCanceled && status != "success" {
@@ -2267,6 +2268,15 @@ func (a *UIApp) setMergeState(res uiMergeResult, status string, progress int, sk
 		state.Error = "全集已生成，但状态保存失败；请检查数据目录后重试清理"
 	}
 	a.mu.Unlock()
+	// long: 合并失败原因此前只存在 UI 状态里，日志里查不到；这里按“状态或原因变化”记录一次。
+	if status == "failed" && state.Error != "" {
+		changed := previousState == nil || previousState.Status != "failed" || previousState.Error != state.Error
+		if changed {
+			a.downloader.recordDiagnostic(diagnosticEvent{Level: "error", Event: "merge.failed", Source: sourceHongguo,
+				DramaID: res.DramaID, DramaTitle: res.DramaTitle, Episode: res.StartEpisode,
+				Message: state.Error})
+		}
+	}
 	if err == nil && (status == "success" || status == "failed") {
 		a.notifyEmbyMerge(res.DramaID)
 	}

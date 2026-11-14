@@ -16,6 +16,12 @@ type mergeMediaPlan struct {
 	videoCount   int
 	audioCount   int
 	remuxCount   int
+	// audioNormalized 表示音轨档位不一致且多数档位无法编码，已统一重编为 AAC-LC。
+	audioNormalized bool
+	// audioBitrate 是重编音轨的目标码率；0 表示沿用默认值。
+	audioBitrate int
+	// audioDiffEpisodes 记录音轨与多数不一致的分集序号（1 起），用于进度说明。
+	audioDiffEpisodes []int
 }
 
 type mergeMediaStep struct {
@@ -87,6 +93,26 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 	for i := range plan.steps {
 		step := &plan.steps[i]
 		step.remux = step.remux || plan.transport
+	}
+	plan.countSteps()
+	// long: 上游可能个别分集封装了不同音轨档位（例如 1 集 AAC-LC、其余 HE-AACv2）。
+	// FFmpeg 编不出 HE-AACv2，此时只能把所有音轨统一重编为 AAC-LC，否则整剧无法合并。
+	if plan.audioCount > 0 && !mergeAudioTargetEncodable(plan.audio) {
+		plan.audioDiffEpisodes = plan.audioDiffs(infos)
+		plan.audio.audioCodec, plan.audio.audioProfile, plan.audio.audioExtra = "aac", "LC", ""
+		plan.audioNormalized = true
+		plan.audioBitrate = mergeNormalizedAudioBitrate
+		for i := range plan.steps {
+			plan.steps[i].audio = true
+		}
+		plan.countSteps()
+	}
+	return plan
+}
+
+func (plan *mergeMediaPlan) countSteps() {
+	plan.videoCount, plan.audioCount, plan.remuxCount = 0, 0, 0
+	for _, step := range plan.steps {
 		if step.video {
 			plan.videoCount++
 		}
@@ -97,7 +123,52 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 			plan.remuxCount++
 		}
 	}
-	return plan
+}
+
+// audioDiffs 返回音轨档位与多数不一致的分集序号（1 起）。
+func (plan mergeMediaPlan) audioDiffs(infos []mergeMediaInfo) []int {
+	diffs := make([]int, 0, 4)
+	for index, info := range infos {
+		if !plan.audio.audio || !info.audio || info.audioKey() != plan.audio.audioKey() {
+			diffs = append(diffs, index+1)
+		}
+	}
+	return diffs
+}
+
+// formatMergeEpisodes 把分集序号压成简短说明，最多列出 3 个。
+func formatMergeEpisodes(episodes []int) string {
+	if len(episodes) == 0 {
+		return "分集"
+	}
+	const limit = 3
+	parts := make([]string, 0, limit)
+	for index, episode := range episodes {
+		if index >= limit {
+			break
+		}
+		parts = append(parts, fmt.Sprintf("%03d", episode))
+	}
+	text := strings.Join(parts, "、")
+	if len(episodes) > limit {
+		text += fmt.Sprintf(" 等 %d 集", len(episodes))
+	}
+	return text
+}
+
+// mergeAudioTargetEncodable 判断当前 FFmpeg 原生编码器能否产出多数音轨的编码档位。
+func mergeAudioTargetEncodable(info mergeMediaInfo) bool {
+	if !info.audio {
+		return true
+	}
+	switch info.audioCodec {
+	case "aac":
+		return info.audioProfile == "" || info.audioProfile == "LC"
+	case "mp3", "ac3", "eac3", "alac":
+		return true
+	default:
+		return false
+	}
 }
 
 func (plan mergeMediaPlan) description() string {
@@ -106,7 +177,12 @@ func (plan mergeMediaPlan) description() string {
 		parts = append(parts, fmt.Sprintf("仅转视频 %d/%d 集（%s %dx%d）", plan.videoCount, len(plan.steps), strings.ToUpper(plan.video.videoCodec), plan.video.width, plan.video.height))
 	}
 	if plan.audioCount > 0 {
-		parts = append(parts, fmt.Sprintf("调整音轨 %d/%d 集", plan.audioCount, len(plan.steps)))
+		if plan.audioNormalized {
+			parts = append(parts, fmt.Sprintf("统一音轨 %d/%d 集（AAC-LC，因 %s 集音轨不同）",
+				plan.audioCount, len(plan.steps), formatMergeEpisodes(plan.audioDiffEpisodes)))
+		} else {
+			parts = append(parts, fmt.Sprintf("调整音轨 %d/%d 集", plan.audioCount, len(plan.steps)))
+		}
 	}
 	if len(parts) == 0 {
 		if plan.remuxCount > 0 {
@@ -144,7 +220,9 @@ func mergeVideoEncoder(info mergeMediaInfo, threads int) ([]string, error) {
 	return append(args, "-pix_fmt", info.pixelFormat), nil
 }
 
-func mergeAudioEncoder(info mergeMediaInfo) ([]string, error) {
+const mergeNormalizedAudioBitrate = 128000
+
+func mergeAudioEncoder(info mergeMediaInfo, bitrate int) ([]string, error) {
 	encoder := info.audioCodec
 	switch encoder {
 	case "aac":
@@ -162,7 +240,10 @@ func mergeAudioEncoder(info mergeMediaInfo) ([]string, error) {
 	}
 	args := []string{"-c:a", encoder, "-ar", strconv.Itoa(info.sampleRate), "-channel_layout:a", info.layout}
 	if encoder == "aac" {
-		args = append(args, "-profile:a", "aac_low", "-b:a", "192k")
+		if bitrate <= 0 {
+			bitrate = 192000
+		}
+		args = append(args, "-profile:a", "aac_low", "-b:a", strconv.Itoa(bitrate/1000)+"k")
 	}
 	return args, nil
 }
@@ -200,7 +281,7 @@ func (plan mergeMediaPlan) prepareArgs(input, output string, info mergeMediaInfo
 		}
 		args = append(args, "-map", stream)
 		if step.audio {
-			encoder, err := mergeAudioEncoder(plan.audio)
+			encoder, err := mergeAudioEncoder(plan.audio, plan.audioBitrate)
 			if err != nil {
 				return nil, err
 			}
