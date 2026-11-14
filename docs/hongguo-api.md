@@ -10,14 +10,14 @@
 
 | 顺序 | 链路 | 返回编码 | 说明 |
 | --- | --- | --- | --- |
-| 1 | App `POST /novel/player/video_model/v1/` | 1080p HEVC（`hvc1`）+ HE-AACv2 | 与上游客户端一致，返回全部档位并取最高，保证同一部剧编码统一 |
-| 2 | 站点 `POST /api/video/protected/play-info` | h264（最高 720p） | App 被限流时兜底；传 `1080p` 会返回 HTTP 400 |
-| 3 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | 仅在站点仍保留 SSR 数据时可用 |
+| 1 | App `POST /novel/player/video_model/v1/` | 1080p HEVC（`hvc1`）+ HE-AACv2 | 与上游客户端一致，返回全部档位并取最高，播放与下载共用 |
+| 2 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | 仅在站点仍保留 SSR 数据时可用 |
 
-**为什么 App 优先**：站点 `play-info` 只接受 `360p/480p/720p`，且返回 H.264 + AAC-LC；
-App 接口返回 `1080/720/540/480/360` 全部档位，产物是 HEVC + HE-AACv2。
-两条链路交替命中会让同一部剧出现混合编码，合并时被迫转码。统一走 App 后，
-下载产物固定为 1080p HEVC + HE-AACv2，合并无需转码。
+**只保留一条主链路的原因**：站点 `play-info` 只接受 `360p/480p/720p`（传 `1080p` 返回
+HTTP 400），返回 H.264 + AAC-LC；App 接口返回 `1080/720/540/480/360` 全部档位，
+产物是 HEVC + HE-AACv2。两条链路交替命中会让同一部剧出现混合编码，合并时被迫转码。
+2026-11-14 起移除 `play-info` 兜底，播放与下载都固定走 App 主链路，
+产物统一为 1080p HEVC + HE-AACv2，合并无需转码。
 
 播放端若浏览器不支持 HEVC，会在计划阶段标记 `video_codec_unsupported` 并由服务端转码为 H.264。
 
@@ -31,7 +31,9 @@ App 接口返回 `1080/720/540/480/360` 全部档位，产物是 HEVC + HE-AACv2
 
 基地址：`https://hongguoduanju.com`（可通过 `DUANJU_HONGGUO_URL` 覆盖）。
 
-### 2.1 播放信息
+### 2.1 播放信息（已停用）
+
+> 2026-11-14 起不再调用。该接口最高 720p，且会与 App 链路混出不同编码，保留本节仅作历史参考。
 
 ```http
 POST /api/video/protected/play-info

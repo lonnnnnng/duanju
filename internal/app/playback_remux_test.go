@@ -5,7 +5,6 @@ import (
 	"context"
 	"encoding/binary"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -244,45 +243,6 @@ func TestPlaybackRemuxSplitCENCKeepsAudio(t *testing.T) {
 		defer outputServer.Close()
 		if !reflect.DeepEqual(packets, playbackFixturePackets(t, ffmpeg, outputServer.URL+planned.plan.URL)) {
 			t.Fatal("generated HLS lost or changed audio/video packets")
-		}
-	})
-	t.Run("download through protected playback", func(t *testing.T) {
-		fixture := protectedPlaybackFixture(time.Now())
-		info := nestedMap(fixture, "play_info")
-		info["player_access_key"] = hongguoTestContentKey(decodedKey, "22")
-		nestedMap(info, "audio")["player_access_key"] = info["player_access_key"]
-		body, err := json.Marshal(fixture)
-		if err != nil {
-			t.Fatal(err)
-		}
-		// long: 全流程只访问本地合成音视频，验证 App 空响应回退网页后仍能下载到完整双轨 MP4。
-		app.downloader.client = &http.Client{Transport: rankingTransport(func(request *http.Request) (*http.Response, error) {
-			switch request.URL.Path {
-			case "/novel/player/multi_video_model/v1/":
-				return rankingHTTPResponse(request, http.StatusOK, ""), nil
-			case "/player/700001/800001":
-				return rankingHTTPResponse(request, http.StatusOK, `<script>window._ROUTER_DATA={"loaderData":{"player_page":{"series_id":"700001","vid":"800001","protectedPlayback":true}}}</script>`), nil
-			case "/api/video/protected/play-info":
-				return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
-			case "/video.mp4", "/audio.mp4":
-				if request.URL.Hostname() != "video.example.test" || request.Header.Get("Referer") != hongguoBaseURL+"/player/700001/800001" {
-					return nil, fmt.Errorf("unexpected media host or missing referer")
-				}
-				local := request.Clone(request.Context())
-				local.URL.Scheme, local.URL.Host = "http", strings.TrimPrefix(server.URL, "http://")
-				return server.Client().Transport.RoundTrip(local)
-			default:
-				return nil, fmt.Errorf("unexpected fixture request path: %s", request.URL.Path)
-			}
-		})}
-		app.downloader.cfg.Retries = 1
-		task := Task{DramaID: "hongguo:700001", Index: 1, OutPath: filepath.Join(t.TempDir(), "download.mp4"),
-			Chapter: Chapter{Source: sourceHongguo, VideoURL: "hongguo-cenc://800001"}}
-		if err := app.downloader.downloadMediaWithProgress(ctx, task, nil); err != nil {
-			t.Fatal(err)
-		}
-		if !reflect.DeepEqual(packets, playbackFixturePackets(t, ffmpeg, task.OutPath)) {
-			t.Fatal("download lost or changed audio/video packets")
 		}
 	})
 }

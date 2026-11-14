@@ -43,9 +43,8 @@ Web 端播放与下载全部不可用：进入剧集取不到分集，或取流�
   - 解析 `data.video_model`（兼容 JSON 字符串与 base64 编码）；
   - 新增 `hongguoMediaAddresses`，汇总 `main_url`/`backup_url*`/`url_list` 并自动解码 base64。
 
-取流顺序已调整为与上游客户端一致：App `video_model`（1080p HEVC，优先）
-→ 站点 `play-info`（h264，最高 720p，兜底）→ 网页页面。开放签名 GET 与第三方备用接口
-已在此后清理中移除（长期不可用）。
+取流顺序与上游客户端一致：App `video_model`（1080p HEVC）→ 网页页面。
+站点 `play-info`、开放签名 GET、第三方备用接口均已移除，避免混出不同编码或无效重试。
 
 ## 4. 验证
 
