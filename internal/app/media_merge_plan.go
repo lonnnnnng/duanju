@@ -117,7 +117,7 @@ func (plan mergeMediaPlan) description() string {
 	return strings.Join(parts, "；")
 }
 
-func mergeVideoEncoder(info mergeMediaInfo) ([]string, error) {
+func mergeVideoEncoder(info mergeMediaInfo, threads int) ([]string, error) {
 	profile := strings.ToLower(info.videoProfile)
 	var args []string
 	switch info.videoCodec {
@@ -127,14 +127,13 @@ func mergeVideoEncoder(info mergeMediaInfo) ([]string, error) {
 		if !ok {
 			return nil, fmt.Errorf("暂不能将少数分集转为多数使用的 H.264 %s", info.videoProfile)
 		}
-		args = []string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-profile:v", value, "-threads:v", strconv.Itoa(mergeThreadCount())}
+		args = []string{"-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-profile:v", value, "-threads:v", strconv.Itoa(threads)}
 	case "hevc":
 		profiles := map[string]string{"main": "main", "main 10": "main10"}
 		value, ok := profiles[profile]
 		if !ok {
 			return nil, fmt.Errorf("暂不能将少数分集转为多数使用的 HEVC %s", info.videoProfile)
 		}
-		threads := mergeThreadCount()
 		args = []string{"-c:v", "libx265", "-preset", "veryfast", "-crf", "18", "-profile:v", value, "-threads:v", strconv.Itoa(threads), "-x265-params", fmt.Sprintf("pools=%d:frame-threads=%d:log-level=error", threads, threads)}
 	default:
 		return nil, fmt.Errorf("暂不支持将少数分集转为多数使用的 %s 编码；未对整剧转码", info.videoCodec)
@@ -168,14 +167,17 @@ func mergeAudioEncoder(info mergeMediaInfo) ([]string, error) {
 	return args, nil
 }
 
-func (plan mergeMediaPlan) prepareArgs(input, output string, info mergeMediaInfo, step mergeMediaStep) ([]string, error) {
-	args := []string{"-xerror", "-threads", strconv.Itoa(mergeThreadCount()), "-protocol_whitelist", "file,pipe", "-i", input}
+func (plan mergeMediaPlan) prepareArgs(input, output string, info mergeMediaInfo, step mergeMediaStep, threads int) ([]string, error) {
+	if threads < 1 {
+		threads = 1
+	}
+	args := []string{"-xerror", "-threads", strconv.Itoa(threads), "-protocol_whitelist", "file,pipe", "-i", input}
 	if plan.audio.audio && !info.audio {
 		args = append(args, "-f", "lavfi", "-i", fmt.Sprintf("anullsrc=channel_layout=%s:sample_rate=%d", plan.audio.layout, plan.audio.sampleRate))
 	}
 	args = append(args, "-map", "0:v:0", "-sn", "-dn", "-map_metadata", "-1", "-c:v", "copy")
 	if step.video {
-		encoder, err := mergeVideoEncoder(plan.video)
+		encoder, err := mergeVideoEncoder(plan.video, threads)
 		if err != nil {
 			return nil, err
 		}

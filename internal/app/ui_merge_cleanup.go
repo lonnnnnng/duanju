@@ -61,8 +61,9 @@ func (a *UIApp) handleMergeCleanup(writer http.ResponseWriter, request *http.Req
 			writeJSON(writer, http.StatusConflict, map[string]string{"error": "全集文件不存在或已移动，原分集已保留"})
 			return
 		}
-		if _, err = probeMergeMedia(verifyCtx, ffmpeg, target.output); err == nil {
-			err = decodeMergedMedia(verifyCtx, ffmpeg, target.output, nil)
+		var probe mergeMediaInfo
+		if probe, err = probeMergeMedia(verifyCtx, ffmpeg, target.output); err == nil {
+			err = verifyMergedMedia(verifyCtx, ffmpeg, target.output, probe.duration, nil)
 		}
 		if err != nil {
 			writeJSON(writer, http.StatusConflict, map[string]string{"error": "全集解码校验失败，原分集已保留：" + a.redactError(err)})

@@ -1977,12 +1977,13 @@ func (a *UIApp) mergeDrama(ctx context.Context, dramaID string, tasks []*UITask,
 		}
 		verifyCtx, verifyCancel := context.WithTimeout(ctx, 2*time.Hour)
 		ffmpeg, probeErr := a.downloader.ensureFFmpeg(verifyCtx)
+		var existingMedia mergeMediaInfo
 		if probeErr == nil {
-			_, probeErr = probeMergeMedia(verifyCtx, ffmpeg, outPath)
+			existingMedia, probeErr = probeMergeMedia(verifyCtx, ffmpeg, outPath)
 		}
 		if probeErr == nil && deleteEpisodes {
-			// long: 删除原分集前完整解码旧全集，防止外部替换或截断的文件只通过容器检查。
-			probeErr = decodeMergedMedia(verifyCtx, ffmpeg, outPath, nil)
+			// long: 删除原分集前完整解码旧全集（分段并行），防止外部替换或截断的文件只通过容器检查。
+			probeErr = verifyMergedMedia(verifyCtx, ffmpeg, outPath, existingMedia.duration, nil)
 		}
 		verifyCancel()
 		if probeErr != nil {
