@@ -16,6 +16,9 @@ type mergeMediaPlan struct {
 	videoCount   int
 	audioCount   int
 	remuxCount   int
+	// audioNormalized 表示多数音轨的编码档位无法由当前 FFmpeg 生成，
+	// 已改为把所有音轨统一重编为 AAC-LC。
+	audioNormalized bool
 }
 
 type mergeMediaStep struct {
@@ -87,6 +90,24 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 	for i := range plan.steps {
 		step := &plan.steps[i]
 		step.remux = step.remux || plan.transport
+	}
+	plan.countSteps()
+	// long: 多数音轨的 AAC 档位（如 HE-AACv2）需要 libfdk_aac，原生编码器只能输出 LC。
+	// 改用统一重编 AAC-LC，避免少数分集无法转成多数档位导致整剧合并中断。
+	if plan.audioCount > 0 && !mergeAudioTargetEncodable(plan.audio) {
+		plan.audio.audioCodec, plan.audio.audioProfile = "aac", "LC"
+		plan.audioNormalized = true
+		for i := range plan.steps {
+			plan.steps[i].audio = true
+		}
+		plan.countSteps()
+	}
+	return plan
+}
+
+func (plan *mergeMediaPlan) countSteps() {
+	plan.videoCount, plan.audioCount, plan.remuxCount = 0, 0, 0
+	for _, step := range plan.steps {
 		if step.video {
 			plan.videoCount++
 		}
@@ -97,7 +118,21 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 			plan.remuxCount++
 		}
 	}
-	return plan
+}
+
+// mergeAudioTargetEncodable 判断当前 FFmpeg 原生编码器能否产出多数音轨的编码档位。
+func mergeAudioTargetEncodable(info mergeMediaInfo) bool {
+	if !info.audio {
+		return true
+	}
+	switch info.audioCodec {
+	case "aac":
+		return info.audioProfile == "" || info.audioProfile == "LC"
+	case "mp3", "ac3", "eac3", "alac":
+		return true
+	default:
+		return false
+	}
 }
 
 func (plan mergeMediaPlan) description() string {
@@ -106,7 +141,11 @@ func (plan mergeMediaPlan) description() string {
 		parts = append(parts, fmt.Sprintf("仅转视频 %d/%d 集（%s %dx%d）", plan.videoCount, len(plan.steps), strings.ToUpper(plan.video.videoCodec), plan.video.width, plan.video.height))
 	}
 	if plan.audioCount > 0 {
-		parts = append(parts, fmt.Sprintf("调整音轨 %d/%d 集", plan.audioCount, len(plan.steps)))
+		if plan.audioNormalized {
+			parts = append(parts, fmt.Sprintf("统一音轨 %d/%d 集（AAC-LC）", plan.audioCount, len(plan.steps)))
+		} else {
+			parts = append(parts, fmt.Sprintf("调整音轨 %d/%d 集", plan.audioCount, len(plan.steps)))
+		}
 	}
 	if len(parts) == 0 {
 		if plan.remuxCount > 0 {
