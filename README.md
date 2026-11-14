@@ -21,7 +21,6 @@ go run .
 - [播放、下载与合并](docs/playback-downloads.md)：播放选项、任务行为、自动合并和磁盘空间检查。
 - [Emby 同步](docs/emby.md)：分集与全集同步模式、扫描通知和权限。
 - [常见问题](docs/troubleshooting.md)：网络、播放、下载和同步排查。
-- [Android 应用](docs/android-app.md)：Android 客户端构建与使用说明。
 - [发布流程](docs/releasing.md)：手动触发 Release 工作流。
 
 ## 开发检查

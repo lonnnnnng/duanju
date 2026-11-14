@@ -23,8 +23,8 @@ remote error: tls: no application protocol
 
 | 链路 | 实测 | 结论 |
 | --- | --- | --- |
-| 签名 POST `/novel/player/multi_video_model/v1/` | `200` + 0 字节 | 上游网关已拒绝（与 11-06 安卓端遇到的情况一致） |
-| 签名 GET `reading/.../multi_video_model/v/`（安卓同款） | `200` + 0 字节 | 本机也已被限流/拒绝；详情接口同签名仍正常（91KB），说明不是签名算法问题 |
+| 签名 POST `/novel/player/multi_video_model/v1/` | `200` + 0 字节 | 上游网关已拒绝（与 11-06 遇到的情况一致） |
+| 签名 GET `reading/.../multi_video_model/v/` | `200` + 0 字节 | 本机也已被限流/拒绝；详情接口同签名仍正常（91KB），说明不是签名算法问题 |
 | 站点 HTML `/player/<sid>/<vid>` | `200`，但 `_ROUTER_DATA` 已不存在 | 站点早已改为 React，旧的页面解析路径无效；且解析失败会直接 return，堵死后面的降级 |
 | 站点 `POST /api/video/protected/play-info` | `200`，返回明文 h264+aac 直链 | **可用**，且不需要 App 签名 |
 | 备用 `djapi.999888456.xyz` | TLS `no application protocol` | 该服务本身已不可用（TLS/ALPN 配置异常） |
@@ -41,14 +41,14 @@ remote error: tls: no application protocol
 `internal/app/provider_hongguo.go` 调整取流顺序为：
 
 1. **站点 `play-info`**（新增首选，无需签名，返回明文 MP4）
-2. 开放接口签名 GET（`provider_hongguo_open_media.go` 新增，安卓同款，恢复后自动启用）
+2. 开放接口签名 GET（`provider_hongguo_open_media.go` 新增，恢复后自动启用）
 3. 签名 POST（保留，作为历史路径）
 4. 站点 HTML 解析（保留，作为最后兜底）
 5. 备用接口（保留）
 
 同时 `resolveHongguoWebMedia` 不再阻断后续降级（`play-info` 已提前）。
 
-新增 `internal/app/provider_hongguo_open_media.go`：与安卓一致的
+新增 `internal/app/provider_hongguo_open_media.go`：使用旧版全套签名的
 `reading/bookapi/video_tab/multi_video_model/v/`（`version_code=74232`）+
 旧版全套签名（X-Gorgon/X-Argus/X-Ladon/X-Khronos/X-SS-Req-Ticket/X-SS-STUB），
 空正文重试 3~4 次。
