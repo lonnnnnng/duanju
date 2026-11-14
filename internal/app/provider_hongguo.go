@@ -198,17 +198,18 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("章节 ID 无效，请重新获取章节")
 	}
-	// 首选站点受保护接口（play-info）：不依赖 App 签名，返回 h264，浏览器可直接播放。
-	media, protectedErr := d.resolveHongguoProtectedMedia(ctx, seriesID, videoID)
-	if protectedErr == nil {
+	// long: 与上游客户端一致，App 单集接口优先：它返回全部分辨率档位，
+	// 下载固定取最高档（1080p HEVC + HE-AACv2），保证同一部剧的产物编码一致。
+	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
+	if nativeErr == nil {
 		return media, nil
 	}
 	if err := ctx.Err(); err != nil {
 		return providerMedia{}, err
 	}
-	// 兜底使用 App 单集取流（播放器签名 + 已注册设备），返回 HEVC，需要硬件解码支持。
-	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
-	if nativeErr == nil {
+	// 兜底使用站点 play-info（仅 h264，最高 720p），用于 App 接口被限流时仍可播放/下载。
+	media, protectedErr := d.resolveHongguoProtectedMedia(ctx, seriesID, videoID)
+	if protectedErr == nil {
 		return media, nil
 	}
 	if err := ctx.Err(); err != nil {
@@ -219,8 +220,8 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if pageErr == nil {
 		return media, nil
 	}
-	return providerMedia{}, fmt.Errorf("站点取流失败：%v；App 取流失败：%v；网页取流失败：%w",
-		publicError(protectedErr), publicError(nativeErr), publicError(pageErr))
+	return providerMedia{}, fmt.Errorf("App 取流失败：%v；站点取流失败：%v；网页取流失败：%w",
+		publicError(nativeErr), publicError(protectedErr), publicError(pageErr))
 }
 
 func (d *Downloader) resolveHongguoWebMedia(ctx context.Context, seriesID, videoID string) (providerMedia, error) {
