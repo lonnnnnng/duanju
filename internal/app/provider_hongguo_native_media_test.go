@@ -22,27 +22,26 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 		t.Run(format, func(t *testing.T) {
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 				var payload struct {
-					VideoID string `json:"video_id"`
-					Type    int    `json:"content_type"`
-					Biz     struct {
-						Platform int  `json:"video_platform"`
-						All      bool `json:"need_all_video_definition"`
-					} `json:"biz_param"`
+					Biz   map[string]any `json:"biz_param"`
+					Map   map[string]any `json:"mixed_video_id_map"`
+					Scene string         `json:"dr_scene"`
 				}
-				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/video_model/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
+				if request.Method != http.MethodPost || request.URL.Path != "/novel/player/multi_video_model/player/v1/" || json.NewDecoder(request.Body).Decode(&payload) != nil {
 					t.Fatal("incorrect model request")
 				}
-				if payload.VideoID != episode || payload.Type != 1 || payload.Biz.Platform != 3 || !payload.Biz.All {
+				ids, _ := payload.Map["1004"].([]any)
+				if len(ids) != 1 || ids[0] != episode || payload.Scene != "player" || payload.Biz["video_platform"] != float64(1024) {
 					t.Fatal("model request lost episode or required parameters")
 				}
-				if request.Header.Get("X-Gorgon") == "" || request.Header.Get("X-SS-STUB") == "" || request.Header.Get("X-Argus") == "" || request.Header.Get("X-Ladon") == "" {
-					t.Fatal("model request was not signed")
+				if request.Header.Get("X-Helios") == "" || request.Header.Get("X-Medusa") == "" || request.Header.Get("X-SS-STUB") == "" {
+					t.Fatal("model request was not V5 signed")
 				}
 				var value any = model
 				if format == "string" {
 					value = string(encoded)
 				}
-				body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{"video_model": value}})
+				body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{"1004": map[string]any{
+					episode: map[string]any{"video_model": value}}}})
 				return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
 			})
 			media, err := d.resolveHongguoAppMedia(context.Background(), episode)

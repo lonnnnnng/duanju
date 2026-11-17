@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -13,19 +14,116 @@ import (
 	"time"
 )
 
+// long: 播放接口只接受被服务端信任的设备身份；这里设备级复用同机官方红果 App 的身份。
+const (
+	hongguoPlaybackOfficialDeviceID  = "3471634475833546"
+	hongguoPlaybackOfficialInstallID = "1342981674659067"
+)
+
 func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoID string) (providerMedia, error) {
 	if !hongguoNumericID.MatchString(videoID) {
 		return providerMedia{}, errors.New("视频 ID 无效")
 	}
 	payload := map[string]any{
-		"video_id": videoID, "content_type": 1,
-		"biz_param": map[string]any{"need_all_video_definition": true, "video_platform": 3},
+		"biz_param": map[string]any{
+			"detail_page_version": 0, "device_level": 3, "disable_digg_stat": false,
+			"disable_video_relate_book": false, "need_all_video_definition": true,
+			"need_mp4_align": false, "use_os_player": false, "use_server_dns": false,
+			"video_platform": 1024,
+		},
+		"mixed_video_id_map": map[string]any{"1004": []string{videoID}},
+		"dr_scene":           "player",
 	}
-	result, err := downloader.hongguoAppRequest(ctx, http.MethodPost, "/novel/player/video_model/v1/", nil, payload)
+	body, err := json.Marshal(payload)
 	if err != nil {
 		return providerMedia{}, err
 	}
-	return parseHongguoAppPreloadMediaOrdered(result, videoID, downloader.hostHealth)
+	result, err := downloader.hongguoPlaybackV5Request(ctx, body)
+	if err != nil {
+		return providerMedia{}, err
+	}
+	data := nestedMap(result, "data")
+	if data == nil {
+		return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+	}
+	bucket := data
+	if nested := nestedMap(data, "1004"); len(nested) > 0 {
+		bucket = nested
+	}
+	return parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
+}
+
+func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body []byte) (map[string]any, error) {
+	address := hongguoPlaybackBaseURL + hongguoPlaybackPath
+	attempts := downloader.cfg.Retries
+	if attempts < 1 {
+		attempts = 1
+	}
+	if attempts > 3 {
+		attempts = 3
+	}
+	var lastErr error
+	for attempt := 0; attempt < attempts; attempt++ {
+		if attempt > 0 {
+			select {
+			case <-time.After(time.Duration(attempt) * time.Second):
+			case <-ctx.Done():
+				return nil, ctx.Err()
+			}
+		}
+		query := hongguoPlaybackQuery(hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID)
+		signedURL, headers, err := hongguoV5Sign(address, query, body, time.Now())
+		if err != nil {
+			return nil, err
+		}
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, signedURL, bytes.NewReader(body))
+		if err != nil {
+			return nil, err
+		}
+		for name, value := range headers {
+			request.Header.Set(name, value)
+		}
+		request.Header.Set("User-Agent", hongguoPlaybackUserAgent)
+		request.Header.Set("Accept", "application/json")
+		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, nil)
+		if err != nil {
+			lastErr = err
+			var backoff *requestBackoff
+			if errors.As(err, &backoff) || ctx.Err() != nil {
+				return nil, err
+			}
+			continue
+		}
+		content, readErr := io.ReadAll(io.LimitReader(response.Body, providerMaxBodyBytes+1))
+		response.Body.Close()
+		if readErr != nil {
+			lastErr = readErr
+			continue
+		}
+		if response.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf(" App 接口 HTTP %d", response.StatusCode)
+			if response.StatusCode >= 400 && response.StatusCode < 500 {
+				return nil, lastErr
+			}
+			continue
+		}
+		if len(content) == 0 || len(content) > providerMaxBodyBytes {
+			lastErr = errors.New(" App 接口返回空正文（HTTP 200）")
+			continue
+		}
+		decoder := json.NewDecoder(bytes.NewReader(content))
+		decoder.UseNumber()
+		var result map[string]any
+		if err := decoder.Decode(&result); err != nil {
+			lastErr = errors.New(" App 接口返回格式异常")
+			continue
+		}
+		return result, nil
+	}
+	if lastErr == nil {
+		lastErr = errors.New(" App 接口未返回有效数据")
+	}
+	return nil, lastErr
 }
 
 func parseHongguoAppPreloadMediaOrdered(result map[string]any, videoID string, health *providerHostHealth) (providerMedia, error) {
