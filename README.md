@@ -4,7 +4,7 @@
 
 ## 快速开始
 
-从 [GitHub Releases](https://github.com/lonnnnnng/duanju/releases) 下载适合当前系统和 CPU 架构的程序。macOS / Linux 首次运行可能需要执行 `chmod +x 程序名`。
+从 [GitHub Releases](https://github.com/lonnnnnng/duanju/releases) 下载 `linux-amd64` 程序；首次运行可能需要执行 `chmod +x 程序名`。
 
 默认监听 `0.0.0.0:3333`，浏览器打开 `http://127.0.0.1:3333` 即可使用。只允许本机访问时加上 `-listen 127.0.0.1:3333`；后台运行时可加 `-open=false`。
 

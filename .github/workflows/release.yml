@@ -98,7 +98,7 @@ jobs:
           go vet ./...
           git diff --exit-code
 
-      - name: 构建五个平台程序与校验清单
+      - name: 构建 linux-amd64 程序与校验清单
         run: bash scripts/build.sh
 
       - name: 上传到草稿并核对全部资产
@@ -108,11 +108,7 @@ jobs:
         run: |
           # long: 在线更新只读取正式 Release，先上传并核对完整产物后才允许公开新版本。
           gh release create "$VERSION" \
-            "dist/duanju-${VERSION}-darwin-arm64" \
-            "dist/duanju-${VERSION}-darwin-amd64" \
             "dist/duanju-${VERSION}-linux-amd64" \
-            "dist/duanju-${VERSION}-linux-arm64" \
-            "dist/duanju-${VERSION}-windows-amd64.exe" \
             dist/SHA256SUMS \
             --target "$GITHUB_SHA" --draft --title "$VERSION" \
             --generate-notes --notes "$RELEASE_NOTES"
@@ -131,7 +127,7 @@ jobs:
           root = pathlib.Path('dist')
           expected = {name: digest for digest, name in (
               line.split() for line in (root / 'SHA256SUMS').read_text().splitlines())}
-          assert len(expected) == 5
+          assert len(expected) == 1
           assert {asset['name'] for asset in release['assets']} == set(expected) | {'SHA256SUMS'}
           for asset in release['assets']:
               path = root / asset['name']
@@ -140,7 +136,7 @@ jobs:
               assert asset['digest'] == 'sha256:' + digest
               if path.name != 'SHA256SUMS':
                   assert expected[path.name] == digest
-          print('五个平台程序及 SHA256SUMS 的远端大小与摘要全部匹配')
+          print('linux-amd64 程序及 SHA256SUMS 的远端大小与摘要全部匹配')
           PY
 
       - name: 正式发布并复查最新版本
@@ -157,10 +153,10 @@ jobs:
           release = json.loads((pathlib.Path(os.environ['RUNNER_TEMP']) / 'duanju-latest-release.json').read_text())
           assert release['tag_name'] == os.environ['VERSION']
           assert not release['draft'] and not release['prerelease']
-          assert len(release['assets']) == 6
+          assert len(release['assets']) == 2
           with open(os.environ['GITHUB_STEP_SUMMARY'], 'a') as summary:
               summary.write('## 发布完成\n\n')
               summary.write('- Release：' + release['html_url'] + '\n')
               summary.write('- 提交：`' + os.environ['GITHUB_SHA'] + '`\n')
-              summary.write('- 五个平台程序与 SHA256SUMS 均已校验。\n')
+              summary.write('- linux-amd64 程序与 SHA256SUMS 均已校验。\n')
           PY
