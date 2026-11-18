@@ -85,9 +85,11 @@
       filterWrap.hidden = groups.length === 0;
       const options = [new Option('总榜', '')];
       for (const group of groups) {
+        const groupOptions = (group.options || []).filter(option => option.id);
+        if (!groupOptions.length) continue;
         const optgroup = document.createElement('optgroup');
         optgroup.label = group.name;
-        for (const option of group.options || []) {
+        for (const option of groupOptions) {
           optgroup.appendChild(new Option(option.name, option.id));
         }
         options.push(optgroup);
