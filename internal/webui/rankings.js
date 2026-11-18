@@ -251,7 +251,7 @@
         image.addEventListener('error', () => image.replaceWith(placeholder()));
         poster.appendChild(image);
       } else poster.appendChild(placeholder());
-      const rank = node('span', 'rankings-rank' + (item.rank <= 3 ? ' top' : ''), String(item.rank).padStart(2, '0'));
+      const rank = node('span', 'rankings-rank' + (item.rank <= 3 ? ' top rank-' + item.rank : ''), String(item.rank).padStart(2, '0'));
       rank.setAttribute('aria-label', '第 ' + item.rank + ' 名');
       poster.appendChild(rank);
       if (item.label) poster.appendChild(node('span', 'rankings-kind', item.label));

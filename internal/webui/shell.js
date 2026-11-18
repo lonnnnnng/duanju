@@ -39,7 +39,7 @@ export function createShell(app) {
     if (!detail) return;
     const state = sourceStates.hongguo || Object.values(sourceStates)[0] || {};
     const count = Number.isFinite(state.count) ? state.count + ' 部' : '';
-    const date = state.updatedAt && !state.updatedAt.startsWith('0001') ? new Date(state.updatedAt).toLocaleString() : '';
+    const date = state.updatedAt && !state.updatedAt.startsWith('0001') ? new Date(state.updatedAt).toLocaleString('zh-CN', {month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false}) : '';
     detail.textContent = [count, date].filter(Boolean).join(' · ') || '站源状态未知';
     detail.title = [state.status ? '状态：' + state.status : '', state.error || ''].filter(Boolean).join(' · ') || '主站剧库状态';
   }

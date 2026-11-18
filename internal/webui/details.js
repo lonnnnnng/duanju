@@ -122,7 +122,7 @@ export function createDetails(app) {
       emby.title = '导出 STRM 分集文件，用于现有 Emby 电视剧媒体库';
       secondary.append(app.downloads.qualityControl(), download, watched, emby);
       actions.after(secondary);
-      content.appendChild(element('p', 'small notice', '手动标记用于整理清单，实际播放进度仍自动保存。'));
+      content.appendChild(element('p', 'small notice', '手动标记仅用于整理清单。'));
     });
   }
 
