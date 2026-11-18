@@ -42,15 +42,8 @@
   let streamComplete = false;
   let prefetchAttempted = 0;
   let prefetchVersion = 0;
-  let historySource = '', releaseStatus = '';
-  let historySequence = 0;
-  let historyPlayed = false;
-  let historyCompleted = false;
-  let historySentAt = 0;
-  let historySignature = '';
+  let releaseStatus = '';
   let playbackDuration = 0;
-  let historyMessage = '';
-  const historyStatus = node('playbackHistoryStatus');
   const prefetchToggle = node('prefetchNextEpisode');
   const prefetchStatus = node('prefetchStatus');
   try {prefetchToggle.checked = localStorage.getItem('duanju.playback.prefetchNext') !== 'false';} catch (_) {}
@@ -107,7 +100,7 @@
       if (planMode === 'legacy') allowRemux = false;
     }
     const position = !loading && Number.isFinite(video.currentTime) ? video.currentTime : lastPosition;
-    playEpisode(currentIndex, position, desiredPlayback, true);
+    playEpisode(currentIndex, position, desiredPlayback);
     return true;
   }
   let desiredPlayback = true;
@@ -118,15 +111,15 @@
     onError: error => {sessionAvailable = false; recoveryBlocked = true; showError(error);}
   });
 
-  function fallbackPlayback(index, offset, shouldPlay, keepResumeMessage = true) {
+  function fallbackPlayback(index, offset, shouldPlay) {
     if (transport === 'mse' && allowRemux && streamRemux) {
       allowRemux = false;
-      playEpisode(index, offset, shouldPlay, keepResumeMessage);
+      playEpisode(index, offset, shouldPlay);
       return true;
     }
     if (transport !== 'mse' || !supportsNativePlayback()) return false;
     transport = 'hls';
-    playEpisode(index, offset, shouldPlay, keepResumeMessage);
+    playEpisode(index, offset, shouldPlay);
     return true;
   }
 
@@ -184,43 +177,13 @@
     }
   }
 
-  function historySnapshot(force = false, repeat = false) {
-    if (!historyPlayed || !sessionID || !playbackRun || !episodes[currentIndex - 1] || !window.DuanjuHistory) return null;
-    const position = !loading && Number.isFinite(video.currentTime) ? video.currentTime : lastPosition;
-    const duration = Number.isFinite(video.duration) && video.duration > 0 ? video.duration : playbackDuration;
-    if (!Number.isFinite(position) || position < 0) return null;
-    const signature = playbackRun + ':' + position.toFixed(3) + ':' + historyCompleted;
-    if (!repeat && signature === historySignature || !force && Date.now() - historySentAt < 10000) return null;
-    historySignature = signature;
-    historySentAt = Date.now();
-    const episode = episodes[currentIndex - 1];
-    const progress = {run: playbackRun, sequence: ++historySequence, episode: currentIndex, position, duration: duration || 0, completed: historyCompleted};
-    const entry = {dramaId: dramaID, title: dramaName, source: historySource, chapterId: episode.chapterId || '', episode: episode.episode, index: episode.number || currentIndex, total: episode.total || episodes.length, position, duration: duration || 0, completed: historyCompleted, mode: collectionMode ? 'collection' : 'online', taskId: episode.taskId || '', watchedAt: new Date().toISOString()};
-    return {progress, entry};
-  }
-
-  function saveHistory(force = false) {
-    const snapshot = historySnapshot(force);
-    if (!snapshot) return;
-    const session = sessionID;
-    window.DuanjuHistory.save(session, snapshot.progress, snapshot.entry).then(() => {
-      if (session === sessionID && snapshot.progress.sequence === historySequence) historyStatus.textContent = historyMessage;
-    }).catch(error => {
-      if (session !== sessionID || snapshot.progress.sequence !== historySequence) return;
-      historySignature = '';
-      if (error.status === 410) {sessionAvailable = false; recoverPlayback(); return;}
-      historyStatus.textContent = '观看进度暂未保存：' + error.message;
-    });
-  }
-
-  function releaseSession(id, progress, unloading = false) {
+  function releaseSession(id, unloading = false) {
     if (!id) return;
-    const body = JSON.stringify({session: id, action: 'close', ...(progress ? {progress} : {})});
+    const body = JSON.stringify({session: id, action: 'close'});
     if (unloading && navigator.sendBeacon && navigator.sendBeacon('/api/ui/playback/control', new Blob([body], {type: 'application/json'}))) return;
     fetch('/api/ui/playback/control', {method: 'POST', headers: {'Content-Type': 'application/json', ...window.DuanjuViewer?.headers()}, credentials: 'same-origin', body, keepalive: true}).then(response => response.json()).then(result => {
       window.DuanjuViewer?.checkResponse(result);
-      if (progress && result.historyError) window.DuanjuHistory?.reportError(result.historyError);
-    }).catch(error => {if (progress && !unloading) window.DuanjuHistory?.reportError(error.message);});
+    }).catch(() => {});
   }
 
   function stopStream() {
@@ -229,10 +192,6 @@
     mediaLoader.destroy();
     mediaPlan = null;
     controls.reset();
-    saveHistory(true);
-    historyPlayed = false;
-    historyCompleted = false;
-    historySignature = '';
     playbackDuration = 0;
     window.DuanjuPlaybackDanmaku?.suspend();
     streamVersion++;
@@ -281,14 +240,11 @@
       }
       stallRecoveryAttempts.push(Date.now());
       statusText.textContent = '播放停滞，正在自动恢复…';
-      playEpisode(index, recoveryPosition(), true, true);
+      playEpisode(index, recoveryPosition(), true);
     }, 8000);
   }
 
   function dispose(unloading = false) {
-    const snapshot = historySnapshot(true, true);
-    if (snapshot) window.DuanjuHistory.remember(snapshot.entry);
-    historyPlayed = false;
     openingVersion++;
     if (openingController) openingController.abort();
     openingController = null;
@@ -296,7 +252,7 @@
     recoveryPromise = null;
     recoveryTarget = null;
     stopStream();
-    releaseSession(sessionID, snapshot?.progress, unloading);
+    releaseSession(sessionID, unloading);
     sessionID = '';
     sessionAvailable = false;
     preparedIndex = 0;
@@ -388,8 +344,6 @@
       return Promise.resolve(false);
     }
     recoveryAttempts.push(Date.now());
-    const snapshot = historySnapshot(true, true);
-    if (snapshot) window.DuanjuHistory?.remember(snapshot.entry);
     const completed = new Set(Array.from(completedEpisodes, number => episodes[number - 1]?.chapterId));
     const previousSession = sessionID;
     const version = ++openingVersion;
@@ -397,7 +351,6 @@
     openingController?.abort();
     const controller = new AbortController();
     openingController = controller;
-    historyPlayed = false;
     stopStream();
     sessionID = '';
     releaseSession(previousSession);
@@ -414,7 +367,6 @@
         mimeType = result.mimeType || mimeType;
         dramaID = result.dramaId || dramaID;
         dramaName = result.title || dramaName;
-        historySource = result.source || historySource;
         releaseStatus = result.releaseStatus || releaseStatus;
         episodes = result.episodes || [];
         if (!episodes.length) throw new Error('站点没有返回可播放的分集');
@@ -425,15 +377,11 @@
         completedEpisodes.clear();
         for (const item of episodes) if (item.chapterId && completed.has(item.chapterId)) completedEpisodes.add(item.index);
         preparedIndex = 0;
-        historySequence = 0;
-        historySentAt = 0;
-        historyMessage = '已自动恢复到刚才的观看位置';
-        historyStatus.textContent = historyMessage;
         node('playerTitle').textContent = dramaName;
         renderEpisodes(Math.floor((selected.index - 1) / 30));
         keepalive.start(sessionID);
         recoveryTarget = null;
-        playEpisode(selected.index, Math.max(0, latest.offset), latest.shouldPlay, true);
+        playEpisode(selected.index, Math.max(0, latest.offset), latest.shouldPlay);
         return true;
       } catch (error) {
         if (version === openingVersion && error.name !== 'AbortError') {
@@ -463,7 +411,7 @@
     if (state && version === streamVersion && panel.open && video.error) recoverPlayback();
   }
 
-  async function open(id, title, initialIndex = 0, offset = 0, taskID = '', resume = true, fromHistory = false) {
+  async function open(id, title, initialIndex = 0, offset = 0, taskID = '') {
     dispose();
     recoveryAttempts = [];
     stallRecoveryAttempts = [];
@@ -479,12 +427,7 @@
     completedEpisodes.clear();
     currentIndex = 0;
     lastPosition = offset;
-    historySource = '';
     releaseStatus = '';
-    historySequence = 0;
-    historyMessage = '';
-    historySentAt = 0;
-    historyStatus.textContent = '';
     node('playerTitle').textContent = title;
     statusText.textContent = collectionMode ? '正在读取合集分集…' : '正在获取分集…';
     updatePlaybackHint('');
@@ -499,8 +442,7 @@
     const version = openingVersion;
     openingController = new AbortController();
     try {
-      const shouldResume = resume && initialIndex === 0;
-      const result = await requestJSON('/api/ui/playback/open', {...(taskID ? {taskId: taskID} : {dramaId: id}), resume: shouldResume, fromHistory}, openingController.signal);
+      const result = await requestJSON('/api/ui/playback/open', {...(taskID ? {taskId: taskID} : {dramaId: id}), resume: false}, openingController.signal);
       if (version !== openingVersion || !panel.open) {
         releaseSession(result.session);
         return;
@@ -510,15 +452,9 @@
       mimeType = result.mimeType;
       dramaID = result.dramaId || id;
       dramaName = result.title || title;
-      historySource = result.source || '';
       releaseStatus = result.releaseStatus || '';
       collectionMode = result.mode === 'collection';
       episodes = result.episodes || [];
-      const remembered = window.DuanjuHistory.get(dramaID);
-      if (remembered?.completed) {
-        const finished = episodes.find(episode => remembered.chapterId ? episode.chapterId === remembered.chapterId : episode.episode === remembered.episode);
-        if (finished) completedEpisodes.add(finished.index);
-      }
       transport = capabilities.choose(mimeType);
       allowRemux = transport === 'mse' && capabilities.remux();
       if (!episodes.length) throw new Error('站点没有返回可播放的分集');
@@ -526,25 +462,19 @@
       node('playerTitle').textContent = result.title || title;
       renderEpisodes();
       keepalive.start(sessionID);
-      historyMessage = shouldResume ? result.resumeMessage || '' : '';
-      historyStatus.textContent = historyMessage;
-      playEpisode(Math.min(Math.max(initialIndex || result.initialIndex || 1, 1), episodes.length), shouldResume ? Number(result.initialPosition) || 0 : offset, !shouldResume || !result.resumePaused, true);
+      playEpisode(Math.min(Math.max(initialIndex || result.initialIndex || 1, 1), episodes.length), offset, true);
     } catch (error) {
       if (version === openingVersion && error.name !== 'AbortError') showError(error);
     }
   }
 
-  function openCollection(taskID, title, resume = false) {
-    return open('', title, 0, 0, taskID, resume);
-  }
-
-  function openHistory(id, title) {
-    return open(id, title, 0, 0, '', true, true);
+  function openCollection(taskID, title) {
+    return open('', title, 0, 0, taskID);
   }
 
   function reopen(index, offset) {
-    if (collectionMode) return open('', dramaName, 0, offset, episodes[index - 1]?.taskId || collectionTaskID, false);
-    return open(dramaID, dramaName, index, offset, '', false);
+    if (collectionMode) return open('', dramaName, 0, offset, episodes[index - 1]?.taskId || collectionTaskID);
+    return open(dramaID, dramaName, index, offset);
   }
 
   function updatePlaybackHint(source) {
@@ -677,7 +607,7 @@
     if (result.player === 'legacy') {
       planMode = 'legacy';
       if (result.reason !== 'optimization_disabled') allowRemux = false;
-      playEpisode(index, offset, shouldPlay, true);
+      playEpisode(index, offset, shouldPlay);
       return;
     }
     mediaPlan = result;
@@ -703,17 +633,13 @@
     });
   }
 
-  async function playEpisode(index, offset = 0, shouldPlay = true, keepResumeMessage = false) {
+  async function playEpisode(index, offset = 0, shouldPlay = true) {
     if (!episodes[index - 1]) return;
     if (currentIndex !== index) stallRecoveryAttempts = [];
     const nextPlanKey = dramaID + ':' + index + ':' + quality;
     if (planKey !== nextPlanKey) {planKey = nextPlanKey; planMode = 'auto'; planFallbacks = 0; networkRefreshes = 0;}
     if (!sessionAvailable) {recoverPlayback(index, offset, shouldPlay); return;}
     stopStream();
-    if (!keepResumeMessage) {
-      historyMessage = '';
-      historyStatus.textContent = '';
-    }
     currentIndex = index;
     streamRemux = false;
     desiredPlayback = shouldPlay;
@@ -766,7 +692,7 @@
       streamRemux = response.headers.get('X-Playback-Mode') === 'remux';
       const streamMIME = response.headers.get('X-Playback-MIME') || mimeType;
       if (!supportsMediaSource(streamMIME)) {
-        if (fallbackPlayback(index, offset, shouldPlay, keepResumeMessage)) return;
+        if (fallbackPlayback(index, offset, shouldPlay)) return;
         throw new Error('浏览器不支持当前清晰度的编码，可切换较低清晰度后重试');
       }
       updatePlaybackHint(response.headers.get('X-Playback-Source'));
@@ -818,7 +744,7 @@
         if (error.status === 410) {recoverPlayback(index, Math.max(offset, lastPosition), desiredPlayback); return;}
         if (mediaPlan && (error.playbackDecode || error.playbackNetwork) && await handleMediaFailure(error, version)) return;
         const compatibleFailure = error.playbackDecode || error.name === 'NotSupportedError';
-        if (compatibleFailure && fallbackPlayback(index, Math.max(offset, lastPosition), desiredPlayback, keepResumeMessage)) return;
+        if (compatibleFailure && fallbackPlayback(index, Math.max(offset, lastPosition), desiredPlayback)) return;
         showError(error);
       }
     } finally {
@@ -836,12 +762,12 @@
     }
     seekTimer = setTimeout(() => playEpisode(currentIndex, target, !video.paused), 180);
   });
-  video.addEventListener('timeupdate', () => {if (!loading && Number.isFinite(video.currentTime)) {lastPosition = video.currentTime; if (!video.paused && !video.seeking) saveHistory();} maybePrefetchNext();});
+  video.addEventListener('timeupdate', () => {if (!loading && Number.isFinite(video.currentTime)) lastPosition = video.currentTime; maybePrefetchNext();});
   video.addEventListener('playing', () => {
     clearTimeout(stallRecoveryTimer);
     stallRecoveryTimer = null;
     desiredPlayback = true;
-    if (!loading && !errorText.textContent) {historyPlayed = true; historyCompleted = false; statusText.textContent = '正在播放'; saveHistory(true);}
+    if (!loading && !errorText.textContent) statusText.textContent = '正在播放';
     maybePrefetchNext();
   });
   video.addEventListener('waiting', () => {
@@ -854,7 +780,6 @@
     clearTimeout(stallRecoveryTimer);
     stallRecoveryTimer = null;
     if (!loading && !video.error) desiredPlayback = false;
-    if (!loading) saveHistory(true);
     if (!loading && !video.ended && !errorText.textContent) statusText.textContent = '已暂停';
   });
   video.addEventListener('error', async () => {
@@ -873,10 +798,8 @@
   });
   video.addEventListener('ended', () => {
     if (loading || !panel.open || errorText.textContent) return;
-    historyCompleted = true;
     completedEpisodes.add(currentIndex);
     updateEpisodeControls();
-    saveHistory(true);
     if (node('autoNextEpisode').checked && currentIndex < episodes.length) playEpisode(currentIndex + 1);
     else statusText.textContent = '本集播放完毕';
   });
@@ -905,7 +828,7 @@
   });
   node('closePlayerBtn').addEventListener('click', () => panel.close());
   panel.addEventListener('close', () => {if (!panel.open) dispose();});
-  document.addEventListener('visibilitychange', () => {if (document.hidden) saveHistory(true); else wakePlayback();});
+  document.addEventListener('visibilitychange', () => {if (!document.hidden) wakePlayback();});
   window.addEventListener('pagehide', () => {lastPosition = recoveryPosition(); dispose(true);});
   for (const type of ['pageshow', 'online']) window.addEventListener(type, wakePlayback);
   video.addEventListener('play', () => {if (!loading) wakePlayback();});
@@ -1053,5 +976,5 @@
   });
   document.addEventListener('visibilitychange', schedulePrefetchStatus);
 
-  window.dramaPlayer = {open, openCollection, openHistory, updateDependency};
+  window.dramaPlayer = {open, openCollection, updateDependency};
 })();

@@ -2,7 +2,7 @@ import { $, element, button, readPreference, savePreference, populateIcons } fro
 
 export function createShell(app) {
   const main = $('workspaceMain');
-  const positions = {library: 0, rankings: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0, 'watch-history': 0};
+  const positions = {library: 0, rankings: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0};
   let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
   let sourceNotice;
   const sourceRows = new Map(), sourceErrors = new Map();
@@ -26,9 +26,6 @@ export function createShell(app) {
     }
     if (page === 'emby-settings') {
       app.emby?.refresh?.();
-    }
-    if (page === 'watch-history') {
-      window.DuanjuHistory?.refresh?.();
     }
     requestAnimationFrame(() => {main.scrollTop = positions[page] || 0;});
   }
@@ -136,7 +133,7 @@ export function createShell(app) {
     populateIcons();
     window.DuanjuDialogs.listen(setPage);
     document.querySelectorAll('button[data-page], [data-go]').forEach(control => control.addEventListener('click', () => {
-      if (control.dataset.go === 'following') app.following.showTab('watching');
+      if (control.dataset.go === 'following') app.following.showTab('saved');
       window.DuanjuDialogs.navigate(control.dataset.page || control.dataset.go);
     }));
     document.querySelector('.brand').addEventListener('click', event => {event.preventDefault(); window.DuanjuDialogs.navigate('library');});

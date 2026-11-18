@@ -65,9 +65,8 @@ export function createDetails(app) {
   function render() {
     if (!currentID) return;
     const saved = app.following.get(currentID);
-    const history = window.DuanjuHistory.get(currentID);
     const known = app.library.get(currentID);
-    const drama = known || {id: currentID, title: saved?.title || history?.title || '短剧', source: saved?.source || history?.source, totalEpisode: saved?.totalEpisode || history?.total, categoryName: saved?.category};
+    const drama = known || {id: currentID, title: saved?.title || '短剧', source: saved?.source, totalEpisode: saved?.totalEpisode, categoryName: saved?.category};
     const title = dramaTitle(drama);
     withFocus(content, () => {
       content.replaceChildren();
@@ -88,10 +87,9 @@ export function createDetails(app) {
       metadataStatus.hidden = !metadataStatus.textContent;
       content.appendChild(metadataStatus);
       if (drama.vip === true) content.appendChild(element('p', 'notice vip-notice', '此剧含 VIP 分集，站源仅提供试看；试看内容不会作为完整分集下载。'));
-      if (history) content.appendChild(element('p', 'detail-progress', window.DuanjuHistory.progressText(history)));
       if (saved?.newEpisodes > 0) content.appendChild(element('p', 'following-update notice', '剧库新增 ' + saved.newEpisodes + ' 集'));
       const actions = element('div', 'detail-actions');
-      const play = button(history ? '继续观看' : '开始观看', () => app.play(currentID, title), false, 'primary-action button-content');
+      const play = button('开始观看', () => app.play(currentID, title), false, 'primary-action button-content');
       play.prepend(icon('play'));
       play.dataset.focusKey = 'detail-play';
       const bookmark = button(saved?.saved ? '已收藏' : '加入想看', () => app.following.toggleSaved(currentID), app.following.busy(currentID), 'secondary');

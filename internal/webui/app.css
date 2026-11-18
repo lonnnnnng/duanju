@@ -1,5 +1,5 @@
-:root{color-scheme:light;--bg:#f7f7f2;--panel:#fffefb;--soft:#edeee8;--text:#242a27;--muted:#626b63;--line:#dde2d9;--line-strong:#9aa99d;--brand:#315e52;--on-brand:#fff;--brand-text:#355f52;--tint:#e7eee8;--poster:#e7e9e1;--poster-ink:#5e6b5e;--danger:#a34242;--danger-bg:#f7e9e6;--success:#376348;--success-bg:#e7efe6;--warning:#7c5b29;--warning-bg:#f5eddf;--shadow:0 12px 40px #1b302019;--radius:10px;--control-radius:7px}
-:root[data-theme=dark]{color-scheme:dark;--bg:#161b19;--panel:#1e2622;--soft:#29332d;--text:#e9efe9;--muted:#a4b1a8;--line:#354239;--line-strong:#687e6f;--brand:#b5d5c1;--on-brand:#1b3023;--brand-text:#b5d5c1;--tint:#2b3e32;--poster:#29372e;--poster-ink:#b3c4b5;--danger:#efb0aa;--danger-bg:#3e2b29;--success:#b0cfb4;--success-bg:#2a3d2d;--warning:#ddc397;--warning-bg:#3b3426;--shadow:0 12px 40px #0005}
+:root{color-scheme:light;--bg:#f6f7fb;--panel:#ffffff;--soft:#eceff6;--text:#1b2030;--muted:#606a82;--line:#dfe3ee;--line-strong:#9aa3b8;--brand:#5b5fd6;--on-brand:#fff;--brand-text:#4b4fc4;--tint:#ebeaff;--poster:#e8eaf3;--poster-ink:#5c6379;--danger:#b93b3b;--danger-bg:#fbecec;--success:#1f7a5c;--success-bg:#e5f4ee;--warning:#8a5a12;--warning-bg:#f8efdf;--shadow:0 12px 40px #1b213019;--radius:10px;--control-radius:7px}
+:root[data-theme=dark]{color-scheme:dark;--bg:#0e1118;--panel:#171b25;--soft:#222736;--text:#edf0f8;--muted:#a3aabd;--line:#2c3243;--line-strong:#5f687e;--brand:#8b8cf0;--on-brand:#14162e;--brand-text:#a9b4ff;--tint:#26284a;--poster:#232838;--poster-ink:#b4bbcf;--danger:#f0a7a3;--danger-bg:#3a2527;--success:#9ed8c5;--success-bg:#1f3330;--warning:#e5c58c;--warning-bg:#3a3226;--shadow:0 12px 40px #0007}
 *{box-sizing:border-box}
 html,body{height:100%;margin:0}
 body{display:flex;flex-direction:column;height:100dvh;overflow:hidden;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;-webkit-font-smoothing:antialiased}
@@ -129,7 +129,7 @@ dialog .dialog-heading h2{font-size:17px}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{scroll-behavior:auto!important;transition:none!important}}
 
 .viewer-notice {display: flex; align-items: center; justify-content: center; gap: 12px; flex-wrap: wrap; margin: 12px 20px; padding: 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); font-size: 13px;}
-.viewer-notice[hidden], #legacyImportSection[hidden] {display: none;}
+.viewer-notice[hidden] {display: none;}
 .viewer-settings {margin-top: 16px; padding: 14px 0 0; border-top: 1px solid var(--line);}
 .viewer-settings h3 {display: flex; flex-wrap: wrap; align-items: baseline; gap: 10px; margin: 0 0 6px; font-size: 14px;}
 .viewer-settings p {margin: 6px 0; line-height: 1.6;}

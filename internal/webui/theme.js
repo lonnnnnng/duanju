@@ -7,7 +7,7 @@
     const theme = preference === 'system' ? (system.matches ? 'dark' : 'light') : preference;
     document.documentElement.dataset.theme = theme;
     const browserColor = document.querySelector('meta[name="theme-color"]');
-    if (browserColor) browserColor.content = theme === 'dark' ? '#161b19' : '#f7f7f2';
+    if (browserColor) browserColor.content = theme === 'dark' ? '#0e1118' : '#f6f7fb';
     document.dispatchEvent(new CustomEvent('themechange', {detail: preference}));
   }
   function set(value) {

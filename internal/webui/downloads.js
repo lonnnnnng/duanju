@@ -1,5 +1,5 @@
 import { reconcileChildren, withFocus, readPreference, savePreference } from './ui-core.js';
-import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, watchLabel, historySuffix, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
+import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
 
 export function createDownloads(app) {
   let tasks = [], visibleGroups = [], mergeStates = {}, autoMergeStates = {}, taskRequest = false, ffmpegStatus = '';
@@ -100,7 +100,7 @@ function renderTasks(next) {
       const nodes = [];
       for (const group of visibleGroups) {
         const old = previous.get(group.id);
-        const key = JSON.stringify([group, mergeStates[group.id], openGroups.has(group.id), batch, selectedMerges.has(group.id), exportingMerges.has(group.id), verifyingGroups.has(group.id), group.tasks.map(task => selectedTasks.has(task.id)), historySuffix(group.id)]);
+        const key = JSON.stringify([group, mergeStates[group.id], openGroups.has(group.id), batch, selectedMerges.has(group.id), exportingMerges.has(group.id), verifyingGroups.has(group.id), group.tasks.map(task => selectedTasks.has(task.id))]);
         // long: 进度轮询只替换变化的分集行，保留同一合集的其余分集 DOM、焦点和内部滚动位置。
         const node = old || element('article', 'group');
         node.dataset.dramaId = group.id;
@@ -168,7 +168,7 @@ function renderGroupHead(group) {
   if (qualities.length) statuses.push('画质：' + (qualities.length === 1 ? qualityLabel(qualities[0]) : '按分集设置'));
   for (const [key, label] of [['running','下载中'],['queued','排队'],['parsing','解析中'],['paused','暂停'],['failed','失败'],['canceled','已取消']]) if (stats[key]) statuses.push(label + ' ' + stats[key]);
   const meta = element('p', 'small', statuses.join(' · '));
-  meta.appendChild(element('span', 'group-watch-progress', historySuffix(group.id)));
+  meta.appendChild(element('span', 'group-watch-progress'));
   info.appendChild(meta);
   const selection = element('label', 'selection-target');
   selection.appendChild(checkbox);
@@ -189,7 +189,7 @@ function renderGroupHead(group) {
   }
   const playable = group.tasks.filter(task => task.playable && !task.localFileUnavailable).sort((left, right) => number(left.index) - number(right.index))[0];
   if (merge?.playbackTaskId) actions.appendChild(action('播放全集（' + merge.startEpisode + '–' + merge.endEpisode + '集）', 'play-merged', () => window.dramaPlayer.openCollection(merge.playbackTaskId, group.title, true), false, 'collection-play-button merged-play-button'));
-  if (group.tasks.length) actions.appendChild(action(merge?.playbackTaskId ? '分集播放' : watchLabel(group.id, '播放'), 'play', () => window.dramaPlayer.openCollection(playable.id, group.title, true), !playable, 'secondary collection-play-button'));
+  if (group.tasks.length) actions.appendChild(action(merge?.playbackTaskId ? '分集播放' : '播放', 'play', () => window.dramaPlayer.openCollection(playable.id, group.title), !playable, 'secondary collection-play-button'));
   const toggle = action(openGroups.has(group.id) ? '收起分集' : '查看分集', 'episodes', () => {
     if (openGroups.has(group.id)) openGroups.delete(group.id); else openGroups.add(group.id);
     renderTasks(tasks);

@@ -3,15 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#f7f7f2">
+<meta name="theme-color" content="#f6f7fb">
 <title>短剧</title>
 <script src="/assets/theme.js"></script>
 <link rel="stylesheet" href="/assets/app.css">
 <link rel="stylesheet" href="/assets/library.css">
 <link rel="stylesheet" href="/assets/downloads.css">
 <link rel="stylesheet" href="/assets/player.css">
-<link rel="stylesheet" href="/assets/library-tools.css">
-<link rel="stylesheet" href="/assets/history.css">
 <link rel="stylesheet" href="/assets/rankings.css">
 </head>
 <body>
@@ -25,14 +23,11 @@
     <button class="nav-button" data-page="downloads"><span data-icon="download"></span>下载<span class="nav-count" data-download-count hidden></span></button>
     <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span>系统设置</button>
     <button class="nav-button" data-page="emby-settings"><span data-icon="folder"></span>Emby设置</button>
-    <button class="nav-button" data-page="watch-history"><span data-icon="clock"></span>观看记录</button>
   </nav>
   <div class="header-actions">
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
-    <div class="header-update" aria-label="应用更新">
+    <div class="header-update" aria-label="版本">
       <span id="appVersionText" class="small header-version" title="当前版本">版本…</span>
-      <button id="checkAppUpdateBtn" class="secondary header-update-button">检查更新</button>
-      <span id="appUpdateStatus" class="small header-update-status" role="status" aria-live="polite"></span>
     </div>
   </div>
 </header>
@@ -56,10 +51,7 @@
     <div id="libraryFeedback" class="library-feedback" hidden><span id="libraryStatus" class="small" role="status" aria-live="polite"></span><button id="retryLibraryBtn" class="quiet" hidden>重试读取</button></div>
     <div class="catalog-layout" id="catalogLayout">
       <div class="catalog-content">
-        <div class="section-heading catalog-heading"><div class="library-view-switch" role="group" aria-label="浏览内容"><button id="libraryModeBtn" class="quiet" aria-pressed="true">剧库</button><button id="recommendModeBtn" class="quiet" aria-pressed="false">推荐</button><span id="dramaCount" class="small" role="status"></span></div><section id="continueSection" class="continue-section" aria-labelledby="continueTitle" hidden>
-      <div class="section-heading"><h2 id="continueTitle">继续观看</h2><button class="quiet" data-go="following" aria-label="查看全部在看的剧集"><span data-icon="right"></span></button></div>
-      <div id="continueList" class="continue-list"></div>
-    </section><div class="row"><span id="libraryUpdatedAt" class="small library-updated"></span><button id="resetFiltersBtn" class="quiet" hidden>重置</button><button id="activityToggle" data-download-only class="quiet activity-toggle" aria-pressed="false"><span class="button-content"><span data-icon="sidebar"></span><span id="activityToggleLabel">任务侧栏</span></span></button></div></div>
+        <div class="section-heading catalog-heading"><div class="library-view-switch" role="group" aria-label="浏览内容"><button id="libraryModeBtn" class="quiet" aria-pressed="true">剧库</button><button id="recommendModeBtn" class="quiet" aria-pressed="false">推荐</button><span id="dramaCount" class="small" role="status"></span></div><div class="row"><span id="libraryUpdatedAt" class="small library-updated"></span><button id="resetFiltersBtn" class="quiet" hidden>重置</button><button id="activityToggle" data-download-only class="quiet activity-toggle" aria-pressed="false"><span class="button-content"><span data-icon="sidebar"></span><span id="activityToggleLabel">任务侧栏</span></span></button></div></div>
         <div id="libraryScroll"><div id="cards" class="cards" aria-label="剧集列表" aria-busy="true"></div></div>
         <div id="recommendFooter" class="recommend-footer" hidden><span id="recommendStatus" class="small" role="status" aria-live="polite"></span><button id="recommendMoreBtn" class="secondary">继续推荐</button></div>
         <div id="libraryBatchBar" data-download-only class="batch-bar" hidden><span id="dramaSelection" class="small"></span><span class="spacer"></span><div class="batch-range" role="group" aria-label="选择范围"><button id="selectVisibleBtn" class="quiet" title="全选筛选结果">全选</button><button id="invertVisibleBtn" class="quiet" title="反选筛选结果">反选</button><button id="deselectDramasBtn" class="quiet">取消勾选</button></div><label class="download-quality" data-download-only>画质<select data-download-quality aria-label="批量下载清晰度"></select></label><button id="enqueueBtn">加入下载</button><button id="finishBatchBtn" class="secondary">完成</button></div>
@@ -84,11 +76,11 @@
     <p id="rankingActionStatus" class="rankings-action-status" role="status" aria-live="polite"></p>
   </section>
   <section class="page-view" id="followingPage" data-view="following" aria-label="我的追剧" hidden>
-    <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，接着上次看。</p></div></div>
-    <div class="following-toolbar"><div class="segments" role="group" aria-label="追剧分组"><button data-follow-tab="watching" aria-pressed="true">在看 <span id="watchingCount">0</span></button><button data-follow-tab="saved" aria-pressed="false">想看 <span id="savedCount">0</span></button><button data-follow-tab="completed" aria-pressed="false">已看 <span id="completedCount">0</span></button></div><input id="followingSearch" type="search" maxlength="80" aria-label="搜索追剧清单" placeholder="搜索我的追剧"></div>
+    <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，标记看过的。</p></div></div>
+    <div class="following-toolbar"><div class="segments" role="group" aria-label="追剧分组"><button data-follow-tab="saved" aria-pressed="true">想看 <span id="savedCount">0</span></button><button data-follow-tab="completed" aria-pressed="false">已看 <span id="completedCount">0</span></button></div><input id="followingSearch" type="search" maxlength="80" aria-label="搜索追剧清单" placeholder="搜索我的追剧"></div>
     <div id="followingError" class="error notice" role="status"></div><button id="retryFollowingBtn" class="secondary" hidden>重新读取追剧清单</button>
     <div id="followingList" class="following-list" aria-live="polite"></div>
-    <p class="page-footnote">新集提示来自已更新的剧库资料。完整播放记录可在“观看记录”页查看。</p>
+    <p class="page-footnote">新集提示来自已更新的剧库资料。</p>
   </section>
   <section class="page-view" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
     <div class="page-heading"><div><h1>下载管理 <span id="taskCount" class="small"></span></h1><p>文件保存在运行短剧的电脑。</p></div></div>
@@ -168,36 +160,15 @@
       <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
     </section>
   </section>
-  <section class="page-view settings-page" id="watchHistoryPage" data-view="watch-history" aria-label="观看记录" hidden>
-    <div class="page-heading"><div><h1>观看记录</h1><p>查看并管理当前浏览器保存的播放进度。</p></div></div>
-    <section id="historySection" class="settings-section history-settings" aria-labelledby="historyTitle">
-      <div class="history-header">
-        <div class="heading"><h2 id="historyTitle">最近观看 <span id="historyCount" class="small"></span></h2><div class="history-heading-actions"><button id="clearHistoryBtn" class="secondary" disabled>清空</button></div></div>
-        <input id="historySearch" type="search" maxlength="80" placeholder="搜索本浏览器的观看记录" aria-label="搜索本浏览器的观看记录">
-        <div id="historyError" class="error" role="status" aria-live="polite"></div>
-      </div>
-      <div id="historyContent" class="history-content" tabindex="0" aria-label="观看记录列表" aria-busy="false"><ol id="historyList" class="history-list"></ol></div>
-      <div class="history-footer"><span id="historySummary" class="small"></span><button id="retryHistoryBtn" class="secondary" hidden>重试</button></div>
-    </section>
-    <section class="viewer-settings settings-section" aria-labelledby="viewerSettingsTitle">
-      <div class="settings-section-heading"><h2 id="viewerSettingsTitle">个人记录</h2><span class="small" id="viewerIdentityLabel">当前浏览器</span></div>
-      <p class="small" id="viewerRecordsHint">观看记录和追剧清单按浏览器独立保存。</p>
-      <div id="legacyImportSection" hidden>
-        <div class="viewer-import-row"><label class="small">旧版记录恢复码<input id="legacyImportCode" type="password" maxlength="64" autocomplete="off" placeholder="粘贴一次性恢复码"></label><button id="legacyImportBtn" class="secondary">接回旧记录</button></div>
-        <p class="small">恢复码在服务所在电脑的 data/viewer-legacy-code 文件中。旧版记录接回当前浏览器。</p>
-      </div>
-      <p id="viewerImportStatus" class="small" role="status" aria-live="polite"></p>
-    </section>
-  </section>
+
 </main>
 <nav class="mobile-nav" aria-label="手机主导航">
   <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
   <button class="nav-button" data-page="rankings"><span data-icon="chart"></span><span>榜单</span></button>
   <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
   <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
-  <button class="nav-button" data-page="system-settings" aria-label="系统设置"><span data-icon="settings"></span><span>系统</span></button>
-  <button class="nav-button" data-page="emby-settings" aria-label="Emby设置"><span data-icon="folder"></span><span>Emby</span></button>
-  <button class="nav-button" data-page="watch-history" aria-label="观看记录"><span data-icon="clock"></span><span>记录</span></button>
+  <button class="nav-button" data-page="system-settings" aria-label="系统设置"><span data-icon="settings"></span><span>系统设置</span></button>
+  <button class="nav-button" data-page="emby-settings" aria-label="Emby设置"><span data-icon="folder"></span><span>Emby设置</span></button>
 </nav>
 <dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
 
@@ -244,7 +215,7 @@
         </div>
         <div class="player-toolbar"><button id="toggleEpisodesBtn" class="secondary" aria-expanded="false" aria-controls="playerEpisodesPanel">选集</button><button id="previousEpisodeBtn" class="secondary icon-button" aria-label="上一集" title="上一集" disabled><span data-icon="previous"></span></button><button id="nextEpisodeBtn" class="button-content" disabled>下一集<span data-icon="next"></span></button><label id="playbackQualityControl" hidden>画质<select id="playbackQuality" aria-label="播放清晰度"><option value="0">自动</option></select></label><label>倍速<select id="playbackRate" aria-label="播放倍速"><option value="0.75">0.75 倍</option><option value="1" selected>1 倍</option><option value="1.25">1.25 倍</option><option value="1.5">1.5 倍</option><option value="2">2 倍</option><option value="3">3 倍</option></select></label><button id="playerFullscreenBtn" class="secondary icon-button" aria-label="全屏" title="全屏" hidden><span data-icon="fullscreen"></span></button><button id="playerPreferencesBtn" class="secondary icon-button" aria-label="播放设置" aria-expanded="false" aria-controls="playerPreferences"><span data-icon="settings"></span></button></div>
         <div class="playback-feedback"><span id="playbackStatus" class="small" role="status" aria-live="polite"></span><span id="prefetchStatus" class="small" role="status" aria-live="polite" hidden></span></div>
-        <div id="playbackHistoryStatus" class="small" role="status" aria-live="polite"></div><div class="playback-error-row"><div id="playbackError" class="error" role="alert"></div><button id="retryPlaybackBtn" class="secondary" disabled hidden>重试播放</button></div>
+        <div class="playback-error-row"><div id="playbackError" class="error" role="alert"></div><button id="retryPlaybackBtn" class="secondary" disabled hidden>重试播放</button></div>
         <div id="playerPreferences" class="player-preferences" hidden>
           <div class="mobile-settings-heading mobile-only"><h3 id="mobilePreferencesTitle">更多</h3><button id="closePlayerPreferencesBtn" class="quiet icon-button" aria-label="关闭播放设置"><span data-icon="close"></span></button></div>
           <div id="mobileRateGroup" class="mobile-setting-group mobile-only"><span>倍速</span><div id="mobileRateChoices" class="mobile-setting-choices" role="group" aria-label="播放倍速"></div></div>
@@ -262,7 +233,6 @@
 <div class="toast" id="messageText" role="status" aria-live="polite"></div>
 <script src="/assets/navigation.js"></script>
 <script src="/assets/player-danmaku.js"></script>
-<script src="/assets/history.js"></script>
 <script src="/assets/player-orientation.js"></script>
 <script src="/assets/player-mobile.js"></script>
 <script src="/assets/player-controls.js"></script>

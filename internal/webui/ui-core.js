@@ -32,10 +32,6 @@ function firstNonEmpty(...values){ for(const value of values){const text=valueTe
 
 function dramaTitle(drama){ return drama.title||drama.name||'短剧'; }
 
-function watchLabel(id,fallback){return window.DuanjuHistory.get(id)?'继续观看':fallback;}
-
-function historySuffix(id){const text=window.DuanjuHistory.progressText(id);return text?' · '+text:'';}
-
 function normalizeSource(value){
     let source=String(value||'').trim().toLowerCase();
     if(/^https?:\/\//.test(source)){try{source=new URL(source).hostname;}catch(_){return '';}}
@@ -80,7 +76,7 @@ function episodeLabel(task){const sequence=number(task.episode||task.index);retu
 
 function groupStats(group){const stats={success:0,failed:0,running:0,parsing:0,queued:0,paused:0,canceled:0,percent:0,bytes:0,speed:0};group.tasks.forEach(task=>{if(task.status in stats)stats[task.status]++;stats.percent+=task.status==='success'?100:number(task.progress);stats.bytes+=number(task.downloadedBytes);if(task.status==='running')stats.speed+=number(task.speedBytesPerSecond);});stats.percent=group.tasks.length?Math.floor(stats.percent/group.tasks.length):0;return stats;}
 
-export { element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, watchLabel, historySuffix, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats };
+export { element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats };
 
 const iconShapes = {
   user: [['circle', {cx: 12, cy: 8, r: 4}], ['path', {d: 'M4 21v-2a6 6 0 0 1 6-6h4a6 6 0 0 1 6 6v2'}]],

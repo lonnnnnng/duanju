@@ -3,7 +3,7 @@ import { createCoverRepair } from './cover-repair.js';
 import { createDramaRefresh } from './drama-refresh.js';
 import { createRecommendations } from './recommendations.js';
 import { icon, initial, withFocus, readPreference, savePreference } from './ui-core.js';
-import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, watchLabel, historySuffix, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
+import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
 
 export function createLibrary(app) {
   const dramas = [], selected = new Set(), byID = new Map(), cards = $('cards');
@@ -83,10 +83,9 @@ function metadataPriorityIDs(){const pending=new Set(dramas.filter(drama=>!drama
 function updateRefreshLabel(){ const source=$('sourceSelect').value;const hongguo=app.viewer?.sources?.includes('hongguo')!==false&&(!source||source==='hongguo');updateLibraryButton();$('onlineSearchBtn').hidden=!hongguo;$('searchInput').placeholder='搜索剧名、简介或标签';$('onlineSearchBtn').title='联网搜索，也可按回车'; }
 
 function dramaMetaText(drama) {
-  const history = window.DuanjuHistory.progressText(drama.id);
   const count = episodeCount(drama);
   const status = drama.releaseStatus === 'finished' ? '已完结' : drama.releaseStatus === 'ongoing' ? '连载中' : '';
-  return [history || (count ? count + ' 集' : '集数未知'), history ? '' : status].filter(Boolean).join(' · ');
+  return [(count ? count + ' 集' : '集数未知'), status].filter(Boolean).join(' · ');
 }
 
 function dramaCardKey(drama) {
@@ -111,9 +110,8 @@ function renderCard(drama) {
     updateDramaSelection();
   });
   label.appendChild(checkbox);
-  const hasProgress = Boolean(window.DuanjuHistory.get(drama.id));
-  const poster = button('', () => app.play(drama.id, title), false, 'poster watch-button' + (hasProgress ? ' has-progress' : ''));
-  poster.setAttribute('aria-label', (hasProgress ? '继续观看 ' : '播放 ') + title);
+  const poster = button('', () => app.play(drama.id, title), false, 'poster watch-button');
+  poster.setAttribute('aria-label', '播放 ' + title);
   poster.dataset.focusKey = 'play-' + drama.id;
   const cover = coverURL(drama);
   const fallback = element('span', 'cover placeholder');
@@ -133,12 +131,8 @@ function renderCard(drama) {
   poster.appendChild(element('span', 'poster-badge', sourceLabel(sourceKey(drama))));
   const caption = element('span', 'poster-caption');
   caption.setAttribute('aria-hidden', 'true');
-  caption.append(icon('play'), element('span', 'watch-label', hasProgress ? '续播' : '播放'), element('span', 'poster-category', categoryName(drama)));
-  const progress = element('span', 'poster-progress');
-  progress.setAttribute('aria-hidden', 'true');
-  progress.appendChild(element('span'));
-  progress.hidden = true;
-  poster.append(caption, progress);
+  caption.append(icon('play'), element('span', 'watch-label', '播放'), element('span', 'poster-category', categoryName(drama)));
+  poster.appendChild(caption);
   const body = element('div', 'card-body');
   const name = button(title, () => app.details.open(drama.id), false, 'card-title');
   name.title = '查看详情 · ' + title;
@@ -356,14 +350,9 @@ function refreshFollowing(nodes = cards.querySelectorAll('.card')) {
       save.title = saved ? '取消收藏' : '加入想看';
       save.disabled = app.following.busy(id);
     }
-    const history = window.DuanjuHistory.get(id);
     const watch = card.querySelector('.watch-button');
-    watch.querySelector('.watch-label').textContent = history ? '续播' : '播放';
-    watch.classList.toggle('has-progress', Boolean(history));
-    watch.setAttribute('aria-label', (history ? '继续观看 ' : '播放 ') + dramaTitle(drama));
-    const progress = watch.querySelector('.poster-progress');
-    progress.hidden = !(history?.duration > 0);
-    progress.firstElementChild.style.width = history?.duration > 0 ? Math.min(100, Math.max(0, history.position / history.duration * 100)) + '%' : '0%';
+    watch.querySelector('.watch-label').textContent = '播放';
+    watch.setAttribute('aria-label', '播放 ' + dramaTitle(drama));
     card.querySelector('.meta').textContent = dramaMetaText(drama);
     card.querySelector('.meta').title = dramaMetaText(drama);
   }

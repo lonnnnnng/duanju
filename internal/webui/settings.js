@@ -22,40 +22,16 @@ async function saveSettings(){
 async function checkNetwork(){ $('checkNetworkBtn').disabled=true;$('settingsStatus').textContent='正在检测已保存的网络配置和入口，最多约一分钟…';try{const result=await post('/api/ui/network/check',{});$('settingsStatus').textContent=(result.data||[]).map(item=>item.name+'：'+(item.error||[item.status?'HTTP '+item.status:'',item.detail||''].filter(Boolean).join(' · '))).join('；');}catch(error){$('settingsStatus').textContent='检测失败：'+error.message;}finally{$('checkNetworkBtn').disabled=false;} }
 
 function setAppVersion(info){const version=info.currentVersion||info.version||'未知';$('appVersionText').textContent='当前 '+version;$('appVersionText').title='当前 '+version+(info.currentCommit?' · commit '+info.currentCommit:'')+(info.buildTime?' · 构建 '+info.buildTime:'');}
-function renderUpdateInfo(info){setAppVersion(info);$('appUpdateStatus').textContent=info.message||(info.latestVersion?'最新正式版 '+info.latestVersion+' · '+(info.assetName||'当前平台暂无安装包'):'尚未检查更新');}
 async function loadAppVersion(){try{const info=await api('/healthz');setAppVersion(info);}catch(error){$('appVersionText').textContent='版本读取失败';$('appVersionText').title=error.message;}}
-async function checkAppUpdate(){const button=$('checkAppUpdateBtn');button.disabled=true;$('appUpdateStatus').textContent='正在查询 GitHub Release…';try{renderUpdateInfo(await api('/api/ui/settings/update'));}catch(error){$('appUpdateStatus').textContent='检查失败：'+error.message;}finally{button.disabled=false;}}
-
-async function importLegacyRecords() {
-  const control = $('legacyImportBtn');
-  control.disabled = true;
-  $('viewerImportStatus').textContent = '正在接回旧版记录…';
-  try {
-    await post('/api/ui/viewer/legacy', {code: $('legacyImportCode').value.trim()});
-    $('legacyImportCode').value = '';
-    $('legacyImportSection').hidden = true;
-    app.viewer.legacyAvailable = false;
-    await Promise.all([window.DuanjuHistory.refresh(), app.following.refresh()]);
-    $('viewerImportStatus').textContent = '旧版记录已接回当前浏览器，原始文件仍保留。';
-  } catch (error) {
-    $('viewerImportStatus').textContent = error.message;
-  } finally {
-    control.disabled = false;
-  }
-}
 
 function init() {
-  $('legacyImportSection').hidden = !app.viewer?.legacyAvailable;
-  $('viewerImportStatus').textContent = app.viewer?.legacyError || '';
-  $('legacyImportBtn').addEventListener('click', importLegacyRecords);
   $('proxyMode').addEventListener('change', updateProxyFields);
   $('saveSettingsBtn').addEventListener('click', saveSettings);
   $('checkNetworkBtn').addEventListener('click', checkNetwork);
-  $('checkAppUpdateBtn').addEventListener('click', checkAppUpdate);
   $('themeSelect').value = window.DuanjuTheme.get();
   $('themeSelect').addEventListener('change', () => window.DuanjuTheme.set($('themeSelect').value));
   document.addEventListener('themechange', event => {$('themeSelect').value = event.detail;});
-  return Promise.all([loadConfig(), createPlaybackSettings().init(), loadAppVersion(), checkAppUpdate()]);
+  return Promise.all([loadConfig(), createPlaybackSettings().init(), loadAppVersion()]);
 }
 return {init, config: () => config};
 

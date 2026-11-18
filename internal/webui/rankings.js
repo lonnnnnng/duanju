@@ -260,7 +260,7 @@
       }
       const actions = node('div', 'rankings-actions');
       if (item.playable && drama) {
-        const watchLabel = window.DuanjuHistory?.get(drama.id) ? '继续观看' : '播放';
+        const watchLabel = '播放';
         const watch = action(watchLabel, () => play(drama.id, title));
         watch.setAttribute('aria-label', watchLabel + ' ' + title);
         actions.appendChild(watch);

@@ -15,8 +15,8 @@ export async function initializeViewer() {
   async function read(path) {
     const response = await fetch(path, {credentials: 'same-origin', cache: 'no-store', headers: {'Accept': 'application/json'}});
     let result;
-    try {result = await response.json();} catch (_) {throw new Error('无法建立独立观看记录，请确认已启动新版程序');}
-    if (!response.ok) throw new Error(result.error || '无法建立独立观看记录');
+    try {result = await response.json();} catch (_) {throw new Error('无法建立浏览器身份，请确认已启动新版程序');}
+    if (!response.ok) throw new Error(result.error || '无法建立浏览器身份');
     return result;
   }
   let result = await read('/api/ui/viewer');

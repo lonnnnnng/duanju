@@ -1,5 +1,5 @@
 (() => {
-  const pages = ['library', 'rankings', 'following', 'downloads', 'system-settings', 'emby-settings', 'watch-history'];
+  const pages = ['library', 'rankings', 'following', 'downloads', 'system-settings', 'emby-settings'];
   const native = new WeakMap();
   let currentPage = pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'library';
   let active = null, pendingBack = false, pendingOpen = null, pendingPage = '', pendingClose = '', listener = null;

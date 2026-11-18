@@ -1,4 +1,4 @@
-import { api, post, sourceLabel, normalizeSource, setMessage } from './ui-core.js';
+import { api, post, setMessage } from './ui-core.js';
 import { createShell } from './shell.js';
 import { createLibrary } from './library.js';
 import { createDownloads } from './downloads.js';
@@ -10,8 +10,7 @@ import { createEmby } from './emby.js';
 
 const app = {api, post};
 app.play = (id, title) => {
-  if (window.DuanjuHistory.get(id)) window.dramaPlayer.openHistory(id, title);
-  else window.dramaPlayer.open(id, title);
+  window.dramaPlayer.open(id, title);
   app.following.acknowledge(id);
   app.library.refreshDrama(id);
 };
@@ -53,13 +52,7 @@ async function initialize() {
   }
 app.emby.init();
 app.shell.access();
-window.DuanjuHistory.init({
-  api, post,
-  sourceLabel: value => sourceLabel(normalizeSource(value) || value),
-  onChanged: () => {app.library.refreshFollowing(); app.following.render(); app.details.refresh(); app.downloads.render();},
-  onError: message => setMessage(message, true),
-  play: app.play
-});
+
 Promise.allSettled([app.settings.init(), app.library.init(), app.downloads.init(), app.following.init()]).then(results => {
   const failure = results.find(result => result.status === 'rejected');
   if (failure) setMessage('部分功能未能初始化：' + (failure.reason?.message || '请刷新页面重试'), true);

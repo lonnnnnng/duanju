@@ -2,7 +2,7 @@ import { $, element, button, icon, initial, withFocus, dramaTitle, sourceKey, so
 
 export function createFollowing(app) {
   const entries = new Map(), pending = new Set();
-  let tab = 'watching', loaded = false, loading = false, generation = 0, requestID = 0, visibleLimit = 100;
+  let tab = 'saved', loaded = false, loading = false, generation = 0, requestID = 0, visibleLimit = 100;
   let lastRefresh = 0, refreshPromise;
 
   function get(id) {
@@ -14,41 +14,21 @@ export function createFollowing(app) {
   }
 
   function records() {
-    const history = new Map((window.DuanjuHistory.list?.() || []).filter(entry => sourceKey({id: entry.dramaId, source: entry.source}) === 'hongguo').map(entry => [entry.dramaId, entry]));
-    return Array.from(new Set([...history.keys(), ...entries.keys()])).map(id => {
-      const entry = get(id), watched = history.get(id), drama = app.library?.get(id);
-      const total = number(drama && episodeCount(drama)) || entry?.totalEpisode || watched?.total || 0;
-      const completed = Boolean(entry?.completed && !entry.newEpisodes || watched?.completed && watched.index >= Math.max(total, watched.total));
-      return {id, cover: drama ? coverURL(drama) : '', title: drama ? dramaTitle(drama) : entry?.title || watched?.title || '短剧', source: drama ? sourceKey(drama) : entry?.source || watched?.source, history: watched, entry, total, completed, watching: !completed && Boolean(watched || entry?.completed), saved: Boolean(entry?.saved), newEpisodes: entry?.newEpisodes || 0};
-    }).sort((left, right) => new Date(right.history?.watchedAt || right.entry?.updatedAt || 0) - new Date(left.history?.watchedAt || left.entry?.updatedAt || 0));
-  }
-
-  function renderContinue(all) {
-    const list = all.filter(entry => entry.watching).slice(0, 6);
-    $('continueSection').hidden = !list.length;
-    withFocus($('continueList'), () => {
-      $('continueList').replaceChildren();
-      for (const record of list) {
-        const control = button('', () => app.play(record.id, record.title), false, 'continue-card');
-        control.dataset.focusKey = 'continue-' + record.id;
-        control.setAttribute('aria-label', '继续观看 ' + record.title);
-        control.title = record.title + (record.history ? ' · ' + window.DuanjuHistory.progressText(record.history) : ' · 有新集');
-        const identity = element('span', 'continue-initial', initial(record.title));
-        identity.setAttribute('aria-hidden', 'true');
-        const content = element('span', 'continue-content');
-        content.append(element('strong', '', record.title), element('span', 'small', record.history?.index > 0 ? '第 ' + record.history.index + ' 集' : '接着看'));
-        const progress = element('span', 'progress');
-        const fill = element('span');
-        const history = record.history;
-        fill.style.width = history?.duration > 0 ? Math.min(100, Math.max(0, history.position / history.duration * 100)) + '%' : '0%';
-        progress.appendChild(fill);
-        content.appendChild(progress);
-        const play = icon('play');
-        play.classList.add('continue-play');
-        control.append(identity, content, play);
-        $('continueList').appendChild(control);
-      }
-    });
+    return Array.from(entries.values()).map(entry => {
+      const drama = app.library?.get(entry.dramaId);
+      const total = number(drama && episodeCount(drama)) || entry.totalEpisode || entry.knownEpisodes || 0;
+      return {
+        id: entry.dramaId,
+        cover: drama ? coverURL(drama) : '',
+        title: drama ? dramaTitle(drama) : entry.title || '短剧',
+        source: drama ? sourceKey(drama) : entry.source,
+        entry,
+        total,
+        completed: Boolean(entry.completed),
+        saved: Boolean(entry.saved),
+        newEpisodes: entry.newEpisodes || 0
+      };
+    }).sort((left, right) => new Date(right.entry?.updatedAt || 0) - new Date(left.entry?.updatedAt || 0));
   }
 
   function renderCover(record) {
@@ -79,13 +59,14 @@ export function createFollowing(app) {
 
   function render() {
     const all = records();
-    const lists = {watching: all.filter(entry => entry.watching), saved: all.filter(entry => entry.saved && !entry.watching && !entry.completed), completed: all.filter(entry => entry.completed)};
-    $('watchingCount').textContent = lists.watching.length;
+    const lists = {
+      saved: all.filter(entry => entry.saved && !entry.completed),
+      completed: all.filter(entry => entry.completed)
+    };
     $('savedCount').textContent = loaded ? lists.saved.length : '—';
     $('completedCount').textContent = lists.completed.length;
-    document.querySelectorAll('[data-follow-count]').forEach(node => {node.textContent = lists.watching.length; node.hidden = !lists.watching.length;});
+    document.querySelectorAll('[data-follow-count]').forEach(node => {node.textContent = lists.saved.length; node.hidden = !lists.saved.length;});
     document.querySelectorAll('[data-follow-tab]').forEach(node => node.setAttribute('aria-pressed', String(node.dataset.followTab === tab)));
-    renderContinue(all);
     if ($('followingPage').hidden) return;
     const keyword = $('followingSearch').value.trim().toLocaleLowerCase();
     const list = lists[tab].filter(entry => (entry.title + ' ' + sourceLabel(entry.source)).toLocaleLowerCase().includes(keyword));
@@ -98,11 +79,11 @@ export function createFollowing(app) {
         const description = element('div', 'following-description');
         const name = button(record.title, () => app.details.open(record.id), false, 'following-title');
         name.dataset.focusKey = 'following-title-' + record.id;
-        const progress = record.entry?.completed ? '手动标为已看' : record.history ? window.DuanjuHistory.progressText(record.history) : '尚未开始';
+        const progress = record.completed ? '已看完' : '已加入想看';
         description.append(name, element('p', 'small', [sourceLabel(record.source), progress, record.total ? record.total + ' 集' : '集数待补充'].join(' · ')));
         if (record.newEpisodes) description.appendChild(element('p', 'following-update', '剧库新增 ' + record.newEpisodes + ' 集'));
         const actions = element('div', 'following-actions');
-        const play = button(record.completed ? '重看' : record.watching ? '继续观看' : '开始看', () => app.play(record.id, record.title), false, record.watching ? '' : 'subtle');
+        const play = button(record.completed ? '重看' : '播放', () => app.play(record.id, record.title), false, 'subtle');
         play.dataset.focusKey = 'following-play-' + record.id;
         const save = saveButton(record.id, record.title);
         actions.append(play, save);
@@ -112,8 +93,8 @@ export function createFollowing(app) {
       if (list.length > visibleLimit) fragment.appendChild(button('显示更多 · 还有 ' + (list.length - visibleLimit) + ' 部', () => {visibleLimit += 100; render();}, false, 'secondary'));
       if (!list.length) {
         const empty = element('div', 'empty');
-        const title = loading ? '正在读取追剧清单…' : !loaded && tab === 'saved' ? '追剧清单暂未读取' : keyword ? '没有匹配的剧集' : {watching: '还没有正在观看的剧集', saved: '先收藏一部想看的剧', completed: '还没有已看完的剧集'}[tab];
-        empty.append(element('strong', '', title), element('p', '', keyword ? '试试其他关键词。' : tab === 'saved' ? '在剧集卡片或详情中点击收藏，就能在这里找到。' : '观看进度会自动保存，也可以在详情里手动标记已看。'));
+        const title = loading ? '正在读取追剧清单…' : !loaded ? '追剧清单暂未读取' : keyword ? '没有匹配的剧集' : {saved: '还没有想看的剧', completed: '还没有已看完的剧集'}[tab];
+        empty.append(element('strong', '', title), element('p', '', keyword ? '试试其他关键词。' : tab === 'saved' ? '在剧集卡片或详情中点击收藏，就能在这里找到。' : '在详情里手动标记已看后，会出现在这里。'));
         empty.appendChild(button('去剧库看看', () => window.DuanjuDialogs.navigate('library'), false, 'secondary'));
         fragment.appendChild(empty);
       }
@@ -185,7 +166,7 @@ export function createFollowing(app) {
   }
 
   function setCompleted(id, value) {
-    return change(id, {completed: value}, value ? '已标为已看，播放进度仍保留' : '已取消手动已看标记', {completed: !value});
+    return change(id, {completed: value}, value ? '已标为已看' : '已取消已看标记', {completed: !value});
   }
 
   function saveButton(id, title) {
@@ -201,7 +182,7 @@ export function createFollowing(app) {
   }
 
   function showTab(value) {
-    if (!['watching', 'saved', 'completed'].includes(value)) return;
+    if (!['saved', 'completed'].includes(value)) return;
     tab = value;
     visibleLimit = 100;
     render();
