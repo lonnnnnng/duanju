@@ -1,4 +1,4 @@
-import { api, post, setMessage } from './ui-core.js';
+import { api, post, setMessage, icon } from './ui-core.js';
 import { createShell } from './shell.js';
 import { createLibrary } from './library.js';
 import { createDownloads } from './downloads.js';
@@ -22,8 +22,9 @@ app.following = createFollowing(app);
 app.details = createDetails(app);
 app.emby = createEmby(app);
 app.rankings = window.DuanjuRankings.init({
-  api, post,
+  api, post, icon,
   getDrama: id => app.library.get(id),
+  openDetails: id => app.details.open(id),
   onDownloadsChanged: () => app.downloads.refresh?.(),
   getDownloadQuality: app.downloads.quality,
   play: app.play

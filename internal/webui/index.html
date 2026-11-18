@@ -15,17 +15,19 @@
 <body>
 <a class="skip-link" href="#workspaceMain">跳到主要内容</a>
 <header class="app-header">
-  <a class="brand" href="#library" aria-label="短剧首页"><span class="brand-mark" aria-hidden="true"><span data-icon="brand"></span></span><span class="brand-name">短剧</span></a>
+  <a class="brand" href="#rankings" aria-label="短剧首页"><span class="brand-mark" aria-hidden="true"><span data-icon="brand"></span></span><span class="brand-name">短剧</span></a>
   <nav class="desktop-nav" aria-label="主导航">
-    <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span>剧库</button>
-    <button class="nav-button" data-page="rankings"><span data-icon="chart"></span>榜单</button>
+    <button class="nav-button" data-page="rankings" aria-current="page"><span data-icon="chart"></span>榜单</button>
+    <button class="nav-button" data-page="library"><span data-icon="library"></span>剧库</button>
     <button class="nav-button" data-page="following"><span data-icon="bookmark"></span>追剧<span class="nav-count" data-follow-count hidden></span></button>
     <button class="nav-button" data-page="downloads"><span data-icon="download"></span>下载<span class="nav-count" data-download-count hidden></span></button>
     <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span>系统设置</button>
     <button class="nav-button" data-page="emby-settings"><span data-icon="folder"></span>Emby设置</button>
   </nav>
   <div class="header-actions">
+    <span id="headerSourceDetail" class="small header-source-detail" aria-live="polite" title="站源状态">站源状态…</span>
     <button id="refreshBtn" class="secondary"><span class="button-content"><span data-icon="refresh"></span><span id="refreshBtnLabel">更新剧库</span></span></button>
+    <button id="themeToggleBtn" class="secondary icon-button" type="button" aria-label="切换主题" title="切换主题"><span data-icon="sun"></span></button>
     <div class="header-update" aria-label="版本">
       <span id="appVersionText" class="small header-version" title="当前版本">版本…</span>
     </div>
@@ -60,7 +62,7 @@
     </div>
   </section>
   <section class="page-view" id="rankingsPage" data-view="rankings" aria-label="榜单" hidden>
-    <div class="page-heading"><div><h1>榜单</h1><p>红果站内分类榜，按 App 接口实时获取。</p></div><div class="rankings-heading-actions"><button id="refreshRankingsBtn" class="secondary">刷新</button></div></div>
+    <div class="page-heading rankings-heading"><div class="rankings-heading-actions"><button id="refreshRankingsBtn" class="secondary">刷新</button></div></div>
     <div class="rankings-toolbar">
       <div id="rankingCategories" class="rankings-tabs rankings-categories" role="tablist" aria-label="榜单分类"></div>
       <div id="rankingBoards" class="rankings-tabs rankings-boards" role="tablist" aria-label="榜单类型"></div>
@@ -76,14 +78,12 @@
     <p id="rankingActionStatus" class="rankings-action-status" role="status" aria-live="polite"></p>
   </section>
   <section class="page-view" id="followingPage" data-view="following" aria-label="我的追剧" hidden>
-    <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，标记看过的。</p></div></div>
     <div class="following-toolbar"><div class="segments" role="group" aria-label="追剧分组"><button data-follow-tab="saved" aria-pressed="true">想看 <span id="savedCount">0</span></button><button data-follow-tab="completed" aria-pressed="false">已看 <span id="completedCount">0</span></button></div><input id="followingSearch" type="search" maxlength="80" aria-label="搜索追剧清单" placeholder="搜索我的追剧"></div>
     <div id="followingError" class="error notice" role="status"></div><button id="retryFollowingBtn" class="secondary" hidden>重新读取追剧清单</button>
     <div id="followingList" class="following-list" aria-live="polite"></div>
     <p class="page-footnote">新集提示来自已更新的剧库资料。</p>
   </section>
   <section class="page-view" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
-    <div class="page-heading"><div><h1>下载管理 <span id="taskCount" class="small"></span></h1><p>文件保存在运行短剧的电脑。</p></div></div>
     <div class="download-destination"><span data-icon="folder"></span><span class="small">保存至</span><span id="downloadLocation" class="download-path">正在读取保存目录…</span></div>
     <div class="download-summary"><div class="summary-tile"><strong id="downloadActiveCount">0</strong><span>正在进行</span></div><div class="summary-tile"><strong id="downloadCompleteCount">0</strong><span>已完成分集</span></div><div class="summary-tile"><strong id="downloadWrittenBytes">0 B</strong><span>任务累计写入</span></div></div>
     <div class="download-filters"><input id="taskSearch" type="search" placeholder="搜索下载合集" aria-label="搜索下载合集"><select id="taskStatus" aria-label="下载状态"><option value="">全部状态</option><option value="completed">已完成</option><option value="failed">失败</option><option value="unfinished">未完成</option><option value="running">进行中</option><option value="paused">已暂停</option><option value="canceled">已取消</option></select><select id="releaseStatus" aria-label="剧集完结状态"><option value="">全部完结状态</option><option value="finished">完结</option><option value="ongoing">未完结</option><option value="unknown">状态未知</option></select></div>
@@ -92,12 +92,7 @@
     <div id="taskScroll"><div id="groups" class="groups"></div></div>
     <p class="page-footnote">“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p>
   </section>
-  <section class="page-view settings-page" id="systemSettingsPage" data-view="system-settings" aria-label="系统设置" hidden>
-    <div class="page-heading"><div><h1>系统设置</h1><p>管理外观、网络、播放资源和站源状态。</p></div></div>
-    <section class="settings-section" aria-labelledby="appearanceSettingsTitle">
-      <div class="settings-section-heading"><h2 id="appearanceSettingsTitle">外观</h2><p class="small">选择适合当前环境的明暗模式</p></div>
-      <div class="appearance-row"><label for="themeSelect">主题</label><select id="themeSelect" aria-label="外观"><option value="system">跟随系统</option><option value="light">浅色</option><option value="dark">深色</option></select></div>
-    </section>
+  <section class="page-view" id="systemSettingsPage" data-view="system-settings" aria-label="系统设置" hidden>
     <section id="serverSettings" class="settings-section" aria-labelledby="networkSettingsTitle">
       <div class="settings-section-heading"><h2 id="networkSettingsTitle">下载与网络</h2><p class="small">调整任务并发和站源访问方式</p></div>
       <div class="settings-grid">
@@ -132,13 +127,8 @@
     <p class="small settings-note">保存后自动持久化。降低并发不终止正在下载的任务；代理变更用于后续连接，失败任务可重试。同一站源的剧库请求顺序执行，下载与剧库请求使用独立并发。</p>
     <div class="statusbar" id="configText"></div>
     <div class="small notice" id="ffmpegSettingsStatus" role="status"></div>
-    <section class="settings-section" aria-labelledby="sourceStatusTitle">
-      <div class="settings-section-heading"><h2 id="sourceStatusTitle">站源状态</h2><p class="small">查看并更新站源目录状态。</p></div>
-      <div id="sourceStatusContent"></div>
-    </section>
   </section>
-  <section class="page-view settings-page" id="embySettingsPage" data-view="emby-settings" aria-label="Emby设置" hidden>
-    <div class="page-heading"><div><h1>Emby设置</h1><p>管理 Emby 自动入库、扫描通知和同步记录。</p></div></div>
+  <section class="page-view" id="embySettingsPage" data-view="emby-settings" aria-label="Emby设置" hidden>
     <section id="embySection" class="settings-section emby-settings" aria-labelledby="embyTitle">
       <div class="settings-section-heading"><h2 id="embyTitle">Emby 自动同步</h2><p class="small">管理自动入库、扫描通知和同步记录。</p></div>
       <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。在线分集会使用当前服务地址生成播放链接。</p>
@@ -163,8 +153,8 @@
 
 </main>
 <nav class="mobile-nav" aria-label="手机主导航">
-  <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
-  <button class="nav-button" data-page="rankings"><span data-icon="chart"></span><span>榜单</span></button>
+  <button class="nav-button" data-page="rankings" aria-current="page"><span data-icon="chart"></span><span>榜单</span></button>
+  <button class="nav-button" data-page="library"><span data-icon="library"></span><span>剧库</span></button>
   <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
   <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
   <button class="nav-button" data-page="system-settings" aria-label="系统设置"><span data-icon="settings"></span><span>系统设置</span></button>

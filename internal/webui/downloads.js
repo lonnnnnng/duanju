@@ -94,7 +94,6 @@ function renderTasks(next) {
   const all = buildGroups();
   if (!$('downloadsPage').hidden) {
     visibleGroups = all.filter(groupMatches);
-    setText($('taskCount'), all.length ? visibleGroups.length + ' 部' : '');
     const previous = new Map(Array.from(groupsEl.querySelectorAll('.group'), node => [node.dataset.dramaId, node]));
     withFocus(groupsEl, () => {
       const nodes = [];

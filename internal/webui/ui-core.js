@@ -105,7 +105,9 @@ const iconShapes = {
   clock: [['circle', {cx: 12, cy: 12, r: 9}], ['path', {d: 'M12 7v5l3 2'}]],
   activity: [['path', {d: 'M3 12h4l3-8 4 16 3-8h4'}]],
   help: [['circle', {cx: 12, cy: 12, r: 9}], ['path', {d: 'M9.5 9a2.5 2.5 0 1 1 4.3 1.75c-.9.7-1.8 1.2-1.8 2.75'}], ['circle', {cx: 12, cy: 17, r: .75, fill: 'currentColor', stroke: 'none'}]],
-  check: [['path', {d: 'm5 12 4 4L19 6'}]]
+  check: [['path', {d: 'm5 12 4 4L19 6'}]],
+  sun: [['circle', {cx: 12, cy: 12, r: 4}], ['path', {d: 'M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4'}]],
+  moon: [['path', {d: 'M20 14.5A8.5 8.5 0 0 1 9.5 4a8.5 8.5 0 1 0 10.5 10.5Z'}]]
 };
 
 const iconTemplates = new Map();

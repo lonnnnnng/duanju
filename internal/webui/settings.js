@@ -1,4 +1,4 @@
-import { $, api, post, number } from './ui-core.js';
+import { $, api, post, number, icon } from './ui-core.js';
 
 import { createPlaybackSettings } from './playback-settings.js';
 
@@ -28,9 +28,20 @@ function init() {
   $('proxyMode').addEventListener('change', updateProxyFields);
   $('saveSettingsBtn').addEventListener('click', saveSettings);
   $('checkNetworkBtn').addEventListener('click', checkNetwork);
-  $('themeSelect').value = window.DuanjuTheme.get();
-  $('themeSelect').addEventListener('change', () => window.DuanjuTheme.set($('themeSelect').value));
-  document.addEventListener('themechange', event => {$('themeSelect').value = event.detail;});
+  const themeButton = $('themeToggleBtn');
+  const syncThemeButton = () => {
+    const dark = document.documentElement.dataset.theme === 'dark';
+    const label = dark ? '切换到浅色主题' : '切换到深色主题';
+    themeButton.replaceChildren(icon(dark ? 'sun' : 'moon'));
+    themeButton.setAttribute('aria-label', label);
+    themeButton.title = label;
+  };
+  themeButton.addEventListener('click', () => {
+    window.DuanjuTheme.set(document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark');
+    syncThemeButton();
+  });
+  document.addEventListener('themechange', syncThemeButton);
+  syncThemeButton();
   return Promise.all([loadConfig(), createPlaybackSettings().init(), loadAppVersion()]);
 }
 return {init, config: () => config};

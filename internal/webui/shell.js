@@ -1,11 +1,9 @@
-import { $, element, button, readPreference, savePreference, populateIcons } from './ui-core.js';
+import { $, readPreference, savePreference, populateIcons } from './ui-core.js';
 
 export function createShell(app) {
   const main = $('workspaceMain');
   const positions = {library: 0, rankings: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0};
-  let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
-  let sourceNotice;
-  const sourceRows = new Map(), sourceErrors = new Map();
+  let current = '', sourceStates = {};
 
   function setPage(page) {
     if (page === current) return;
@@ -21,9 +19,6 @@ export function createShell(app) {
     if (page === 'following') app.following?.render();
     if (page === 'downloads') app.downloads?.render();
     if (page === 'library') app.library?.layout();
-    if (page === 'system-settings') {
-      showSources();
-    }
     if (page === 'emby-settings') {
       app.emby?.refresh?.();
     }
@@ -39,69 +34,14 @@ export function createShell(app) {
     if (visible) app.downloads?.render();
   }
 
-  function updateSourceRows() {
-    const statuses = {loading: '正在获取', ready: '已就绪', success: '已更新', done: '已更新', failed: '暂不可用', error: '暂不可用', partial: '部分更新', cached: '使用缓存', pending: '等待更新'};
-    for (const [id, controls] of sourceRows) {
-      const state = sourceStates[id];
-      const busy = sourceRequest === id || sourceLoading && state?.status === 'loading';
-      controls.status.textContent = sourceRequest === id ? '正在提交' : state ? statuses[state.status] || (state.error ? '暂不可用' : '已有缓存') : '未检查';
-      const date = state?.updatedAt && !state.updatedAt.startsWith('0001') ? new Date(state.updatedAt).toLocaleString() : '';
-      controls.detail.textContent = [Number.isFinite(state?.count) ? state.count + ' 部' : '', date].filter(Boolean).join(' · ');
-      controls.error.textContent = sourceErrors.get(id) || state?.error || '';
-      controls.action.disabled = sourceLoading || Boolean(sourceRequest);
-      controls.action.textContent = busy ? '更新中…' : '更新';
-      controls.action.setAttribute('aria-busy', String(busy));
-      controls.action.title = sourceLoading || sourceRequest ? '正在更新剧库，完成后可再次更新' : '只更新' + controls.label + '的目录和资料';
-    }
-    if (sourceNotice) sourceNotice.textContent = sourceLoading || sourceRequest ? '正在更新剧库，已有内容可继续使用；完成后可单独更新站源。' : '点击对应站源的“更新”可查新、续载和补齐资料，失败时保留已有内容。';
-  }
-
-  async function updateSource(id) {
-    if (sourceLoading || sourceRequest) return;
-    sourceRequest = id;
-    sourceErrors.delete(id);
-    updateSourceRows();
-    try {
-      const result = await app.api('/api/ui/dramas?update=1&source=' + encodeURIComponent(id));
-      sourceStates = result.sources || {};
-      sourceLoading = Boolean(result.loading);
-      if (result.updateAccepted === false) sourceErrors.set(id, '本次未提交：已有更新任务，可在完成后重试。');
-    } catch (error) {
-      sourceErrors.set(id, '更新请求失败：' + error.message);
-    } finally {
-      sourceRequest = '';
-      updateSourceRows();
-      void app.library.refresh();
-    }
-  }
-
-  function showSources() {
-    const names = {hongguo: '主站'};
-    const content = $('sourceStatusContent');
-    sourceRows.clear();
-    sourceNotice = null;
-    content.replaceChildren();
-    for (const [id, label] of Object.entries(names)) {
-      const row = element('section', 'source-status-row');
-      row.dataset.source = id;
-      const heading = element('div', 'heading source-status-heading');
-      const actions = element('div', 'source-status-actions');
-      const status = element('span', 'tag');
-      status.setAttribute('aria-live', 'polite');
-      const action = button('更新', () => updateSource(id), false, 'secondary source-update');
-      action.setAttribute('aria-label', '更新' + label);
-      actions.append(status, action);
-      heading.append(element('h3', '', label), actions);
-      const detail = element('p', 'small'), error = element('p', 'error');
-      error.setAttribute('role', 'status');
-      row.append(heading, detail, error);
-      sourceRows.set(id, {row, label, status, action, detail, error});
-      content.appendChild(row);
-    }
-    sourceNotice = element('p', 'small notice');
-    content.appendChild(sourceNotice);
-    updateSourceRows();
-    void app.library.refresh();
+  function updateHeaderSource() {
+    const detail = $('headerSourceDetail');
+    if (!detail) return;
+    const state = sourceStates.hongguo || Object.values(sourceStates)[0] || {};
+    const count = Number.isFinite(state.count) ? state.count + ' 部' : '';
+    const date = state.updatedAt && !state.updatedAt.startsWith('0001') ? new Date(state.updatedAt).toLocaleString() : '';
+    detail.textContent = [count, date].filter(Boolean).join(' · ') || '站源状态未知';
+    detail.title = [state.status ? '状态：' + state.status : '', state.error || ''].filter(Boolean).join(' · ') || '主站剧库状态';
   }
 
   function positionMenu(menu) {
@@ -124,7 +64,7 @@ export function createShell(app) {
   }
 
   function access() {
-    updateSourceRows();
+    updateHeaderSource();
     activity(readPreference('activitySidebar', false) === true);
     setPage(window.DuanjuDialogs.page());
   }
@@ -136,7 +76,7 @@ export function createShell(app) {
       if (control.dataset.go === 'following') app.following.showTab('saved');
       window.DuanjuDialogs.navigate(control.dataset.page || control.dataset.go);
     }));
-    document.querySelector('.brand').addEventListener('click', event => {event.preventDefault(); window.DuanjuDialogs.navigate('library');});
+    document.querySelector('.brand').addEventListener('click', event => {event.preventDefault(); window.DuanjuDialogs.navigate('rankings');});
     document.querySelector('.skip-link').addEventListener('click', event => {event.preventDefault(); main.focus();});
     $('activityToggle').addEventListener('click', () => activity($('activityPanel').hidden));
     $('closeActivityBtn').addEventListener('click', () => activity(false));
@@ -170,5 +110,5 @@ export function createShell(app) {
     setPage(window.DuanjuDialogs.page());
   }
 
-  return {init, access, page: () => current, resetScroll: () => {main.scrollTop = 0;}, sourceStates: (value, loading) => {sourceStates = value || {}; sourceLoading = Boolean(loading); updateSourceRows();}};
+  return {init, access, page: () => current, resetScroll: () => {main.scrollTop = 0;}, sourceStates: value => {sourceStates = value || {}; updateHeaderSource();}};
 }

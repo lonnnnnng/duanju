@@ -1,7 +1,7 @@
 (() => {
   const pages = ['library', 'rankings', 'following', 'downloads', 'system-settings', 'emby-settings'];
   const native = new WeakMap();
-  let currentPage = pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'library';
+  let currentPage = pages.includes(location.hash.slice(1)) ? location.hash.slice(1) : 'rankings';
   let active = null, pendingBack = false, pendingOpen = null, pendingPage = '', pendingClose = '', listener = null;
   const state = (dialog = '', layer = '') => ({duanju: true, page: currentPage, dialog, layer});
   const url = () => location.pathname + location.search + '#' + currentPage;

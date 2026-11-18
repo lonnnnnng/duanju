@@ -2,7 +2,7 @@
   'use strict';
   window.DuanjuRankings = {init};
 
-  function init({api, post, getDrama = () => null, onDownloadsChanged, getDownloadQuality = () => 0, canDownload = () => true, play}) {
+  function init({api, post, icon, getDrama = () => null, openDetails, onDownloadsChanged, getDownloadQuality = () => 0, canDownload = () => true, play}) {
     const $ = id => document.getElementById(id);
     const categoryRow = $('rankingCategories');
     const boardRow = $('rankingBoards');
@@ -227,54 +227,64 @@
     function renderEntry(item) {
       const drama = item.drama ? dramaFor(item) : null;
       const title = item.title || drama?.title || '短剧';
-      const row = node('li', 'rankings-row');
-      row.dataset.kind = item.kind || 'drama';
-      const rank = node('span', 'rankings-number' + (item.rank <= 3 ? ' top' : ''), String(item.rank).padStart(2, '0'));
-      rank.setAttribute('aria-label', '第 ' + item.rank + ' 名');
-      const cover = node('div', 'rankings-cover');
-      if (item.cover) {
+      const card = node('li', 'card rankings-card');
+      card.dataset.kind = item.kind || 'drama';
+      const playable = Boolean(item.playable && drama);
+      const actionLabel = playable ? '播放' : item.kind === 'person' ? '人物' : item.kind === 'series' ? '系列剧' : '预约';
+      const poster = node('button', 'poster watch-button');
+      poster.type = 'button';
+      poster.setAttribute('aria-label', actionLabel + ' ' + title);
+      const cover = item.cover || (drama && (drama.cover || drama.coverUrl)) || '';
+      const placeholder = () => {
+        const fallback = node('span', 'cover placeholder');
+        fallback.setAttribute('aria-hidden', 'true');
+        fallback.append(node('span', '', title.slice(0, 1)), node('small', '', '暂无海报'));
+        return fallback;
+      };
+      if (cover) {
         const image = document.createElement('img');
+        image.className = 'cover';
         image.loading = 'lazy';
         image.decoding = 'async';
         image.alt = '';
-        image.src = item.cover;
-        image.addEventListener('error', () => { cover.classList.add('empty'); image.remove(); });
-        cover.appendChild(image);
-      } else {
-        cover.classList.add('empty');
-      }
-      const body = node('div', 'rankings-body');
-      const heading = node('div', 'rankings-title-row');
-      const name = node('div', 'rankings-title', title);
+        image.src = cover;
+        image.addEventListener('error', () => image.replaceWith(placeholder()));
+        poster.appendChild(image);
+      } else poster.appendChild(placeholder());
+      const rank = node('span', 'rankings-rank' + (item.rank <= 3 ? ' top' : ''), String(item.rank).padStart(2, '0'));
+      rank.setAttribute('aria-label', '第 ' + item.rank + ' 名');
+      poster.appendChild(rank);
+      if (item.label) poster.appendChild(node('span', 'rankings-kind', item.label));
+      const caption = node('span', 'poster-caption');
+      caption.append(icon(item.kind === 'person' ? 'user' : item.kind === 'upcoming' ? 'clock' : 'play'),
+        node('span', 'watch-label', actionLabel), node('span', 'poster-category', item.metric || ''));
+      poster.appendChild(caption);
+      if (playable) poster.addEventListener('click', () => play(drama.id, title));
+      else poster.disabled = true;
+      const body = node('div', 'card-body');
+      const name = drama && openDetails ? node('button', 'card-title', title) : node('div', 'card-title', title);
       name.title = title;
-      heading.appendChild(name);
-      if (item.label) heading.appendChild(node('span', 'rankings-label', item.label));
-      body.appendChild(heading);
-      const meta = [item.metric, item.subtitle].filter(Boolean).join(' · ');
-      if (meta) body.appendChild(node('div', 'rankings-meta', meta));
-      if (item.description) body.appendChild(node('p', 'rankings-desc', item.description));
-      if (Array.isArray(item.tags) && item.tags.length) {
-        const tags = node('div', 'rankings-tags');
-        for (const tag of item.tags.slice(0, 4)) tags.appendChild(node('span', 'rankings-tag', tag));
-        body.appendChild(tags);
+      if (name.tagName === 'BUTTON') {
+        name.type = 'button';
+        name.addEventListener('click', () => openDetails(drama.id));
       }
-      const actions = node('div', 'rankings-actions');
-      if (item.playable && drama) {
-        const watchLabel = '播放';
-        const watch = action(watchLabel, () => play(drama.id, title));
-        watch.setAttribute('aria-label', watchLabel + ' ' + title);
-        actions.appendChild(watch);
-        if (canDownload()) {
-          const download = action(submitted.has(item.id) ? '已提交' : '下载', () => submitDownload(item, drama, download));
-          download.disabled = submitted.has(item.id) || submitting.has(item.id);
-          download.setAttribute('aria-label', '下载 ' + title);
-          actions.appendChild(download);
-        }
-      } else {
-        actions.appendChild(node('span', 'rankings-label muted', item.kind === 'person' ? '人物' : '暂不可播放'));
+      const meta = node('div', 'meta', item.subtitle || item.metric || '');
+      meta.title = [item.metric, item.subtitle, item.description].filter(Boolean).join(' · ');
+      const footer = node('div', 'card-footer');
+      const actions = node('div', 'card-actions');
+      if (playable && drama && canDownload()) {
+        const download = node('button', 'quiet icon-button card-download');
+        download.type = 'button';
+        download.appendChild(icon('download'));
+        download.title = '加入下载';
+        download.setAttribute('aria-label', '下载 ' + title);
+        download.addEventListener('click', () => submitDownload(item, drama, download));
+        actions.appendChild(download);
       }
-      row.append(rank, cover, body, actions);
-      return row;
+      footer.append(meta, actions);
+      body.append(name, footer);
+      card.append(poster, body);
+      return card;
     }
 
     async function submitDownload(item, drama, button) {

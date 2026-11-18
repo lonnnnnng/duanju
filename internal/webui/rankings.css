@@ -1,4 +1,5 @@
 .rankings-heading-actions{display:flex;gap:8px;flex:none}
+.rankings-heading{justify-content:flex-end;margin-bottom:10px}
 .rankings-toolbar{display:flex;flex-direction:column;gap:7px;margin:0 0 12px}
 .rankings-tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:2px}
 .rankings-tabs button{flex:none;white-space:nowrap;border-radius:999px;border-color:transparent;background:transparent;color:var(--muted);font-size:13px;padding:6px 12px}
@@ -8,7 +9,11 @@
 .rankings-filter select{min-width:150px;max-width:min(320px,60vw)}
 .rankings-summary{margin:0 0 10px;font-size:12px;line-height:1.5;color:var(--muted)}
 .rankings-content{min-height:220px;outline:none}
-.rankings-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.rankings-card{min-width:0}
+.rankings-rank{position:absolute;left:8px;top:8px;z-index:2;min-width:26px;padding:1px 6px;border-radius:5px;background:#0e1118c9;color:#fff;font-size:11px;font-weight:650;line-height:1.7;font-variant-numeric:tabular-nums;text-align:center}
+.rankings-rank.top{background:var(--brand);color:var(--on-brand)}
+.rankings-kind{position:absolute;right:8px;top:8px;z-index:2;padding:1px 7px;border-radius:999px;background:#0e1118b8;color:#fff;font-size:10px;line-height:1.7;white-space:nowrap}
+.rankings-list{list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:18px 14px;align-items:start}
 .rankings-row{display:grid;grid-template-columns:34px 74px minmax(0,1fr) auto;gap:12px;align-items:center;padding:10px;border:1px solid var(--line);border-radius:12px;background:var(--panel)}
 .rankings-number{font-size:17px;font-variant-numeric:tabular-nums;text-align:center;color:var(--muted);font-weight:600}
 .rankings-number.top{color:var(--text)}
@@ -33,10 +38,7 @@
 .rankings-action-status{margin:6px 0 0;font-size:12px;line-height:1.5;color:var(--muted);overflow-wrap:anywhere}
 .rankings-action-status:empty{display:none}
 @media(max-width:720px){
-  .rankings-row{grid-template-columns:26px 58px minmax(0,1fr);gap:8px;padding:8px}
-  .rankings-cover{width:58px}
-  .rankings-actions{grid-column:1/-1;flex-direction:row;justify-content:flex-end}
-  .rankings-actions button{min-width:58px}
+  .rankings-list{grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 12px}
   .rankings-tabs button{font-size:12px;padding:5px 9px}
   .rankings-filter{flex-wrap:wrap}
 }
