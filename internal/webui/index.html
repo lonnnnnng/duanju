@@ -64,11 +64,13 @@
     </div>
   </section>
   <section class="page-view" id="rankingsPage" data-view="rankings" aria-label="榜单" hidden>
-    <div class="page-heading rankings-heading"><div class="rankings-heading-actions"><button id="refreshRankingsBtn" class="secondary">刷新</button></div></div>
     <div class="rankings-toolbar">
       <div id="rankingCategories" class="rankings-tabs rankings-categories" role="tablist" aria-label="榜单分类"></div>
       <div id="rankingBoards" class="rankings-tabs rankings-boards" role="tablist" aria-label="榜单类型"></div>
-      <label class="rankings-filter" id="rankingFilterWrap" hidden>分类筛选<select id="rankingFilter" aria-label="榜单分类筛选"></select></label>
+      <div class="rankings-filter-row">
+        <label class="rankings-filter" id="rankingFilterWrap" hidden>分类筛选<select id="rankingFilter" aria-label="榜单分类筛选"></select></label>
+        <button id="refreshRankingsBtn" class="secondary">刷新</button>
+      </div>
     </div>
     <p id="rankingSummary" class="rankings-summary" aria-live="polite">正在读取可用榜单…</p>
     <div id="rankingError" class="error" role="status" aria-live="polite"></div>

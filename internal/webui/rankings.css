@@ -1,5 +1,4 @@
-.rankings-heading-actions{display:flex;gap:8px;flex:none}
-.rankings-heading{justify-content:flex-end;margin-bottom:10px}
+.rankings-filter-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rankings-toolbar{display:flex;flex-direction:column;gap:7px;margin:0 0 12px}
 .rankings-tabs{display:flex;gap:5px;overflow-x:auto;scrollbar-width:thin;padding:2px}
 .rankings-tabs button{flex:none;white-space:nowrap;border-radius:999px;border-color:transparent;background:transparent;color:var(--muted);font-size:13px;padding:6px 12px}
