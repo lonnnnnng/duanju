@@ -40,6 +40,29 @@ func (info mergeMediaInfo) audioKey() string {
 	return fmt.Sprintf("%s|%s|%d|%s|%s", info.audioCodec, info.audioProfile, info.sampleRate, info.layout, info.audioExtra)
 }
 
+// mergeVideoDimensionTolerance 允许 HEVC/H.264 分集存在极小的尺寸差异（例如 1080×1924 与 1080×1920）。
+// 这类差异通过带内参数集和 MPEG-TS 中转保留，避免为 4px 差异整集重编码。
+const mergeVideoDimensionTolerance = 8
+
+func mergeVideoCompatible(info, target mergeMediaInfo) bool {
+	if info.videoCodec != target.videoCodec || info.videoProfile != target.videoProfile ||
+		info.pixelFormat != target.pixelFormat || info.sar != target.sar {
+		return false
+	}
+	if info.videoCodec == "h264" || info.videoCodec == "hevc" {
+		return mergeIntAbs(info.width-target.width) <= mergeVideoDimensionTolerance &&
+			mergeIntAbs(info.height-target.height) <= mergeVideoDimensionTolerance
+	}
+	return info.videoKey() == target.videoKey()
+}
+
+func mergeIntAbs(value int) int {
+	if value < 0 {
+		return -value
+	}
+	return value
+}
+
 func majorityMergeMedia(infos []mergeMediaInfo, key func(mergeMediaInfo) string, audio bool) mergeMediaInfo {
 	counts := make(map[string]int)
 	durations := make(map[string]time.Duration)
@@ -70,7 +93,7 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 	plan.video = majorityMergeMedia(infos, mergeMediaInfo.videoKey, false)
 	var compatible []mergeMediaInfo
 	for _, info := range infos {
-		if info.videoKey() == plan.video.videoKey() {
+		if mergeVideoCompatible(info, plan.video) {
 			compatible = append(compatible, info)
 		}
 	}
@@ -82,14 +105,14 @@ func planMergeMedia(infos []mergeMediaInfo) mergeMediaPlan {
 		}
 	}
 	for _, info := range infos {
-		step := mergeMediaStep{video: info.videoKey() != plan.video.videoKey(), audio: plan.audio.audio && (!info.audio || info.audioKey() != plan.audio.audioKey())}
-		if step.video || info.videoExtra != plan.video.videoExtra {
+		step := mergeMediaStep{video: !mergeVideoCompatible(info, plan.video), audio: plan.audio.audio && (!info.audio || info.audioKey() != plan.audio.audioKey())}
+		if step.video || info.videoExtra != plan.video.videoExtra || info.width != plan.video.width || info.height != plan.video.height {
 			plan.parameters = true
 		}
 		step.remux = info.videoTB != fmt.Sprintf("1/%d", plan.timescale) || plan.audio.audio && info.audioTB != plan.audio.audioTB || info.reorder
 		plan.steps = append(plan.steps, step)
 	}
-	plan.transport = plan.video.videoCodec == "hevc" && plan.parameters
+	plan.transport = (plan.video.videoCodec == "hevc" || plan.video.videoCodec == "h264") && plan.parameters
 	for i := range plan.steps {
 		step := &plan.steps[i]
 		step.remux = step.remux || plan.transport
@@ -298,7 +321,11 @@ func (plan mergeMediaPlan) prepareArgs(input, output string, info mergeMediaInfo
 		args = append(args, "-t", strconv.FormatFloat(info.duration.Seconds(), 'f', 6, 64))
 	}
 	if plan.transport {
-		args = append(args, "-bsf:v", "hevc_mp4toannexb", "-f", "mpegts")
+		bitstream := "hevc_mp4toannexb"
+		if plan.video.videoCodec == "h264" {
+			bitstream = "h264_mp4toannexb"
+		}
+		args = append(args, "-bsf:v", bitstream, "-f", "mpegts")
 	} else {
 		args = append(args, "-video_track_timescale", strconv.Itoa(plan.timescale), "-f", "mp4")
 	}

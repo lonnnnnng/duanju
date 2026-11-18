@@ -9,6 +9,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"sort"
 	"strconv"
 	"strings"
 	"sync"
@@ -143,24 +144,147 @@ func runMergeFFmpeg(ctx context.Context, ffmpeg string, args []string, progress 
 	return scanner.Err()
 }
 
+const (
+	mergeVerifySampleThreshold = 10 * time.Minute
+	mergeVerifySampleWindow    = 20 * time.Second
+	mergeVerifySampleCount     = 8
+	mergeVerifySampleMaxRatio  = 35
+)
+
+func mergeVerifyFullRequested() bool {
+	return strings.EqualFold(strings.TrimSpace(os.Getenv("DUANJU_MERGE_VERIFY")), "full")
+}
+
+// mergeVerifySampleRanges 为长片生成“首尾 + 均匀片段 + 转码分集”的抽样范围。
+// 抽样总量超过 35% 时退回完整解码，避免抽样反而不省时间。
+func mergeVerifySampleRanges(duration time.Duration, transcoded []mergeTimeRange) ([]mergeTimeRange, time.Duration, bool) {
+	if duration <= 0 {
+		return nil, 0, false
+	}
+	if mergeVerifyFullRequested() || duration <= mergeVerifySampleThreshold {
+		return []mergeTimeRange{{start: 0, length: duration}}, duration, true
+	}
+	window := mergeVerifySampleWindow
+	if window > duration {
+		window = duration
+	}
+	ranges := []mergeTimeRange{
+		{start: 0, length: window},
+		{start: duration - window, length: window},
+	}
+	for index := 1; index <= mergeVerifySampleCount; index++ {
+		start := duration * time.Duration(index) / time.Duration(mergeVerifySampleCount+1)
+		if start+window > duration {
+			start = duration - window
+		}
+		ranges = append(ranges, mergeTimeRange{start: start, length: window})
+	}
+	for _, span := range transcoded {
+		start := span.start - 2*time.Second
+		if start < 0 {
+			start = 0
+		}
+		end := span.start + span.length + 2*time.Second
+		if end > duration {
+			end = duration
+		}
+		if end > start {
+			ranges = append(ranges, mergeTimeRange{start: start, length: end - start})
+		}
+	}
+	merged := mergeNormalizeRanges(ranges, duration)
+	var total time.Duration
+	for _, span := range merged {
+		total += span.length
+	}
+	if total <= 0 || total*100 > duration*mergeVerifySampleMaxRatio {
+		return []mergeTimeRange{{start: 0, length: duration}}, duration, true
+	}
+	return merged, total, false
+}
+
+func mergeNormalizeRanges(ranges []mergeTimeRange, duration time.Duration) []mergeTimeRange {
+	clamped := make([]mergeTimeRange, 0, len(ranges))
+	for _, span := range ranges {
+		start := span.start
+		if start < 0 {
+			start = 0
+		}
+		if start >= duration {
+			continue
+		}
+		length := span.length
+		if start+length > duration {
+			length = duration - start
+		}
+		if length <= 0 {
+			continue
+		}
+		clamped = append(clamped, mergeTimeRange{start: start, length: length})
+	}
+	sort.Slice(clamped, func(i, j int) bool { return clamped[i].start < clamped[j].start })
+	merged := make([]mergeTimeRange, 0, len(clamped))
+	for _, span := range clamped {
+		if len(merged) == 0 {
+			merged = append(merged, span)
+			continue
+		}
+		last := &merged[len(merged)-1]
+		if span.start <= last.start+last.length+time.Second {
+			end := span.start + span.length
+			if end > last.start+last.length {
+				last.length = end - last.start
+			}
+			continue
+		}
+		merged = append(merged, span)
+	}
+	return merged
+}
+
 // verifyMergedMedia 并行分段解码整片：保留“完整解码”的语义，同时把耗时压到 1/N。
 func verifyMergedMedia(ctx context.Context, ffmpeg, path string, duration time.Duration, progress func(time.Duration)) error {
 	if duration <= 0 {
 		return decodeMergedMedia(ctx, ffmpeg, path, progress)
 	}
 	workers := mergeVerifyWorkers(duration)
+	return verifyMergeSpans(ctx, ffmpeg, path, mergeVerifyRanges(duration, workers), duration, progress)
+}
+
+// verifyMergedMediaRanges 只解码抽样片段，避免长片每次都完整解码。
+func verifyMergedMediaRanges(ctx context.Context, ffmpeg, path string, spans []mergeTimeRange, total time.Duration, progress func(time.Duration)) error {
+	if total <= 0 || len(spans) == 0 {
+		return decodeMergedMedia(ctx, ffmpeg, path, progress)
+	}
+	return verifyMergeSpans(ctx, ffmpeg, path, spans, total, progress)
+}
+
+func verifyMergeSpans(ctx context.Context, ffmpeg, path string, spans []mergeTimeRange, total time.Duration, progress func(time.Duration)) error {
+	workers := mergeVerifyWorkers(total)
+	if workers > len(spans) {
+		workers = len(spans)
+	}
+	if workers < 1 {
+		workers = 1
+	}
 	threads := mergeJobThreads(workers)
-	ranges := mergeVerifyRanges(duration, workers)
 	verifyCtx, cancel := context.WithCancel(ctx)
 	defer cancel()
 	var wg sync.WaitGroup
 	var mu sync.Mutex
-	elapsed := make([]time.Duration, len(ranges))
+	elapsed := make([]time.Duration, len(spans))
+	sem := make(chan struct{}, workers)
 	var firstErr error
-	for index, span := range ranges {
+	for index, span := range spans {
 		wg.Add(1)
 		go func(index int, span mergeTimeRange) {
 			defer wg.Done()
+			select {
+			case sem <- struct{}{}:
+				defer func() { <-sem }()
+			case <-verifyCtx.Done():
+				return
+			}
 			args := []string{"-xerror", "-err_detect", "explode", "-threads", strconv.Itoa(threads), "-protocol_whitelist", "file,pipe",
 				"-ss", strconv.FormatFloat(span.start.Seconds(), 'f', 6, 64),
 				"-t", strconv.FormatFloat(span.length.Seconds(), 'f', 6, 64),
@@ -172,13 +296,13 @@ func verifyMergedMedia(ctx context.Context, ffmpeg, path string, duration time.D
 				}
 				mu.Lock()
 				elapsed[index] = value
-				var total time.Duration
+				var sum time.Duration
 				for _, item := range elapsed {
-					total += item
+					sum += item
 				}
 				mu.Unlock()
 				if progress != nil {
-					progress(total)
+					progress(sum)
 				}
 			})
 			if err != nil {
@@ -389,10 +513,30 @@ func mergeMediaFiles(ctx context.Context, ffmpeg string, paths []string, output 
 	if merged.duration < duration-tolerance || merged.duration > duration+tolerance {
 		return "", fmt.Errorf("合并文件时长不符（预计 %.1f 秒，实际 %.1f 秒），原分集已保留", duration.Seconds(), merged.duration.Seconds())
 	}
-	notify(80, "校验完整视频和音轨（只解码，不转码）")
-	err = verifyMergedMedia(ctx, ffmpeg, output, merged.duration, func(elapsed time.Duration) {
-		notify(80+int(elapsed*19/merged.duration), "校验完整视频和音轨（只解码，不转码）")
-	})
+	transcoded := make([]mergeTimeRange, 0, len(metadata))
+	var offset time.Duration
+	for index, info := range metadata {
+		step := plan.steps[index]
+		if step.video || step.audio {
+			transcoded = append(transcoded, mergeTimeRange{start: offset, length: info.duration})
+		}
+		offset += info.duration
+	}
+	spans, verifyTotal, fullVerify := mergeVerifySampleRanges(merged.duration, transcoded)
+	detail := "校验完整视频和音轨（只解码，不转码）"
+	if !fullVerify {
+		detail = "抽样校验关键片段（只解码，不转码）"
+	}
+	notify(80, detail)
+	if fullVerify {
+		err = verifyMergedMedia(ctx, ffmpeg, output, merged.duration, func(elapsed time.Duration) {
+			notify(80+int(elapsed*19/merged.duration), detail)
+		})
+	} else {
+		err = verifyMergedMediaRanges(ctx, ffmpeg, output, spans, verifyTotal, func(elapsed time.Duration) {
+			notify(80+int(elapsed*19/verifyTotal), detail)
+		})
+	}
 	if err != nil {
 		return "", fmt.Errorf("合并文件解码校验失败：%w；原分集已保留", err)
 	}

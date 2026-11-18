@@ -65,3 +65,53 @@ func TestMergeWorkerCountLimits(t *testing.T) {
 		t.Fatalf("单任务线程数必须 >= 1: %d", threads)
 	}
 }
+
+func TestMergeVerifySampleRangesCoverTranscodedEpisodes(t *testing.T) {
+	duration := 2 * time.Hour
+	transcoded := []mergeTimeRange{{start: 10 * time.Minute, length: 2 * time.Minute}}
+	spans, total, full := mergeVerifySampleRanges(duration, transcoded)
+	if full {
+		t.Fatal("长片应抽样校验")
+	}
+	if total <= 0 || total >= duration {
+		t.Fatalf("抽样总量异常: %v", total)
+	}
+	if spans[0].start != 0 || spans[len(spans)-1].start+spans[len(spans)-1].length != duration {
+		t.Fatalf("首尾未覆盖: %+v", spans)
+	}
+	covered := false
+	for _, span := range spans {
+		if span.start <= 10*time.Minute && span.start+span.length >= 12*time.Minute {
+			covered = true
+		}
+	}
+	if !covered {
+		t.Fatalf("未覆盖转码分集: %+v", spans)
+	}
+	previousEnd := time.Duration(-1)
+	for _, span := range spans {
+		if span.start < previousEnd {
+			t.Fatalf("抽样范围未排序或重叠: %+v", spans)
+		}
+		if span.length <= 0 {
+			t.Fatalf("抽样范围长度无效: %+v", spans)
+		}
+		previousEnd = span.start + span.length
+	}
+}
+
+func TestMergeVerifySampleRangesFallBackToFullWhenDense(t *testing.T) {
+	duration := 30 * time.Minute
+	spans, total, full := mergeVerifySampleRanges(duration, []mergeTimeRange{{start: 0, length: 12 * time.Minute}})
+	if !full || total != duration || len(spans) != 1 || spans[0].start != 0 || spans[0].length != duration {
+		t.Fatalf("密集转码应退回完整校验: %+v %v %v", spans, total, full)
+	}
+}
+
+func TestMergeVerifySampleRangesFullOverride(t *testing.T) {
+	t.Setenv("DUANJU_MERGE_VERIFY", "full")
+	spans, total, full := mergeVerifySampleRanges(2*time.Hour, nil)
+	if !full || total != 2*time.Hour || len(spans) != 1 || spans[0].length != 2*time.Hour {
+		t.Fatalf("完整校验覆盖失败: %+v %v %v", spans, total, full)
+	}
+}

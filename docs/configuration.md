@@ -23,6 +23,7 @@
 | `DUANJU_HONGGUO_URL` | 受支持站源的地址覆盖 |
 | `DUANJU_GITHUB_REPO` | 在线更新仓库，格式为 `owner/repository` |
 | `DUANJU_GITHUB_TOKEN` | 私有更新仓库所需的只读令牌 |
+| `DUANJU_MERGE_VERIFY` | 设为 `full` 时合并后完整解码校验；默认对长片抽样校验 |
 
 代理、并发、外观和播放行为也可在“系统设置”中修改。下载目录由部署参数或环境变量管理，页面显示当前生效路径。
 

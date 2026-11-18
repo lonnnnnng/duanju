@@ -147,3 +147,65 @@ func TestMergePreservesMajorityAndOnlyConvertsIncompatibleStreams(t *testing.T) 
 		}
 	})
 }
+
+func TestMergeTreatsTinyHevcDimensionDifferenceAsCompatible(t *testing.T) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("local FFmpeg unavailable")
+	}
+	if !strings.Contains(mergeFixtureCommand(t, ffmpeg, "-encoders"), "libx265") {
+		t.Skip("HEVC encoder unavailable")
+	}
+	work := t.TempDir()
+	base := filepath.Join(work, "hevc-180.mp4")
+	near := filepath.Join(work, "hevc-184.mp4")
+	for path, size := range map[string]string{base: "320x180", near: "320x184"} {
+		mergeFixtureCommand(t, ffmpeg, "-f", "lavfi", "-i", "testsrc2=size="+size+":rate=25:duration=2",
+			"-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=2",
+			"-c:v", "libx265", "-preset", "ultrafast", "-x265-params", "pools=1:frame-threads=1:log-level=error",
+			"-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", path)
+	}
+	var infos []mergeMediaInfo
+	for _, path := range []string{near, base, base} {
+		info, err := probeMergeMedia(context.Background(), ffmpeg, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		infos = append(infos, info)
+	}
+	plan := planMergeMedia(infos)
+	if plan.videoCount != 0 || !plan.parameters || !plan.transport {
+		t.Fatalf("4px 差异不应重编码，应走带内参数集换封装: %+v", plan)
+	}
+	output := filepath.Join(t.TempDir(), "merged.mp4")
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	method, err := mergeMediaFiles(ctx, ffmpeg, []string{near, base, base}, output, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(method, "换封装") && !strings.Contains(method, "不转码") {
+		t.Fatalf("method=%s", method)
+	}
+	if _, err := probeMergeMedia(ctx, ffmpeg, output); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVerifyMergedMediaRangesDecodesSampledSpans(t *testing.T) {
+	ffmpeg, err := exec.LookPath("ffmpeg")
+	if err != nil {
+		t.Skip("local FFmpeg unavailable")
+	}
+	work := t.TempDir()
+	base := filepath.Join(work, "base.mp4")
+	mergeFixtureCommand(t, ffmpeg, "-f", "lavfi", "-i", "testsrc2=size=320x180:rate=25:duration=4",
+		"-f", "lavfi", "-i", "sine=frequency=440:sample_rate=48000:duration=4",
+		"-c:v", "libx264", "-preset", "veryfast", "-threads:v", "2", "-pix_fmt", "yuv420p", "-c:a", "aac", "-ac", "2", base)
+	spans := []mergeTimeRange{{start: 0, length: time.Second}, {start: 2 * time.Second, length: time.Second}}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Minute)
+	defer cancel()
+	if err := verifyMergedMediaRanges(ctx, ffmpeg, base, spans, 2*time.Second, nil); err != nil {
+		t.Fatal(err)
+	}
+}
