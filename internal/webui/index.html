@@ -12,6 +12,7 @@
 <link rel="stylesheet" href="/assets/player.css">
 <link rel="stylesheet" href="/assets/library-tools.css">
 <link rel="stylesheet" href="/assets/history.css">
+<link rel="stylesheet" href="/assets/rankings.css">
 </head>
 <body>
 <a class="skip-link" href="#workspaceMain">跳到主要内容</a>
@@ -19,6 +20,7 @@
   <a class="brand" href="#library" aria-label="短剧首页"><span class="brand-mark" aria-hidden="true"><span data-icon="brand"></span></span><span class="brand-name">短剧</span></a>
   <nav class="desktop-nav" aria-label="主导航">
     <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span>剧库</button>
+    <button class="nav-button" data-page="rankings"><span data-icon="chart"></span>榜单</button>
     <button class="nav-button" data-page="following"><span data-icon="bookmark"></span>追剧<span class="nav-count" data-follow-count hidden></span></button>
     <button class="nav-button" data-page="downloads"><span data-icon="download"></span>下载<span class="nav-count" data-download-count hidden></span></button>
     <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span>系统设置</button>
@@ -47,7 +49,7 @@
         <label class="catalog-select"><select id="sourceSelect" aria-label="站源筛选"><option value="">全部站源</option></select><span data-icon="chevron"></span></label>
         <label class="catalog-select"><select id="channelSelect" aria-label="分类筛选"><option value="">全部分类</option></select><span data-icon="chevron"></span></label>
         <label class="catalog-select"><select id="sortSelect" aria-label="剧库排序"><option value="default">默认排序</option><option value="newest">最新上线</option><option value="oldest">最早上线</option><option value="heat">热度最高</option><option value="views">播放最多</option><option value="title">名称排序</option></select><span data-icon="chevron"></span></label>
-        <button id="openRankingsBtn" class="quiet catalog-action" aria-label="站点榜单" title="站点榜单" aria-haspopup="dialog" aria-controls="rankingPanel"><span class="button-content"><span data-icon="chart"></span><span class="control-label">榜单</span></span></button><button id="batchSelectBtn" data-download-only class="quiet catalog-action" aria-label="批量选择" title="批量选择" aria-pressed="false"><span class="button-content"><span data-icon="select"></span><span id="batchSelectLabel" class="control-label">批量选择</span></span></button>
+        <button id="batchSelectBtn" data-download-only class="quiet catalog-action" aria-label="批量选择" title="批量选择" aria-pressed="false"><span class="button-content"><span data-icon="select"></span><span id="batchSelectLabel" class="control-label">批量选择</span></span></button>
       </div>
     </div>
     <div class="recent-searches" id="recentSearches" hidden aria-label="最近搜索"></div>
@@ -64,6 +66,22 @@
       </div>
       <aside id="activityPanel" data-download-only class="activity-panel" aria-label="下载概览" hidden><div class="section-heading"><h2>下载概览</h2><button id="closeActivityBtn" class="quiet icon-button" aria-label="收起下载概览"><span data-icon="close"></span></button></div><div id="activityTasks"></div><button class="quiet" data-go="downloads">打开下载管理 ›</button></aside>
     </div>
+  </section>
+  <section class="page-view" id="rankingsPage" data-view="rankings" aria-label="榜单" hidden>
+    <div class="page-heading"><div><h1>榜单</h1><p>红果站内分类榜，按 App 接口实时获取。</p></div><div class="rankings-heading-actions"><button id="refreshRankingsBtn" class="secondary">刷新</button></div></div>
+    <div class="rankings-toolbar">
+      <div id="rankingCategories" class="rankings-tabs rankings-categories" role="tablist" aria-label="榜单分类"></div>
+      <div id="rankingBoards" class="rankings-tabs rankings-boards" role="tablist" aria-label="榜单类型"></div>
+      <label class="rankings-filter" id="rankingFilterWrap" hidden>分类筛选<select id="rankingFilter" aria-label="榜单分类筛选"></select></label>
+    </div>
+    <p id="rankingSummary" class="rankings-summary" aria-live="polite">正在读取可用榜单…</p>
+    <div id="rankingError" class="error" role="status" aria-live="polite"></div>
+    <div id="rankingContent" class="rankings-content" tabindex="0" aria-busy="false">
+      <ol id="rankingList" class="rankings-list"></ol>
+      <div id="rankingState" class="rankings-state" hidden></div>
+    </div>
+    <div class="rankings-footer"><span id="rankingFetchedAt" class="small"></span><button id="rankingMoreBtn" class="secondary" hidden>加载更多</button></div>
+    <p id="rankingActionStatus" class="rankings-action-status" role="status" aria-live="polite"></p>
   </section>
   <section class="page-view" id="followingPage" data-view="following" aria-label="我的追剧" hidden>
     <div class="page-heading"><div><h1>我的追剧</h1><p>留住想看的，接着上次看。</p></div></div>
@@ -174,26 +192,16 @@
 </main>
 <nav class="mobile-nav" aria-label="手机主导航">
   <button class="nav-button" data-page="library" aria-current="page"><span data-icon="library"></span><span>剧库</span></button>
+  <button class="nav-button" data-page="rankings"><span data-icon="chart"></span><span>榜单</span></button>
   <button class="nav-button" data-page="following"><span data-icon="bookmark"></span><span>追剧</span><span class="nav-count" data-follow-count hidden></span></button>
   <button class="nav-button" data-page="downloads"><span data-icon="download"></span><span>下载</span><span class="nav-count" data-download-count hidden></span></button>
-  <button class="nav-button" data-page="system-settings"><span data-icon="settings"></span><span>系统设置</span></button>
-  <button class="nav-button" data-page="emby-settings"><span data-icon="folder"></span><span>Emby设置</span></button>
-  <button class="nav-button" data-page="watch-history"><span data-icon="clock"></span><span>观看记录</span></button>
+  <button class="nav-button" data-page="system-settings" aria-label="系统设置"><span data-icon="settings"></span><span>系统</span></button>
+  <button class="nav-button" data-page="emby-settings" aria-label="Emby设置"><span data-icon="folder"></span><span>Emby</span></button>
+  <button class="nav-button" data-page="watch-history" aria-label="观看记录"><span data-icon="clock"></span><span>记录</span></button>
 </nav>
 <dialog id="detailPanel" class="detail-dialog" aria-labelledby="detailTitle"><div class="dialog-heading"><h2>剧集详情</h2><button class="quiet icon-button" data-close aria-label="关闭详情"><span data-icon="close"></span></button></div><div class="dialog-body" id="detailContent"></div></dialog>
 
-  <dialog id="rankingPanel" class="ranking-dialog" aria-labelledby="rankingTitle">
-    <div class="ranking-header">
-      <div class="heading"><h2 id="rankingTitle">站点榜单</h2><div class="ranking-heading-actions"><button id="refreshRankingBtn" class="secondary">刷新</button><button id="closeRankingsBtn" class="secondary" aria-label="关闭榜单">关闭</button></div></div>
-      <div class="ranking-controls"><select id="rankingSource" aria-label="榜单站源"></select><label class="download-quality" data-download-only>下载画质<select data-download-quality aria-label="榜单下载清晰度"></select></label><div id="rankingTabs" class="ranking-tabs" role="tablist" aria-label="榜单类型"></div></div>
-      <p id="rankingSummary" class="ranking-summary" aria-live="polite">按站点名次展示，独立于剧库筛选。</p>
-    </div>
-    <div id="rankingContent" class="ranking-content" role="tabpanel" tabindex="0" aria-label="榜单列表" aria-busy="false"><ol id="rankingList" class="ranking-list"></ol></div>
-    <div class="ranking-footer">
-      <div class="ranking-footer-row"><span id="rankingFetchedAt" class="small" role="status" aria-live="polite"></span><button id="rankingMoreBtn" class="secondary" hidden>加载更多</button></div>
-      <p id="rankingError" class="error ranking-error" role="alert"></p><p id="rankingActionStatus" class="ranking-action-status" role="status" aria-live="polite"></p>
-    </div>
-  </dialog>
+
 
 
 

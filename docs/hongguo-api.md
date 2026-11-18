@@ -128,6 +128,28 @@ POST /novel/commentapi/comment/list/<video_id>/v1/
 使用评论签名（带 `Comment-Source: 601`、`Server-Channel: 1000`），
 该路径不需要设备注册。
 
+### 3.6 榜单
+
+```http
+GET /reading/bookapi/bookmall/cell/change/v/
+```
+
+使用 App 设备签名（与首页、搜索相同）。关键参数：
+
+| 参数 | 说明 |
+| --- | --- |
+| `selected_items` | 分类：`all`、`series_album`、`comic_series_rank`、`human`、`ai_playlet` |
+| `sub_selected_items` | 榜型，如 `ranklist_hot_sc`、`human_hot_play`、`human_new_rank` |
+| `panel_selected_items` | 题材/性别筛选 ID；空字符串为总榜 |
+| `offset` / `session_id` / `rank_version` / `filter_ids` | 翻页游标 |
+
+响应 `data.cell_view.cell_selector` 给出分类、榜型和筛选项；`cell_data` 的
+`video_data` / `ugc_user_data` 给出条目。剧集用 `series_id`；系列剧用
+`jump_schema` 里的 `video_series_id`；`recommend_info.rank` 是名次，
+`rec_text_item.RecommendText` 是热度指标，`cover` 是 HEIC 封面。
+网页端通过 `/api/ui/rankings/catalog` 和 `/api/ui/rankings/app` 封装该接口，
+并由 `/api/ui/image` 转换 HEIC 封面。
+
 ## 4. 签名
 
 | 路径 | 签名 |

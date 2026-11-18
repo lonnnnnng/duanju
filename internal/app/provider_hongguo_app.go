@@ -114,6 +114,9 @@ type hongguoAppClient struct {
 	pending             map[string]*hongguoDetailCall
 	searches            map[string]hongguoSearchEntry
 	searchPending       map[string]*hongguoSearchCall
+	rankingMu           sync.Mutex
+	rankingCatalog      rankingAppCatalog
+	rankingPages        map[string]rankingAppPage
 	danmaku             map[string]hongguoDanmakuCacheEntry
 	danmakuPending      map[string]*hongguoDanmakuCall
 }

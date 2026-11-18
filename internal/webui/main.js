@@ -22,6 +22,13 @@ app.settings = createSettings(app);
 app.following = createFollowing(app);
 app.details = createDetails(app);
 app.emby = createEmby(app);
+app.rankings = window.DuanjuRankings.init({
+  api, post,
+  getDrama: id => app.library.get(id),
+  onDownloadsChanged: () => app.downloads.refresh?.(),
+  getDownloadQuality: app.downloads.quality,
+  play: app.play
+});
 
 app.shell.init();
 window.addEventListener('duanjuviewerchange', () => {
@@ -51,16 +58,6 @@ window.DuanjuHistory.init({
   sourceLabel: value => sourceLabel(normalizeSource(value) || value),
   onChanged: () => {app.library.refreshFollowing(); app.following.render(); app.details.refresh(); app.downloads.render();},
   onError: message => setMessage(message, true),
-  play: app.play
-});
-window.DuanjuRankings.init({
-  api, post,
-  getSource: () => document.getElementById('sourceSelect').value,
-  getDrama: id => app.library.get(id),
-  sourceLabel,
-  onLibraryChanged: () => app.library.refresh(),
-  onDownloadsChanged: app.downloads.refresh,
-  getDownloadQuality: app.downloads.quality,
   play: app.play
 });
 Promise.allSettled([app.settings.init(), app.library.init(), app.downloads.init(), app.following.init()]).then(results => {

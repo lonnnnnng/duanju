@@ -2,14 +2,20 @@
   'use strict';
   window.DuanjuRankings = {init};
 
-  function init({api, post, getSource, getDrama = () => null, sourceLabel, onLibraryChanged, onDownloadsChanged, getDownloadQuality = () => 0, canDownload = () => true, play}) {
+  function init({api, post, getDrama = () => null, onDownloadsChanged, getDownloadQuality = () => 0, canDownload = () => true, play}) {
     const $ = id => document.getElementById(id);
-    const dialog = $('rankingPanel');
+    const categoryRow = $('rankingCategories');
+    const boardRow = $('rankingBoards');
+    const filterWrap = $('rankingFilterWrap');
+    const filterSelect = $('rankingFilter');
     const list = $('rankingList');
-    const tabs = $('rankingTabs');
-    let boards = [], board = null, entries = [], page = 0, hasMore = false;
-    let busy = false, controller = null, sequence = 0, changed = false, fetchedAt = '', updatedText = '';
-    const lastBoards = new Map(), submitted = new Set(), submitting = new Set();
+    const stateBox = $('rankingState');
+    const content = $('rankingContent');
+    const moreBtn = $('rankingMoreBtn');
+    const refreshBtn = $('refreshRankingsBtn');
+    let catalog = null, category = null, board = null, filter = '';
+    let items = [], cursor = null, busy = false, controller = null, sequence = 0, loaded = false;
+    const submitted = new Set(), submitting = new Set();
 
     function node(tag, className, text) {
       const result = document.createElement(tag);
@@ -17,234 +23,296 @@
       if (text !== undefined) result.textContent = text;
       return result;
     }
+
     function action(text, handler) {
       const result = node('button', 'secondary', text);
       result.type = 'button';
       result.addEventListener('click', handler);
       return result;
     }
+
+    function setError(text) { $('rankingError').textContent = text || ''; }
+    function setState(text) { stateBox.textContent = text || ''; stateBox.hidden = !text; }
+    function setBusy(value) {
+      busy = value;
+      content.setAttribute('aria-busy', String(value));
+      refreshBtn.disabled = value;
+      moreBtn.disabled = value;
+      moreBtn.textContent = value ? '加载中…' : '加载更多';
+    }
+
     function cancel() {
       sequence++;
       if (controller) controller.abort();
       controller = null;
-      busy = false;
-    }
-    function controls() {
-      $('refreshRankingBtn').disabled = busy;
-      $('rankingMoreBtn').disabled = busy;
-      $('rankingMoreBtn').hidden = !hasMore;
-      $('rankingMoreBtn').textContent = busy ? '加载中…' : '加载更多';
-      $('rankingContent').setAttribute('aria-busy', String(busy));
-    }
-    function state(text) {
-      list.replaceChildren(node('li', 'ranking-state', text));
-    }
-    function setError(text) { $('rankingError').textContent = text || ''; }
-    function updateSummary(stale) {
-      $('rankingSummary').textContent = (updatedText || board?.description || '按站点名次展示') + (entries.length ? ' · 已加载 ' + entries.length + ' 部' : '');
-      $('rankingFetchedAt').textContent = fetchedAt ? (stale ? '上次获取：' : '获取于 ') + new Date(fetchedAt).toLocaleString() : '';
     }
 
-    function renderEntries() {
-      list.replaceChildren(...entries.map(renderEntry));
-      if (!entries.length) state('此榜单暂时没有条目');
+    function summary(result) {
+      const description = result?.description || board?.description || '按站点名次展示';
+      $('rankingSummary').textContent = description + (items.length ? ' · 已加载 ' + items.length + ' 部' : '');
+      const fetchedAt = result?.fetchedAt || '';
+      $('rankingFetchedAt').textContent = fetchedAt ? (result.stale ? '上次获取：' : '获取于 ') + new Date(fetchedAt).toLocaleString() : '';
     }
 
-    function dramaFor(item) {
-      const known = getDrama(item.drama.id) || {};
-      if ((Date.parse(known.sortMetadata?.checkedAt) || 0) > (Date.parse(fetchedAt) || 0)) return {...item.drama, ...known};
-      const drama = {...known, ...item.drama};
-      for (const [key, value] of Object.entries(known)) {if (drama[key] == null || drama[key] === '') drama[key] = value;}
-      return drama;
+    function renderCategories() {
+      const categories = catalog?.categories || [];
+      categoryRow.replaceChildren(...categories.map(item => {
+        const tab = action(item.name, () => selectCategory(item.id));
+        tab.id = 'ranking-cat-' + item.id;
+        tab.dataset.category = item.id;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', String(category?.id === item.id));
+        tab.tabIndex = category?.id === item.id ? 0 : -1;
+        return tab;
+      }));
     }
-    window.addEventListener('duanjulibrarychange', () => {if (dialog.open) {renderEntries(); updateSummary(false);}});
 
-    function renderEntry(item) {
-      const drama = dramaFor(item), title = drama.title || drama.name || '短剧';
-      const row = node('li', 'ranking-row');
-      row.value = item.rank;
-      const rank = node('span', 'ranking-number' + (item.rank <= 3 ? ' top' : ''), String(item.rank).padStart(2, '0'));
-      rank.setAttribute('aria-label', '第 ' + item.rank + ' 名');
-      const content = node('div');
-      const heading = node('div', 'ranking-title', title);
-      heading.title = title;
-      content.appendChild(heading);
-      const count = drama.totalEpisode || drama.episodeCount;
-      const details = [item.metric, drama.remark || (count ? count + ' 集' : ''), drama.categoryName].filter(Boolean);
-      if (details.length) content.appendChild(node('div', 'ranking-meta', details.join(' · ')));
-      const actions = node('div', 'ranking-actions');
-      const watchLabel = window.DuanjuHistory?.get(drama.id) ? '继续观看' : '播放';
-      const watch = action(watchLabel, () => { dialog.close(); play(drama.id, title); });
-      watch.setAttribute('aria-label', watchLabel + ' ' + title);
-      const download = action(submitted.has(drama.id) ? '已提交' : '下载', async () => {
-        if (!canDownload() || submitting.has(drama.id) || submitted.has(drama.id)) return;
-        submitting.add(drama.id);
-        download.disabled = true;
-        download.textContent = '提交中';
-        try {
-          await post('/api/ui/download', {ids: [drama.id], quality: getDownloadQuality()});
-          submitted.add(drama.id);
-          download.textContent = '已提交';
-          $('rankingActionStatus').textContent = '已将《' + title + '》加入下载队列';
-          onDownloadsChanged();
-        } catch (error) {
-          download.textContent = '下载';
-          download.disabled = false;
-          $('rankingActionStatus').textContent = '加入下载失败：' + error.message;
-        } finally {
-          submitting.delete(drama.id);
+    function renderBoards() {
+      const boards = category?.boards || [];
+      boardRow.replaceChildren(...boards.map(item => {
+        const tab = action(item.name, () => selectBoard(item.id));
+        tab.id = 'ranking-board-' + item.id;
+        tab.dataset.board = item.id;
+        tab.setAttribute('role', 'tab');
+        tab.setAttribute('aria-selected', String(board?.id === item.id));
+        tab.tabIndex = board?.id === item.id ? 0 : -1;
+        return tab;
+      }));
+    }
+
+    function renderFilters() {
+      const groups = board?.filters || [];
+      filterWrap.hidden = groups.length === 0;
+      const options = [new Option('总榜', '')];
+      for (const group of groups) {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = group.name;
+        for (const option of group.options || []) {
+          optgroup.appendChild(new Option(option.name, option.id));
         }
-      });
-      download.disabled = submitted.has(drama.id) || submitting.has(drama.id);
-      download.setAttribute('aria-label', '下载 ' + title);
-      actions.appendChild(watch);
-      if (canDownload()) actions.appendChild(download);
-      row.append(rank, content, actions);
-      return row;
-    }
-
-    async function loadPage(nextPage, refresh = false) {
-      if (!board) return;
-      cancel();
-      const ticket = sequence, activeBoard = board;
-      controller = new AbortController();
-      const signal = controller.signal;
-      busy = true;
-      setError('');
-      $('rankingActionStatus').textContent = '';
-      if (!entries.length) state('正在获取站点榜单…');
-      controls();
-      try {
-        const result = await api('/api/ui/rankings?board=' + encodeURIComponent(activeBoard.id) + '&page=' + nextPage + (refresh ? '&refresh=1' : ''), {signal});
-        if (ticket !== sequence || !dialog.open) return;
-        if (result.boardId !== activeBoard.id || result.page !== nextPage || !Array.isArray(result.items)) throw new Error('榜单响应不完整，请刷新重试');
-        if (nextPage > 1 && result.stale) throw new Error('此页暂时只能取得旧榜单，请刷新后继续');
-        const incoming = result.items;
-        let previousRank = nextPage > 1 && entries.length ? entries[entries.length - 1].rank : 0;
-        const ids = new Set(nextPage > 1 ? entries.map(item => item.drama.id) : []);
-        for (const item of incoming) {
-          if (!item.drama?.id || item.drama.source !== 'hongguo' || !/^hongguo:\d{1,32}$/.test(item.drama.id) || !Number.isInteger(item.rank) || item.rank <= previousRank || ids.has(item.drama.id)) throw new Error('榜单顺序已变化，请刷新后继续');
-          previousRank = item.rank;
-          ids.add(item.drama.id);
-        }
-        if (nextPage > 1 && updatedText && result.updatedText && result.updatedText !== updatedText) throw new Error('站点榜单已更新，请刷新后继续');
-        if (nextPage === 1) {
-          entries = [];
-          list.replaceChildren();
-          $('rankingContent').scrollTop = 0;
-          fetchedAt = result.fetchedAt || '';
-          updatedText = result.updatedText || '';
-        }
-        for (const item of incoming) list.appendChild(renderEntry(item));
-        entries.push(...incoming);
-        page = nextPage;
-        hasMore = Boolean(result.hasMore) && incoming.length > 0 && !result.stale;
-        changed = changed || incoming.length > 0;
-        if (!entries.length) state('此榜单暂时没有条目');
-        updateSummary(result.stale);
-        setError([result.warning, result.saved === false && incoming.length ? '剧库缓存未保存，本次仍可播放和下载。' : ''].filter(Boolean).join(' '));
-      } catch (error) {
-        if (ticket !== sequence || signal.aborted) return;
-        setError(error.message + (entries.length ? '；已保留当前列表。' : ''));
-        if (!entries.length) state('暂时无法取得榜单，点击“刷新”重试');
-      } finally {
-        if (ticket === sequence) { busy = false; controller = null; controls(); }
+        options.push(optgroup);
       }
+      filterSelect.replaceChildren(...options);
+      const available = [...filterSelect.options].some(option => option.value === filter);
+      if (!available) filter = '';
+      filterSelect.value = filter;
+    }
+
+    function selectCategory(id) {
+      if (!catalog) return;
+      const next = catalog.categories.find(item => item.id === id);
+      if (!next || next.id === category?.id) return;
+      category = next;
+      board = category.boards[0] || null;
+      filter = '';
+      renderCategories();
+      renderBoards();
+      renderFilters();
+      loadPage(null);
     }
 
     function selectBoard(id) {
-      board = boards.find(item => item.id === id);
-      if (!board) return;
-      lastBoards.set(board.source, board.id);
-      entries = []; page = 0; hasMore = false; fetchedAt = ''; updatedText = '';
-      for (const tab of tabs.children) {
-        const active = tab.dataset.board === id;
-        tab.setAttribute('aria-selected', String(active));
-        tab.tabIndex = active ? 0 : -1;
-      }
-      $('rankingContent').setAttribute('aria-labelledby', 'ranking-tab-' + id);
-      updateSummary(false);
-      loadPage(1);
+      const next = category?.boards.find(item => item.id === id);
+      if (!next || next.id === board?.id) return;
+      board = next;
+      filter = '';
+      renderBoards();
+      renderFilters();
+      loadPage(null);
     }
 
-    function selectSource() {
-      const source = $('rankingSource').value;
-      const available = boards.filter(item => item.source === source);
-      tabs.replaceChildren();
-      for (const item of available) {
-        const tab = action(item.name, () => selectBoard(item.id));
-        tab.id = 'ranking-tab-' + item.id;
-        tab.dataset.board = item.id;
-        tab.setAttribute('role', 'tab');
-        tab.setAttribute('aria-controls', 'rankingContent');
-        tabs.appendChild(tab);
-      }
-      selectBoard(available.find(item => item.id === lastBoards.get(source))?.id || available[0]?.id);
+    function selectFilter(id) {
+      if (id === filter) return;
+      filter = id;
+      loadPage(null);
     }
 
-    async function loadCatalog() {
+    async function loadCatalog(refresh = false) {
       cancel();
       const ticket = sequence;
-      busy = true;
       controller = new AbortController();
-      const signal = controller.signal;
-      controls();
+      setBusy(true);
       setError('');
-      state('正在读取可用榜单…');
+      setState('正在读取可用榜单…');
       try {
-        if (!boards.length) {
-          const result = await api('/api/ui/rankings', {signal});
-          if (ticket !== sequence || !dialog.open) return;
-          boards = Array.isArray(result.boards) ? result.boards.filter(item => item.source === 'hongguo') : [];
-        }
-        if (!boards.length) throw new Error('暂未提供可用榜单');
-        const sources = [...new Set(boards.map(item => item.source))];
-        const wanted = getSource() || $('rankingSource').value;
-        $('rankingSource').replaceChildren(...sources.map(source => {
-          const option = node('option', '', sourceLabel(source));
-          option.value = source;
-          return option;
-        }));
-        $('rankingSource').value = sources.includes(wanted) ? wanted : sources[0];
-        selectSource();
+        const result = await api('/api/ui/rankings/catalog' + (refresh ? '?refresh=1' : ''), {signal: controller.signal});
+        if (ticket !== sequence) return;
+        const categories = Array.isArray(result?.categories) ? result.categories : [];
+        if (!categories.length) throw new Error('暂未提供可用榜单');
+        catalog = result;
+        category = categories.find(item => item.id === result.default?.category) || categories[0];
+        board = category.boards.find(item => item.id === result.default?.board) || category.boards[0] || null;
+        filter = '';
+        loaded = true;
+        renderCategories();
+        renderBoards();
+        renderFilters();
+        await loadPage(null);
       } catch (error) {
-        if (ticket !== sequence || signal.aborted) return;
-        state('点击“刷新”重试');
+        if (ticket !== sequence || error.name === 'AbortError') return;
+        loaded = false;
+        setState('点击“刷新”重试');
         setError(error.message);
-      } finally {
-        if (ticket === sequence) { busy = false; controller = null; controls(); }
+        setBusy(false);
       }
     }
 
-    $('openRankingsBtn').addEventListener('click', () => {
-      dialog.showModal();
-      $('closeRankingsBtn').focus();
-      $('rankingActionStatus').textContent = '';
-      loadCatalog();
+    async function loadPage(next, refresh = false) {
+      if (!board) return;
+      cancel();
+      const ticket = sequence;
+      controller = new AbortController();
+      setBusy(true);
+      setError('');
+      const params = new URLSearchParams({category: category.id, board: board.id, filter, offset: String(next?.offset || 0)});
+      if (next?.session) params.set('session', next.session);
+      if (next?.rankVersion) params.set('rankVersion', next.rankVersion);
+      if (next?.filterIds) params.set('filterIds', next.filterIds);
+      if (refresh) params.set('refresh', '1');
+      if (!next) {
+        items = [];
+        list.replaceChildren();
+        content.scrollTop = 0;
+        setState('正在获取站点榜单…');
+        moreBtn.hidden = true;
+      }
+      try {
+        const result = await api('/api/ui/rankings/app?' + params.toString(), {signal: controller.signal});
+        if (ticket !== sequence) return;
+        if (result.category !== category.id || result.board !== board.id || !Array.isArray(result.items)) throw new Error('榜单响应不完整，请刷新重试');
+        const seen = new Set(items.map(item => item.id));
+        let added = 0;
+        for (const item of result.items) {
+          if (!item.id || seen.has(item.id)) continue;
+          seen.add(item.id);
+          items.push(item);
+          list.appendChild(renderEntry(item));
+          added++;
+        }
+        cursor = result.hasMore && result.nextOffset > (next?.offset || 0) ? {
+          offset: result.nextOffset,
+          session: result.nextSession || '',
+          rankVersion: result.nextVersion || '',
+          filterIds: result.nextFilterIds || ''
+        } : null;
+        moreBtn.hidden = !cursor;
+        setState(items.length ? '' : '此榜单暂时没有条目');
+        summary(result);
+        setError(result.warning || '');
+        if (added === 0 && !items.length) setState('此榜单暂时没有条目');
+      } catch (error) {
+        if (ticket !== sequence || error.name === 'AbortError') return;
+        setError(error.message + (items.length ? '；已保留当前列表。' : ''));
+        if (!items.length) setState('暂时无法取得榜单，点击“刷新”重试');
+      } finally {
+        if (ticket === sequence) {
+          controller = null;
+          setBusy(false);
+        }
+      }
+    }
+
+    function dramaFor(item) {
+      const known = item.drama ? getDrama(item.drama.id) || {} : {};
+      if ((Date.parse(known.sortMetadata?.checkedAt) || 0) > (Date.parse(item.fetchedAt) || 0)) return {...item.drama, ...known};
+      const drama = {...known, ...(item.drama || {})};
+      for (const [key, value] of Object.entries(known)) {
+        if (drama[key] == null || drama[key] === '') drama[key] = value;
+      }
+      return drama;
+    }
+
+    function renderEntry(item) {
+      const drama = item.drama ? dramaFor(item) : null;
+      const title = item.title || drama?.title || '短剧';
+      const row = node('li', 'rankings-row');
+      row.dataset.kind = item.kind || 'drama';
+      const rank = node('span', 'rankings-number' + (item.rank <= 3 ? ' top' : ''), String(item.rank).padStart(2, '0'));
+      rank.setAttribute('aria-label', '第 ' + item.rank + ' 名');
+      const cover = node('div', 'rankings-cover');
+      if (item.cover) {
+        const image = document.createElement('img');
+        image.loading = 'lazy';
+        image.decoding = 'async';
+        image.alt = '';
+        image.src = item.cover;
+        image.addEventListener('error', () => { cover.classList.add('empty'); image.remove(); });
+        cover.appendChild(image);
+      } else {
+        cover.classList.add('empty');
+      }
+      const body = node('div', 'rankings-body');
+      const heading = node('div', 'rankings-title-row');
+      const name = node('div', 'rankings-title', title);
+      name.title = title;
+      heading.appendChild(name);
+      if (item.label) heading.appendChild(node('span', 'rankings-label', item.label));
+      body.appendChild(heading);
+      const meta = [item.metric, item.subtitle].filter(Boolean).join(' · ');
+      if (meta) body.appendChild(node('div', 'rankings-meta', meta));
+      if (item.description) body.appendChild(node('p', 'rankings-desc', item.description));
+      if (Array.isArray(item.tags) && item.tags.length) {
+        const tags = node('div', 'rankings-tags');
+        for (const tag of item.tags.slice(0, 4)) tags.appendChild(node('span', 'rankings-tag', tag));
+        body.appendChild(tags);
+      }
+      const actions = node('div', 'rankings-actions');
+      if (item.playable && drama) {
+        const watchLabel = window.DuanjuHistory?.get(drama.id) ? '继续观看' : '播放';
+        const watch = action(watchLabel, () => play(drama.id, title));
+        watch.setAttribute('aria-label', watchLabel + ' ' + title);
+        actions.appendChild(watch);
+        if (canDownload()) {
+          const download = action(submitted.has(item.id) ? '已提交' : '下载', () => submitDownload(item, drama, download));
+          download.disabled = submitted.has(item.id) || submitting.has(item.id);
+          download.setAttribute('aria-label', '下载 ' + title);
+          actions.appendChild(download);
+        }
+      } else {
+        actions.appendChild(node('span', 'rankings-label muted', item.kind === 'person' ? '人物' : '暂不可播放'));
+      }
+      row.append(rank, cover, body, actions);
+      return row;
+    }
+
+    async function submitDownload(item, drama, button) {
+      if (!drama?.id || submitted.has(item.id) || submitting.has(item.id)) return;
+      submitting.add(item.id);
+      button.disabled = true;
+      button.textContent = '提交中';
+      try {
+        await post('/api/ui/download', {ids: [drama.id], quality: getDownloadQuality()});
+        submitted.add(item.id);
+        button.textContent = '已提交';
+        $('rankingActionStatus').textContent = '已将《' + (item.title || drama.title || '短剧') + '》加入下载队列';
+        onDownloadsChanged?.();
+      } catch (error) {
+        button.disabled = false;
+        button.textContent = '下载';
+        $('rankingActionStatus').textContent = '加入下载失败：' + error.message;
+      } finally {
+        submitting.delete(item.id);
+      }
+    }
+
+    refreshBtn.addEventListener('click', () => {
+      if (!catalog) loadCatalog(true);
+      else loadPage(null, true);
     });
-    $('closeRankingsBtn').addEventListener('click', () => dialog.close());
-    $('refreshRankingBtn').addEventListener('click', () => board ? loadPage(1, true) : loadCatalog());
-    $('rankingMoreBtn').addEventListener('click', () => { if (!busy && hasMore) loadPage(page + 1); });
-    $('rankingSource').addEventListener('change', selectSource);
-    tabs.addEventListener('keydown', event => {
-      const buttons = [...tabs.children], index = buttons.indexOf(event.target);
+    moreBtn.addEventListener('click', () => { if (busy || !cursor) return; loadPage(cursor); });
+    filterSelect.addEventListener('change', () => selectFilter(filterSelect.value));
+    [categoryRow, boardRow].forEach(row => row.addEventListener('keydown', event => {
+      const buttons = [...row.children], index = buttons.indexOf(event.target);
       if (index < 0 || !['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) return;
       event.preventDefault();
       const next = event.key === 'Home' ? 0 : event.key === 'End' ? buttons.length - 1 : (index + (event.key === 'ArrowRight' ? 1 : -1) + buttons.length) % buttons.length;
       buttons[next].focus();
-      selectBoard(buttons[next].dataset.board);
-    });
-    dialog.addEventListener('click', event => {
-      if (event.target !== dialog) return;
-      const box = dialog.getBoundingClientRect();
-      if (event.clientX < box.left || event.clientX > box.right || event.clientY < box.top || event.clientY > box.bottom) dialog.close();
-    });
-    dialog.addEventListener('close', () => {
+      buttons[next].click();
+    }));
 
-      if (dialog.open) return;
-      cancel();
-      controls();
-      if (changed) { changed = false; onLibraryChanged(); }
-    });
+    return {
+      load: () => { if (!loaded) loadCatalog(); },
+      refresh: () => { if (!catalog) loadCatalog(true); else loadPage(null, true); }
+    };
   }
 })();

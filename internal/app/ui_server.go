@@ -66,6 +66,7 @@ type UIApp struct {
 	metadataDone             chan struct{}
 	metadataClosed           bool
 	rankingApplied           map[string]time.Time
+	rankingCovers            map[string]time.Time
 
 	cond                  *sync.Cond
 	statePath             string
@@ -364,6 +365,8 @@ func (a *UIApp) routes() http.Handler {
 	mux.HandleFunc("/api/ui/search", a.handleLibrarySearch)
 	mux.HandleFunc("/api/ui/following", a.handleFollowing)
 	mux.HandleFunc("/api/ui/rankings", a.handleRankings)
+	mux.HandleFunc("/api/ui/rankings/catalog", a.handleRankingCatalog)
+	mux.HandleFunc("/api/ui/rankings/app", a.handleRankingAppPage)
 	mux.HandleFunc("/api/ui/recommendations", a.handleRecommendations)
 	mux.HandleFunc("/api/ui/download", a.handleDownload)
 	mux.HandleFunc("/api/ui/tasks", a.handleTasks)

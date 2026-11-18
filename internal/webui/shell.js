@@ -2,7 +2,7 @@ import { $, element, button, readPreference, savePreference, populateIcons } fro
 
 export function createShell(app) {
   const main = $('workspaceMain');
-  const positions = {library: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0, 'watch-history': 0};
+  const positions = {library: 0, rankings: 0, following: 0, downloads: 0, 'system-settings': 0, 'emby-settings': 0, 'watch-history': 0};
   let current = '', sourceStates = {}, sourceLoading = false, sourceRequest = '';
   let sourceNotice;
   const sourceRows = new Map(), sourceErrors = new Map();
@@ -17,6 +17,7 @@ export function createShell(app) {
       if (control.dataset.page === page) control.setAttribute('aria-current', 'page');
       else control.removeAttribute('aria-current');
     });
+    if (page === 'rankings') app.rankings?.load();
     if (page === 'following') app.following?.render();
     if (page === 'downloads') app.downloads?.render();
     if (page === 'library') app.library?.layout();
