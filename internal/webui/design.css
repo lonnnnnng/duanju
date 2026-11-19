@@ -277,8 +277,8 @@ dialog .dialog-heading{padding:14px 20px;background:color-mix(in srgb,var(--pane
   .nav-button{padding:0 10px;font-size:12.5px}
   .workspace{padding-left:20px;padding-right:20px}
   .cards{grid-template-columns:repeat(auto-fill,minmax(170px,1fr))}
-  .rankings-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 12px}
 }
+@media(max-width:900px){.rankings-list{grid-template-columns:repeat(4,minmax(0,1fr));gap:18px 12px}}
 @media(min-width:701px) and (max-width:820px){.header-source-detail{display:none}}
 @media(max-width:700px){
   .desktop-nav{display:none}
