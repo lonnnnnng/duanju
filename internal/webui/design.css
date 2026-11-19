@@ -205,7 +205,7 @@ select{cursor:pointer}
 .download-selection{padding:10px 12px;border:1px solid var(--line);border-radius:14px;background:color-mix(in srgb,var(--panel) 90%,transparent);margin-bottom:14px}
 .download-selection .action-menu>summary{border-radius:10px;background:var(--soft);border-color:transparent}
 .groups{gap:14px}
-.group{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 16px 40px -32px #1b21304d;overflow:hidden}
+.group{border:1px solid var(--line);border-radius:16px;background:var(--panel);box-shadow:0 16px 40px -32px #1b21304d}
 .group-head{padding:16px 18px}
 .group-title{font-size:15.5px;letter-spacing:-.01em}
 .group-actions{gap:7px}
