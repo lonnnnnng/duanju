@@ -20,13 +20,15 @@ const (
 	hongguoPlaybackOfficialInstallID = "1342981674659067"
 )
 
+var errHongguoNoCompatibleMedia = errors.New(" App 未返回兼容的媒体，已跳过不支持的编码")
+
 func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoID string) (providerMedia, error) {
 	if !hongguoNumericID.MatchString(videoID) {
 		return providerMedia{}, errors.New("视频 ID 无效")
 	}
 	payload := map[string]any{
 		"biz_param": map[string]any{
-			"detail_page_version": 0, "device_level": 3, "disable_digg_stat": false,
+			"detail_page_version": 0, "device_level": 1, "disable_digg_stat": false,
 			"disable_video_relate_book": false, "need_all_video_definition": true,
 			"need_mp4_align": false, "use_os_player": false, "use_server_dns": false,
 			"video_platform": 1024,
@@ -38,22 +40,36 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	if err != nil {
 		return providerMedia{}, err
 	}
-	result, err := downloader.hongguoPlaybackV5Request(ctx, body)
-	if err != nil {
-		return providerMedia{}, err
+	deviceID, installID := hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID
+	for rotations := 0; ; {
+		result, err := downloader.hongguoPlaybackV5Request(ctx, body, deviceID, installID)
+		if err != nil {
+			return providerMedia{}, err
+		}
+		data := nestedMap(result, "data")
+		if data == nil {
+			return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+		}
+		bucket := data
+		if nested := nestedMap(data, "1004"); len(nested) > 0 {
+			bucket = nested
+		}
+		media, err := parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
+		if !errors.Is(err, errHongguoNoCompatibleMedia) {
+			return media, err
+		}
+		if rotations >= hongguoDeviceRotations {
+			return providerMedia{}, err
+		}
+		if switchErr := downloader.ensureHongguoDevice(ctx, deviceID); switchErr != nil {
+			return providerMedia{}, fmt.Errorf("%w（辅助设备切换失败：%v）", err, switchErr)
+		}
+		deviceID, installID, _ = downloader.hongguoDevice()
+		rotations++
 	}
-	data := nestedMap(result, "data")
-	if data == nil {
-		return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
-	}
-	bucket := data
-	if nested := nestedMap(data, "1004"); len(nested) > 0 {
-		bucket = nested
-	}
-	return parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
 }
 
-func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body []byte) (map[string]any, error) {
+func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body []byte, deviceID, installID string) (map[string]any, error) {
 	address := hongguoPlaybackBaseURL + hongguoPlaybackPath
 	attempts := downloader.cfg.Retries
 	if attempts < 1 {
@@ -71,7 +87,7 @@ func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body
 				return nil, ctx.Err()
 			}
 		}
-		query := hongguoPlaybackQuery(hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID)
+		query := hongguoPlaybackQuery(deviceID, installID)
 		signedURL, headers, err := hongguoV5Sign(address, query, body, time.Now())
 		if err != nil {
 			return nil, err
@@ -229,7 +245,7 @@ func selectHongguoAppMediaOrdered(model map[string]any, health *providerHostHeal
 	if keyErr != nil {
 		return providerMedia{}, fmt.Errorf(" App 媒体密钥不可用: %w", keyErr)
 	}
-	return providerMedia{}, errors.New(" App 未返回兼容的媒体，已跳过不支持的编码")
+	return providerMedia{}, errHongguoNoCompatibleMedia
 }
 
 // hongguoMediaAddresses 汇总一个清晰度档位的所有可用地址；部分响应会把地址做 base64 编码。

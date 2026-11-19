@@ -30,8 +30,11 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 					t.Fatal("incorrect model request")
 				}
 				ids, _ := payload.Map["1004"].([]any)
-				if len(ids) != 1 || ids[0] != episode || payload.Scene != "player" || payload.Biz["video_platform"] != float64(1024) {
+				if len(ids) != 1 || ids[0] != episode || payload.Scene != "player" || payload.Biz["video_platform"] != float64(1024) || payload.Biz["device_level"] != float64(1) {
 					t.Fatal("model request lost episode or required parameters")
+				}
+				if request.URL.Query().Get("device_id") != hongguoPlaybackOfficialDeviceID || request.URL.Query().Get("iid") != hongguoPlaybackOfficialInstallID {
+					t.Fatal("first model request must retain the verified official device identity")
 				}
 				if request.Header.Get("X-Helios") == "" || request.Header.Get("X-Medusa") == "" || request.Header.Get("X-SS-STUB") == "" {
 					t.Fatal("model request was not V5 signed")
@@ -59,6 +62,71 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 		if _, err := parseHongguoAppPreloadMediaOrdered(map[string]any{"data": data}, episode, nil); err == nil {
 			t.Fatal("accepted mismatched episode or malformed model")
 		}
+	}
+}
+
+func TestHongguoModelRetriesIncompatibleMediaWithAuxiliaryDevices(t *testing.T) {
+	const episode = "7704572665582849049"
+	const firstID, firstInstall = "8000000000000000001", "8000000000000000011"
+	const secondID, secondInstall = "8000000000000000002", "8000000000000012"
+	var used []string
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		deviceID := request.URL.Query().Get("device_id")
+		used = append(used, deviceID)
+		codec := "bytevc2"
+		if deviceID == secondID {
+			codec = "h264"
+		}
+		model := map[string]any{"video_duration": 40.0, "video_list": []any{map[string]any{
+			"main_url": "https://media.example.test/retry.mp4", "video_meta": map[string]any{"codec_type": codec, "definition": "1080p"},
+		}}}
+		body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{"1004": map[string]any{
+			episode: map[string]any{"video_model": model}}}})
+		return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
+	})
+	client := d.hongguoClient()
+	client.mu.Lock()
+	client.state.DeviceID, client.state.InstallID, client.state.Registered = firstID, firstInstall, true
+	client.state.Devices = []hongguoDevice{{DeviceID: firstID, InstallID: firstInstall}, {DeviceID: secondID, InstallID: secondInstall}}
+	client.mu.Unlock()
+
+	media, err := d.resolveHongguoAppMedia(context.Background(), episode)
+	if err != nil || media.URL != "https://media.example.test/retry.mp4" || media.Quality != 1080 {
+		t.Fatalf("auxiliary device should provide compatible media: media=%+v error=%v", media, err)
+	}
+	want := []string{hongguoPlaybackOfficialDeviceID, firstID, secondID}
+	if len(used) != len(want) {
+		t.Fatalf("unexpected device retry count: %v", used)
+	}
+	for i := range want {
+		if used[i] != want[i] {
+			t.Fatalf("device retry order = %v, want %v", used, want)
+		}
+	}
+	if deviceID, _, _ := d.hongguoDevice(); deviceID != secondID {
+		t.Fatal("successful auxiliary device should remain active in the device pool")
+	}
+}
+
+func TestHongguoModelDoesNotRetryMalformedMedia(t *testing.T) {
+	const episode = "7704572665582849049"
+	var requests int
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		requests++
+		body := fmt.Sprintf(`{"code":0,"data":{"1004":{"%s":{"video_model":"not-json"}}}}`, episode)
+		return rankingHTTPResponse(request, http.StatusOK, body), nil
+	})
+	client := d.hongguoClient()
+	client.mu.Lock()
+	client.state.DeviceID, client.state.InstallID, client.state.Registered = "8000000000000000001", "8000000000000000011", true
+	client.state.Devices = []hongguoDevice{{DeviceID: client.state.DeviceID, InstallID: client.state.InstallID}}
+	client.mu.Unlock()
+
+	if _, err := d.resolveHongguoAppMedia(context.Background(), episode); err == nil {
+		t.Fatal("malformed media should fail")
+	}
+	if requests != 1 {
+		t.Fatalf("malformed media must not trigger an auxiliary retry, got %d requests", requests)
 	}
 }
 
@@ -119,5 +187,36 @@ func TestLiveHongguoModelPlayback(t *testing.T) {
 			}
 			t.Logf("decoded episode=%d quality=%dp duration=%.3fs at start and midpoint", episode, media.Quality, media.Duration.Seconds())
 		})
+	}
+}
+
+func TestLiveHongguoAuxiliaryDeviceDownload(t *testing.T) {
+	if os.Getenv("DUANJU_LIVE_AUXILIARY_DOWNLOAD") != "1" {
+		t.Skip("仅在手动验收辅助设备重试及原失败分集时启用")
+	}
+	const videoID = "7704572665582849049"
+	cfg := defaultConfig()
+	cfg.dataDir, cfg.OutputDir, cfg.Retries = t.TempDir(), t.TempDir(), 1
+	d := NewDownloader(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
+	defer cancel()
+	task := Task{
+		DramaID: "hongguo:491", Index: 491, Total: 491,
+		Chapter: Chapter{Source: sourceHongguo, Title: "第491集", VideoURL: "hongguo-cenc://" + videoID, CurrentEpisode: json.RawMessage("491")},
+		OutPath: filepath.Join(t.TempDir(), "episode-491.mp4"),
+	}
+	if err := d.DownloadEpisode(ctx, task); err != nil {
+		t.Fatal(publicError(err))
+	}
+	if _, _, registered := d.hongguoDevice(); !registered {
+		t.Fatal("原失败分集应通过注册的辅助设备取得兼容媒体")
+	}
+	ffmpeg, err := d.ensureFFmpeg(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	info, err := probeMergeMedia(ctx, ffmpeg, task.OutPath)
+	if err != nil || info.videoCodec == "" || info.audioCodec == "" {
+		t.Fatalf("下载文件音视频校验失败: %v", err)
 	}
 }
