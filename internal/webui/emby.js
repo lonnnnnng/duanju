@@ -1,7 +1,7 @@
 import { $, element } from './ui-core.js';
 
 export function createEmby(app) {
-  let state, timer, loading = false, saving = false;
+  let state, timer, loading = false, saving = false, loadFailed = false;
   const date = value => value && !value.startsWith('0001') ? new Date(value).toLocaleString() : '尚未同步';
   const posterStates = {pending: '海报待同步', waiting: '海报等待扫描', synced: '海报已同步', existing: '保留已有海报', missing: '暂无海报地址', unconfigured: '海报未连接 Emby', failed: '海报同步失败，将重试'};
 
@@ -23,15 +23,19 @@ export function createEmby(app) {
   function sourceFields() {
     const local = $('embyMergedOnly').checked;
     $('embySourceScope').disabled = local;
+    $('embyFollowingScope').textContent = local ? '全集模式同步已合并的本地视频，上方分集范围暂不生效。' : '追剧范围以最后保存设置的浏览器为准。';
   }
 
   function render() {
     if (!state) return;
     const entries = (state.entries || []).filter(entry => entry.episodes > 0 || entry.error);
     const imported = entries.filter(entry => entry.episodes > 0).length;
+    const badge = $('embyStateBadge');
+    const syncState = state.running ? 'running' : state.error ? 'error' : state.settings.enabled ? 'enabled' : 'disabled';
+    badge.dataset.state = syncState;
+    badge.textContent = {running: '正在同步', error: '同步异常', enabled: '自动同步已开启', disabled: '自动同步已关闭'}[syncState];
     $('embyRunBtn').disabled = saving || !state.settings.enabled || state.running;
     $('embyRunBtn').textContent = state.running ? '正在同步…' : '立即同步';
-    $('embyFollowingScope').textContent = '追剧范围以最后保存设置的浏览器为准。';
     const confirmed=entries.filter(entry=>entry.mediaStatus==='confirmed').length;
     $('embySummary').textContent = '文件已发布 ' + imported + ' 部 · ' + (state.episodes || 0) + (state.settings.mergedOnly ? ' 个全集' : ' 集') + (state.settings.mergedOnly&&state.settings.serverUrl?' · Emby 已识别 '+confirmed+' 部':'') + (state.pending ? ' · 待处理 ' + state.pending + ' 部' : '');
     $('embyPosterSummary').textContent = state.settings.mergedOnly || state.settings.serverUrl ? (state.settings.mergedOnly ? '本地海报已同步 ' : '海报已同步 ') + (state.postersSynced || 0) + ' 部' + (state.postersPending ? ' · 等待 ' + state.postersPending + ' 部' : '') + (state.postersFailed ? ' · 失败待重试 ' + state.postersFailed + ' 部' : '') : '填写 Emby 服务器地址和 API Key 后可自动同步海报。';
@@ -67,11 +71,22 @@ export function createEmby(app) {
     if (loading) return;
     loading = true;
     try {
+      const initialLoad = !state;
       state = await app.api('/api/ui/settings/emby');
-      if (fill) fields();
+      if (fill || initialLoad) fields();
+      if (loadFailed) {
+        $('embyFeedback').textContent = '';
+        $('embyFeedback').classList.remove('error');
+        loadFailed = false;
+      }
+      $('embySaveBtn').disabled = saving;
       render();
     } catch (error) {
+      loadFailed = true;
       $('embyFeedback').textContent = '读取失败：' + error.message;
+      $('embyFeedback').classList.add('error');
+      $('embyStateBadge').textContent = '读取失败';
+      $('embyStateBadge').dataset.state = 'error';
     } finally {
       loading = false;
       poll();
@@ -82,7 +97,10 @@ export function createEmby(app) {
     event.preventDefault();
     if (saving || !state) return;
     saving = true;
+    loadFailed = false;
     $('embySaveBtn').disabled = true;
+    $('embySaveBtn').textContent = '正在保存…';
+    $('embyFeedback').classList.remove('error');
     // long: 播放地址不再作为用户配置项暴露，在线分集始终跟随当前服务地址，避免保存过期主机地址。
     const input = {enabled: $('embyEnabled').checked, outputDir: $('embyOutputDir').value.trim(), baseUrl: $('embyMergedOnly').checked ? '' : location.origin, intervalMinutes: Number($('embyInterval').value), mergedOnly: $('embyMergedOnly').checked, following: $('embyFollowing').checked, downloads: $('embyDownloads').checked, serverUrl: $('embyServerURL').value.trim()};
     if ($('embyAPIKey').value) input.apiKey = $('embyAPIKey').value;
@@ -92,9 +110,11 @@ export function createEmby(app) {
       $('embyFeedback').textContent = input.enabled ? '设置已保存，正在安排同步。Emby 媒体库请使用上方的输出目录。' : '设置已保存，自动同步已关闭。';
     } catch (error) {
       $('embyFeedback').textContent = '保存失败：' + error.message;
+      $('embyFeedback').classList.add('error');
     } finally {
       saving = false;
       $('embySaveBtn').disabled = false;
+      $('embySaveBtn').textContent = '保存并应用';
       render();
       poll(500);
     }
@@ -102,12 +122,16 @@ export function createEmby(app) {
 
   async function run() {
     $('embyRunBtn').disabled = true;
+    $('embyRunBtn').textContent = '正在安排…';
+    $('embyRunFeedback').textContent = '';
+    $('embyRunFeedback').classList.remove('error');
     try {
       state = await app.post('/api/ui/settings/emby/sync', {});
-      $('embyFeedback').textContent = '同步已安排，关闭此窗口也会继续。';
+      $('embyRunFeedback').textContent = '同步已安排，关闭此窗口也会继续。';
       render();
     } catch (error) {
-      $('embyFeedback').textContent = error.message;
+      $('embyRunFeedback').textContent = error.message;
+      $('embyRunFeedback').classList.add('error');
       render();
     }
     poll(500);

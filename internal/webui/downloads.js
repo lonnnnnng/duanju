@@ -1,4 +1,4 @@
-import { reconcileChildren, withFocus, readPreference, savePreference } from './ui-core.js';
+import { reconcileChildren, withFocus, readPreference, savePreference, icon } from './ui-core.js';
 import { $, element, empty, button, setMessage, api, post, valueText, firstNonEmpty, dramaTitle, normalizeSource, sourceKey, sourceLabel, categoryName, episodeCount, coverURL, tagsText, dramaSearchText, rebuildOptions, number, formatBytes, formatTime, statusText, releaseText, phaseText, progressText, progressBar, episodeLabel, groupStats } from './ui-core.js';
 
 export function createDownloads(app) {
@@ -94,6 +94,7 @@ function renderTasks(next) {
   const all = buildGroups();
   if (!$('downloadsPage').hidden) {
     visibleGroups = all.filter(groupMatches);
+    setText($('downloadGroupCount'), visibleGroups.length === all.length ? '共 ' + all.length + ' 部' : '显示 ' + visibleGroups.length + ' / ' + all.length + ' 部');
     const previous = new Map(Array.from(groupsEl.querySelectorAll('.group'), node => [node.dataset.dramaId, node]));
     withFocus(groupsEl, () => {
       const nodes = [];
@@ -128,8 +129,8 @@ function renderTasks(next) {
       }
       if (!visibleGroups.length) {
         const empty = element('div', 'empty');
-        empty.append(element('strong', '', tasks.length ? '没有匹配的下载合集' : '还没有下载任务'), element('p', '', tasks.length ? '试试其他筛选条件。' : '在剧集详情加入下载，也可以在剧库批量选择。'));
-        if (!tasks.length) empty.appendChild(button('去剧库看看', () => window.DuanjuDialogs.navigate('library'), false, 'secondary'));
+        empty.append(icon(all.length ? 'search' : 'download'), element('strong', '', all.length ? '没有匹配的下载合集' : '还没有下载任务'), element('p', '', all.length ? '试试其他筛选条件。' : '在剧集详情加入下载，也可以在剧库批量选择。'));
+        if (!all.length) empty.appendChild(button('去剧库看看', () => window.DuanjuDialogs.navigate('library'), false, 'secondary'));
         nodes.push(empty);
       }
       reconcileChildren(groupsEl, nodes);

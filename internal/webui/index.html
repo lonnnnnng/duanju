@@ -87,72 +87,101 @@
     <div id="followingList" class="following-list" aria-live="polite"></div>
     <p class="page-footnote">新集提示来自已更新的剧库资料。</p>
   </section>
-  <section class="page-view" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
-    <div class="download-destination"><span data-icon="folder"></span><span class="small">保存至</span><span id="downloadLocation" class="download-path">正在读取保存目录…</span></div>
-    <div class="download-summary"><div class="summary-tile"><strong id="downloadActiveCount">0</strong><span>正在进行</span></div><div class="summary-tile"><strong id="downloadCompleteCount">0</strong><span>已完成分集</span></div><div class="summary-tile"><strong id="downloadWrittenBytes">0 B</strong><span>任务累计写入</span></div></div>
-    <div class="download-filters"><input id="taskSearch" type="search" placeholder="搜索下载合集" aria-label="搜索下载合集"><select id="taskStatus" aria-label="下载状态"><option value="">全部状态</option><option value="completed">已完成</option><option value="failed">失败</option><option value="unfinished">未完成</option><option value="running">进行中</option><option value="paused">已暂停</option><option value="canceled">已取消</option></select><select id="releaseStatus" aria-label="剧集完结状态"><option value="">全部完结状态</option><option value="finished">完结</option><option value="ongoing">未完结</option><option value="unknown">状态未知</option></select></div>
-    <div class="download-selection toolbar"><label class="download-quality" data-download-only>新任务画质<select id="downloadQuality" data-download-quality aria-label="新任务下载清晰度"></select></label><button id="downloadBatchBtn" class="secondary" aria-pressed="false">批量管理</button><div id="downloadBatchControls" class="toolbar" hidden><button id="selectGroupsBtn" class="secondary">全选</button><button id="invertGroupsBtn" class="secondary">反选</button><button id="deselectGroupsBtn" class="secondary">取消勾选</button><details id="batchMenu" class="action-menu"><summary>批量操作</summary><div class="action-popover"><button id="pauseSelectedBtn" class="secondary">暂停所选</button><button id="resumeSelectedBtn" class="secondary">继续所选</button><button id="cancelSelectedBtn" class="secondary">取消所选下载</button><button id="retrySelectedBtn" class="secondary">重试失败 / 取消</button><button id="prioritySelectedBtn" class="secondary">优先下载所选</button><button id="deferSelectedBtn" class="secondary">稍后下载所选</button><button id="updateSelectedBtn" class="secondary">更新所选合集</button><button id="mergeSelectedBtn">合并所选合集</button><label><input id="deleteEpisodesAfterMerge" type="checkbox"> 合并成功后删除分集文件</label><button id="clearTasksBtn" class="secondary">仅清理任务记录</button><button id="deleteSelectedBtn" class="danger">删除所选资源与文件</button></div></details><span id="taskSelection" class="small"></span></div></div>
+  <section class="page-view management-page" id="downloadsPage" data-view="downloads" aria-label="下载管理" hidden>
+    <div class="page-heading management-heading">
+      <div><h1>下载管理</h1><p>从分集下载到全集合并，在这里管理你的本地剧集。</p></div>
+      <div class="download-destination"><span class="destination-icon" aria-hidden="true"><span data-icon="folder"></span></span><div><span class="small">视频保存目录</span><span id="downloadLocation" class="download-path">正在读取保存目录…</span></div></div>
+    </div>
+    <div class="download-summary" aria-label="下载概览">
+      <div class="summary-tile"><span class="summary-icon" aria-hidden="true"><span data-icon="download"></span></span><div><span>进行中 / 排队</span><strong id="downloadActiveCount">0</strong></div></div>
+      <div class="summary-tile"><span class="summary-icon" aria-hidden="true"><span data-icon="select"></span></span><div><span>已完成分集</span><strong id="downloadCompleteCount">0</strong></div></div>
+      <div class="summary-tile"><span class="summary-icon" aria-hidden="true"><span data-icon="folder"></span></span><div><span>累计写入</span><strong id="downloadWrittenBytes">0 B</strong></div></div>
+    </div>
+    <div class="download-tools">
+      <div class="download-filters">
+        <div class="search-field"><span data-icon="search"></span><input id="taskSearch" type="search" placeholder="搜索下载合集" aria-label="搜索下载合集"></div>
+        <select id="taskStatus" aria-label="下载状态"><option value="">全部下载状态</option><option value="completed">已完成</option><option value="failed">失败</option><option value="unfinished">未完成</option><option value="running">进行中</option><option value="paused">已暂停</option><option value="canceled">已取消</option></select>
+        <select id="releaseStatus" aria-label="剧集完结状态"><option value="">全部完结状态</option><option value="finished">完结</option><option value="ongoing">未完结</option><option value="unknown">状态未知</option></select>
+      </div>
+      <div class="download-selection toolbar">
+        <label class="download-quality" data-download-only>新任务画质<select id="downloadQuality" data-download-quality aria-label="新任务下载清晰度"></select></label>
+        <button id="downloadBatchBtn" class="secondary" aria-pressed="false">批量管理</button>
+        <div id="downloadBatchControls" class="toolbar" hidden><button id="selectGroupsBtn" class="secondary">全选</button><button id="invertGroupsBtn" class="secondary">反选</button><button id="deselectGroupsBtn" class="secondary">取消勾选</button><details id="batchMenu" class="action-menu"><summary>批量操作</summary><div class="action-popover"><button id="pauseSelectedBtn" class="secondary">暂停所选</button><button id="resumeSelectedBtn" class="secondary">继续所选</button><button id="cancelSelectedBtn" class="secondary">取消所选下载</button><button id="retrySelectedBtn" class="secondary">重试失败 / 取消</button><button id="prioritySelectedBtn" class="secondary">优先下载所选</button><button id="deferSelectedBtn" class="secondary">稍后下载所选</button><button id="updateSelectedBtn" class="secondary">更新所选合集</button><button id="mergeSelectedBtn">合并所选合集</button><label><input id="deleteEpisodesAfterMerge" type="checkbox"> 合并成功后删除分集文件</label><button id="clearTasksBtn" class="secondary">仅清理任务记录</button><button id="deleteSelectedBtn" class="danger">删除所选资源与文件</button></div></details><span id="taskSelection" class="small" role="status"></span></div>
+      </div>
+    </div>
+    <div class="download-list-heading"><h2>下载合集</h2><span id="downloadGroupCount" class="small" role="status"></span></div>
     <div id="taskError" class="error notice" role="status"></div><div id="ffmpegNotice" class="small notice" role="status" aria-live="polite" hidden></div>
     <div id="taskScroll"><div id="groups" class="groups"></div></div>
-    <p class="page-footnote">“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p>
+    <details class="management-help"><summary>任务清理与文件保留说明</summary><p>“仅清理任务记录”保留视频；“删除资源与文件”会永久移除所选分集或合并全集的本地 MP4。暂停保留已完成分集。</p></details>
   </section>
-  <section class="page-view" id="systemSettingsPage" data-view="system-settings" aria-label="系统设置" hidden>
-    <section id="serverSettings" class="settings-section" aria-labelledby="networkSettingsTitle">
-      <div class="settings-section-heading"><h2 id="networkSettingsTitle">下载与网络</h2><p class="small">调整任务并发和站源访问方式</p></div>
-      <div class="settings-grid">
-        <label>下载并发<input id="downloadConcurrency" type="number" min="1" max="32" value="2"></label>
-        <label>剧库请求并发<input id="requestConcurrency" type="number" min="1" max="16" value="2"></label>
-        <label>同站间隔（毫秒）<input id="requestInterval" type="number" min="100" max="60000" step="100" value="500"></label>
-        <label>代理模式<select id="proxyMode"><option value="auto">自动（环境变量 / 系统代理）</option><option value="direct">直连（不使用代理）</option><option value="manual">自定义代理</option></select></label>
-        <label class="wide">代理地址<input id="proxyURL" type="url" placeholder="http://127.0.0.1:7897 或 socks5://127.0.0.1:1080" autocomplete="off"></label>
-        <label>用户名（可选）<input id="proxyUsername" type="text" autocomplete="off"></label>
-        <label>密码（可选）<input id="proxyPassword" type="password" autocomplete="new-password"></label>
+  <section class="page-view management-page" id="systemSettingsPage" data-view="system-settings" aria-label="系统设置" hidden>
+    <div class="page-heading management-heading"><div><h1>系统设置</h1><p>调整下载、网络与播放偏好，让服务更适合你的设备。</p></div><span class="page-context"><span data-icon="settings"></span>保存后生效</span></div>
+    <section id="serverSettings" class="settings-section settings-split" aria-labelledby="networkSettingsTitle">
+      <div class="settings-section-heading"><span class="section-symbol" aria-hidden="true"><span data-icon="download"></span></span><h2 id="networkSettingsTitle">下载与网络</h2><p class="small">控制任务并发，设置访问站源时使用的网络连接。</p></div>
+      <div class="settings-section-body">
+        <fieldset class="settings-fieldset settings-fields"><legend>任务并发</legend><div class="settings-grid settings-grid-three">
+          <label>下载并发<input id="downloadConcurrency" type="number" min="1" max="32" value="2"><small>同时下载的分集数</small></label>
+          <label>剧库请求并发<input id="requestConcurrency" type="number" min="1" max="16" value="2"><small>同时执行的剧库请求数</small></label>
+          <label>同站间隔（毫秒）<input id="requestInterval" type="number" min="100" max="60000" step="100" value="500"><small>同一站源请求的最短间隔</small></label>
+        </div></fieldset>
+        <fieldset class="settings-fieldset settings-fields"><legend>网络代理</legend><div class="settings-grid">
+          <label class="wide">代理模式<select id="proxyMode"><option value="auto">自动（环境变量 / 系统代理）</option><option value="direct">直连（不使用代理）</option><option value="manual">自定义代理</option></select></label>
+          <label class="wide">代理地址<input id="proxyURL" type="url" placeholder="http://127.0.0.1:7897 或 socks5://127.0.0.1:1080" autocomplete="off"></label>
+          <label>用户名（可选）<input id="proxyUsername" type="text" autocomplete="off"></label>
+          <label>密码（可选）<input id="proxyPassword" type="password" autocomplete="new-password"></label>
+        </div></fieldset>
+        <div class="settings-actions"><div class="toolbar"><button id="saveSettingsBtn" disabled>保存并应用</button><button id="checkNetworkBtn" class="secondary" disabled>检测当前连接</button></div><p id="settingsStatus" class="settings-feedback small" role="status" aria-live="polite"></p></div>
       </div>
-      <div class="toolbar"><button id="saveSettingsBtn">保存并应用</button><button id="checkNetworkBtn" class="secondary">检测当前连接</button><span id="settingsStatus" class="small" aria-live="polite"></span></div>
     </section>
-    <section class="settings-section playback-settings" aria-labelledby="playbackSettingsTitle">
-      <div class="settings-section-heading"><h2 id="playbackSettingsTitle">播放与资源限制</h2><p class="small">控制播放会话、转码和直连策略</p></div>
-      <label class="playback-option"><input id="originalPlaybackEnabled" type="checkbox"><span>优先原始 MP4 / HLS 播放</span></label>
-      <p class="small">默认关闭，使用原有兼容播放链路；开启后兼容内容免转码，需要处理时优先保留视频。</p>
-      <div class="settings-grid">
-        <label>播放会话上限<input id="playback-maxSessions" type="number" min="1" max="64" value="4"></label>
-        <label>上游媒体连接上限<input id="playback-maxMediaRequests" type="number" min="1" max="64" value="8"></label>
-        <label>解密 / 换封装并发<input id="playback-maxRemuxJobs" type="number" min="0" max="8" value="2"></label>
-        <label>音频转码并发<input id="playback-maxAudioTranscodes" type="number" min="0" max="8" value="1"></label>
-        <label>视频转码并发<input id="playback-maxVideoTranscodes" type="number" min="0" max="8" value="1"></label>
-        <label>下一集预备并发<input id="playback-maxPrefetchJobs" type="number" min="0" max="4" value="1"></label>
-        <label>封装缓存（MB）<input id="playback-cacheMB" type="number" min="64" max="8192" value="512"></label>
+    <section class="settings-section settings-split playback-settings" aria-labelledby="playbackSettingsTitle">
+      <div class="settings-section-heading"><span class="section-symbol" aria-hidden="true"><span data-icon="play"></span></span><h2 id="playbackSettingsTitle">播放与资源</h2><p class="small">选择播放策略，并根据服务器性能分配处理资源。</p></div>
+      <div class="settings-section-body">
+        <label class="settings-toggle"><span><strong>优先原始 MP4 / HLS 播放</strong><small>兼容内容直接播放，需要处理时优先保留视频。关闭时使用兼容播放链路。</small></span><input id="originalPlaybackEnabled" class="switch-input" type="checkbox" role="switch"></label>
+        <fieldset class="settings-fieldset direct-source-field"><legend>允许客户端直连的站源</legend><div id="playbackDirectSources" class="playback-direct-sources"></div><p id="playbackDirectHint" class="small">先开启原始播放，再选择直连站源。连接失败时自动回退到服务器中转。</p></fieldset>
+        <details class="settings-disclosure"><summary><span>资源与并发限制<small>播放会话、转码与缓存</small></span><span data-icon="chevron"></span></summary>
+          <div class="settings-grid settings-grid-three">
+            <label>播放会话上限<input id="playback-maxSessions" type="number" min="1" max="64" value="4"></label>
+            <label>上游媒体连接上限<input id="playback-maxMediaRequests" type="number" min="1" max="64" value="8"></label>
+            <label>解密 / 换封装并发<input id="playback-maxRemuxJobs" type="number" min="0" max="8" value="2"></label>
+            <label>音频转码并发<input id="playback-maxAudioTranscodes" type="number" min="0" max="8" value="1"></label>
+            <label>视频转码并发<input id="playback-maxVideoTranscodes" type="number" min="0" max="8" value="1"></label>
+            <label>下一集预备并发<input id="playback-maxPrefetchJobs" type="number" min="0" max="4" value="1"></label>
+            <label>封装缓存（MB）<input id="playback-cacheMB" type="number" min="64" max="8192" value="512"></label>
+          </div><p class="small">Emby 探测或取流结束即释放会话名额。处理并发设为 0 可禁用该类任务；原始播放不占转码名额。</p>
+        </details>
+        <div class="settings-actions"><button id="savePlaybackSettings" disabled>保存播放设置</button><p id="playbackSettingsStatus" class="settings-feedback small" role="status" aria-live="polite"></p></div>
       </div>
-      <p class="small">Emby 探测或取流结束即释放会话名额。处理并发设为 0 可禁用该类任务；原始播放不占转码名额。</p>
-      <p>允许尝试客户端直连的站源</p><div id="playbackDirectSources" class="playback-direct-sources"></div>
-      <p id="playbackDirectHint" class="small">先开启“优先原始 MP4 / HLS 播放”，再选择直连站源。满足源站鉴权、编码、HTTPS 和跨域条件才会直连，失败退回中转。</p>
-      <div class="toolbar"><button id="savePlaybackSettings" class="secondary">保存播放设置</button><span id="playbackSettingsStatus" class="small" role="status"></span></div>
     </section>
-    <p class="small settings-note">保存后自动持久化。降低并发不终止正在下载的任务；代理变更用于后续连接，失败任务可重试。同一站源的剧库请求顺序执行，下载与剧库请求使用独立并发。</p>
-    <div class="statusbar" id="configText"></div>
+    <details class="management-help"><summary>生效范围与当前运行配置</summary><p>设置保存后自动持久化。降低并发不终止正在下载的任务；代理变更用于后续连接，失败任务可重试。同一站源的剧库请求顺序执行，下载与剧库请求使用独立并发。</p><div class="statusbar" id="configText"></div></details>
     <div class="small notice" id="ffmpegSettingsStatus" role="status"></div>
   </section>
-  <section class="page-view" id="embySettingsPage" data-view="emby-settings" aria-label="Emby设置" hidden>
-    <section id="embySection" class="settings-section emby-settings" aria-labelledby="embyTitle">
-      <div class="settings-section-heading"><h2 id="embyTitle">Emby 自动同步</h2><p class="small">管理自动入库、扫描通知和同步记录。</p></div>
-      <p class="small">可同步在线分集，也可只同步已合并的本地全集。请将输出目录加入 Emby 的电视剧媒体库。在线分集会使用当前服务地址生成播放链接。</p>
-      <form id="embyForm" class="emby-form">
-        <label class="settings-check"><input id="embyEnabled" type="checkbox"><span>启用自动同步</span></label>
-        <div class="settings-grid">
-          <label class="wide">媒体库输出目录<input id="embyOutputDir" type="text" maxlength="2048" required placeholder="程序所在服务器的文件夹"></label>
-          <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required></label>
-        </div>
-        <fieldset class="settings-fieldset"><legend>同步内容</legend><label class="settings-check"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧入库一个真实 MP4 和本地海报，Emby 直接读取文件，停止剧库服务后仍可播放。切换后迁移本程序生成的旧 STRM，原下载文件保留。</small></span></label></fieldset>
-        <fieldset id="embySourceScope" class="settings-fieldset"><legend>分集模式自动加入的范围</legend><label class="settings-check"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>最后保存设置的浏览器中的“在看”和“想看”。</small></span></label><label class="settings-check"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>已下载分集优先读取本地文件，其余分集可在线播放。</small></span></label></fieldset>
-        <p id="embyFollowingScope" class="small"></p>
-        <details class="emby-refresh-settings"><summary>Emby 扫描与连接（可选）</summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">填写后自动通知 Emby 扫描。本地全集模式会把海报保存到输出目录，无需 API Key；在线分集模式由 Emby 获取和缓存海报。已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换 Emby 服务器后需重新填写 API Key。</p></details>
-        <div class="toolbar"><button id="embySaveBtn" type="submit">保存并应用</button><button id="embyRunBtn" class="secondary" type="button" disabled>立即同步</button></div>
-      </form>
-      <p id="embyFeedback" class="small" role="status" aria-live="polite"></p>
-      <div class="emby-status"><strong id="embySummary">尚未同步</strong><p id="embyPosterSummary" class="small"></p><p id="embySchedule" class="small"></p><p id="embyResult" class="small" role="status"></p></div>
-      <p id="embyEmpty" class="small">启用后会自动加入符合当前模式的剧集。</p><ul id="embyEntries" class="emby-entries" aria-label="Emby 同步记录"></ul>
-      <p class="small">切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p>
-    </section>
+  <section class="page-view management-page" id="embySettingsPage" data-view="emby-settings" aria-label="Emby 设置" hidden>
+    <div class="page-heading management-heading"><div><h1>Emby 设置</h1><p>将喜欢的短剧同步到媒体库，在熟悉的播放器里继续观看。</p></div><span class="page-context"><span data-icon="folder"></span>媒体库集成</span></div>
+    <div class="emby-layout">
+      <section id="embySection" class="settings-section emby-settings" aria-labelledby="embyTitle">
+        <div class="settings-section-heading"><div><h2 id="embyTitle">同步配置</h2><p class="small">设置内容范围与自动更新方式。</p></div></div>
+        <form id="embyForm" class="emby-form">
+          <label class="settings-toggle"><span><strong>启用自动同步</strong><small>按设定的间隔检查并更新媒体库文件。</small></span><input id="embyEnabled" class="switch-input" type="checkbox" role="switch"></label>
+          <div class="settings-grid emby-directory-grid">
+            <label>媒体库输出目录<input id="embyOutputDir" type="text" maxlength="2048" required placeholder="程序所在服务器的文件夹"><small>将此目录加入 Emby 的电视剧媒体库。</small></label>
+            <label>检查间隔（分钟）<input id="embyInterval" type="number" min="5" max="1440" value="60" required><small>最短 5 分钟</small></label>
+          </div>
+          <fieldset class="settings-fieldset"><legend>同步内容</legend><label class="settings-check option-card"><input id="embyMergedOnly" type="checkbox"><span>只同步已合并的全集<small>每部剧一个本地 MP4 和海报，Emby 直接读取文件。关闭此选项则按分集同步，在线分集使用当前服务地址播放。</small></span></label></fieldset>
+          <fieldset id="embySourceScope" class="settings-fieldset"><legend>分集模式 · 自动加入范围</legend><div class="emby-scope-options"><label class="settings-check option-card"><input id="embyFollowing" type="checkbox" checked><span>我的追剧<small>包含“在看”和“想看”的剧集。</small></span></label><label class="settings-check option-card"><input id="embyDownloads" type="checkbox" checked><span>有下载记录的剧<small>优先本地分集，其余在线播放。</small></span></label></div><p id="embyFollowingScope" class="small"></p></fieldset>
+          <details class="emby-refresh-settings settings-disclosure"><summary><span>Emby 扫描与连接<small>可选 · 同步后自动通知媒体库扫描</small></span><span data-icon="chevron"></span></summary><div class="settings-grid"><label class="wide">Emby 服务器地址<input id="embyServerURL" type="url" maxlength="2048" placeholder="http://emby:8096" autocomplete="off"></label><label class="wide">Emby API Key<input id="embyAPIKey" type="password" maxlength="2048" autocomplete="new-password"></label></div><p class="small">本地全集的海报无需 API Key；在线分集由 Emby 获取并缓存海报，已有自定义海报会保留。未连接时可使用 Emby 的实时监控或手动扫描；更换服务器后需重新填写 API Key。</p></details>
+          <div class="settings-actions"><button id="embySaveBtn" type="submit" disabled>保存并应用</button><p id="embyFeedback" class="settings-feedback small" role="status" aria-live="polite"></p></div>
+        </form>
+      </section>
+      <section class="settings-section emby-monitor" aria-labelledby="embyMonitorTitle">
+        <div class="settings-section-heading"><h2 id="embyMonitorTitle">同步概览</h2><span id="embyStateBadge" class="sync-badge" role="status">正在读取</span></div>
+        <div class="emby-status"><span class="section-caption">媒体库文件</span><strong id="embySummary">正在读取同步状态…</strong><p id="embyPosterSummary" class="small"></p><p id="embySchedule" class="small"></p><p id="embyResult" class="small" role="status"></p></div>
+        <button id="embyRunBtn" class="secondary emby-run-button" type="button" disabled>立即同步</button>
+        <p id="embyRunFeedback" class="settings-feedback small" role="status" aria-live="polite"></p>
+        <div class="emby-records-heading"><h3>同步记录</h3><span class="small">最近 100 部</span></div>
+        <div id="embyEmpty" class="emby-empty"><span class="section-symbol" aria-hidden="true"><span data-icon="folder"></span></span><strong>暂无同步记录</strong><p class="small">启用同步并保存设置后，符合条件的剧集会显示在这里。</p></div><ul id="embyEntries" class="emby-entries" aria-label="Emby 同步记录"></ul>
+      </section>
+    </div>
+    <details class="management-help"><summary>模式切换与文件保留说明</summary><p>切换同步内容会撤下本程序生成的另一种入库文件，原下载文件保留；关闭同步会停止后续更新并保留已导入文件。本地全集的观看权限由 Emby 管理，旧条目的观看进度请在迁移后核对。手动 ZIP 导出仍使用 HTTP STRM。</p></details>
   </section>
 
 </main>

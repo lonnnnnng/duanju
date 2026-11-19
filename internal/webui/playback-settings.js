@@ -28,21 +28,23 @@ export function createPlaybackSettings() {
     updateDirect();
   }
   async function load() {
-    try {render(await api('/api/ui/settings/playback'));}
-    catch (error) {$('playbackSettingsStatus').textContent = error.message;}
+    try {render(await api('/api/ui/settings/playback'));$('savePlaybackSettings').disabled = false;}
+    catch (error) {$('playbackSettingsStatus').textContent = '读取失败：' + error.message;$('playbackSettingsStatus').classList.add('error');}
   }
   async function save() {
     if (!settings) return;
     const button = $('savePlaybackSettings');
     button.disabled = true;
+    button.textContent = '正在保存…';
+    $('playbackSettingsStatus').classList.remove('error');
     try {
       const value = {...settings, enabled: $('originalPlaybackEnabled').checked,
         directSources: [...$('playbackDirectSources').querySelectorAll('input:checked')].map(input => input.value)};
       for (const name of fields) value[name] = Number($('playback-' + name).value);
       render(await post('/api/ui/settings/playback', value));
       $('playbackSettingsStatus').textContent = '播放设置已保存，新任务按当前限制执行。' + (!value.enabled && value.directSources.length ? '原始播放已关闭，直连暂不生效。' : '');
-    } catch (error) {$('playbackSettingsStatus').textContent = '保存失败：' + error.message;}
-    finally {button.disabled = false;}
+    } catch (error) {$('playbackSettingsStatus').textContent = '保存失败：' + error.message;$('playbackSettingsStatus').classList.add('error');}
+    finally {button.disabled = false;button.textContent = '保存播放设置';}
   }
   function init() {$('savePlaybackSettings').onclick = save; $('originalPlaybackEnabled').onchange = updateDirect; return load();}
   return {init};
