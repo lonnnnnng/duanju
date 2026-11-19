@@ -77,8 +77,8 @@ func TestLiveHongguoRankingApp(t *testing.T) {
 		t.Fatalf("page items invalid: %+v", page.Items)
 	}
 	first := page.Items[0]
-	t.Logf("catalog categories=%d human boards=%d filters=%d page items=%d first=%s kind=%s metric=%s",
-		len(catalog.Categories), len(human.Boards), len(board.Filters), len(page.Items), first.Title, first.Kind, first.Metric)
+	t.Logf("catalog categories=%d human boards=%d filters=%d page items=%d next offset=%d has more=%v first=%s kind=%s metric=%s",
+		len(catalog.Categories), len(human.Boards), len(board.Filters), len(page.Items), page.NextOffset, page.HasMore, first.Title, first.Kind, first.Metric)
 	if !page.HasMore || page.NextOffset <= 0 || page.NextSession == "" {
 		t.Fatalf("pagination missing: %+v", page)
 	}
