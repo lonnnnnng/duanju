@@ -172,6 +172,7 @@ function renderDramas() {
   sortMessage = recommendations.enabled ? '' : window.DuanjuLibrarySort.summary(filtered, mode);
   $('sortSelect').title = '缺少数据的剧集排在后面。' + sortMessage;
   visibleIDs = list.map(drama => drama.id);
+  $('libraryResultTitle').textContent = recommendations.enabled ? '为你推荐' : $('searchInput').value.trim() ? '搜索结果' : $('channelSelect').value || '全部剧集';
   $('dramaCount').textContent = recommendations.enabled ? list.length + ' 部' : list.length === dramas.length ? list.length + ' 部' : list.length + ' / ' + dramas.length + ' 部';
   updateDramaSelection();
   updateLibraryStatus();
@@ -181,7 +182,7 @@ function renderDramas() {
     state = element('div', 'empty', '分类推荐会显示在这里。');
   } else if (!list.length) {
     state = element('div', 'empty');
-    state.append(element('strong', '', dramas.length ? '没有找到匹配的剧集' : '剧库还没有内容'), element('p', '', dramas.length ? '换个关键词，或清除当前筛选。' : '更新剧库即可获取可用站源的内容。'));
+    state.append(icon(dramas.length ? 'search' : 'library'), element('strong', '', dramas.length ? '没有找到匹配的剧集' : '剧库还没有内容'), element('p', '', dramas.length ? '换个关键词，或清除当前筛选。' : '更新剧库即可获取可用站源的内容。'));
     state.appendChild(button(dramas.length ? '清除筛选' : '更新剧库', () => dramas.length ? resetFilters() : loadDramas(true), false, 'secondary'));
   }
   viewport.setItems(list, state);

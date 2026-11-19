@@ -32,11 +32,16 @@
     }
 
     function setError(text) { $('rankingError').textContent = text || ''; }
-    function setState(text) { stateBox.textContent = text || ''; stateBox.hidden = !text; }
+    function setState(text) {
+      stateBox.replaceChildren();
+      if (text) stateBox.append(icon(busy ? 'refresh' : 'chart'), node('p', '', text));
+      stateBox.hidden = !text;
+    }
     function setBusy(value) {
       busy = value;
       content.setAttribute('aria-busy', String(value));
       refreshBtn.disabled = value;
+      refreshBtn.setAttribute('aria-busy', String(value));
       moreBtn.disabled = value;
       moreBtn.textContent = value ? '加载中…' : '加载更多';
     }
@@ -48,6 +53,7 @@
     }
 
     function summary(result) {
+      $('rankingBoardTitle').textContent = [category?.name, board?.name].filter(Boolean).join(' · ') || '榜单精选';
       const description = result?.description || board?.description || '按站点名次展示';
       $('rankingSummary').textContent = description + (items.length ? ' · 已加载 ' + items.length + ' 部' : '');
       const fetchedAt = result?.fetchedAt || '';
@@ -83,6 +89,7 @@
     function renderFilters() {
       const groups = board?.filters || [];
       filterWrap.hidden = groups.length === 0;
+      filterWrap.closest('.rankings-filter-row').hidden = groups.length === 0;
       const options = [new Option('总榜', '')];
       for (const group of groups) {
         const groupOptions = (group.options || []).filter(option => option.id);
@@ -153,7 +160,7 @@
       } catch (error) {
         if (ticket !== sequence || error.name === 'AbortError') return;
         loaded = false;
-        setState('点击“刷新”重试');
+        setState('点击“刷新榜单”重试');
         setError(error.message);
         setBusy(false);
       }
@@ -173,6 +180,7 @@
       if (refresh) params.set('refresh', '1');
       if (!next) {
         items = [];
+        summary();
         list.replaceChildren();
         content.scrollTop = 0;
         setState('正在获取站点榜单…');
@@ -205,7 +213,7 @@
       } catch (error) {
         if (ticket !== sequence || error.name === 'AbortError') return;
         setError(error.message + (items.length ? '；已保留当前列表。' : ''));
-        if (!items.length) setState('暂时无法取得榜单，点击“刷新”重试');
+        if (!items.length) setState('暂时无法取得榜单，点击“刷新榜单”重试');
       } finally {
         if (ticket === sequence) {
           controller = null;
@@ -275,10 +283,10 @@
       if (playable && drama && canDownload()) {
         const download = node('button', 'quiet icon-button card-download');
         download.type = 'button';
-        download.appendChild(icon('download'));
-        download.title = '加入下载';
-        download.setAttribute('aria-label', '下载 ' + title);
-        download.addEventListener('click', () => submitDownload(item, drama, download));
+        download.dataset.rankingId = item.id;
+        download.dataset.title = title;
+        renderDownloadState(download);
+        download.addEventListener('click', () => submitDownload(item, drama));
         actions.appendChild(download);
       }
       footer.append(meta, actions);
@@ -287,23 +295,35 @@
       return card;
     }
 
-    async function submitDownload(item, drama, button) {
+    function renderDownloadState(button) {
+      const pending = submitting.has(button.dataset.rankingId), done = submitted.has(button.dataset.rankingId);
+      button.disabled = pending || done;
+      button.replaceChildren(icon(pending ? 'refresh' : done ? 'check' : 'download'));
+      button.title = pending ? '正在提交下载' : done ? '已加入下载' : '加入下载';
+      button.setAttribute('aria-label', pending || done ? button.title : '下载 ' + button.dataset.title);
+      button.setAttribute('aria-busy', String(pending));
+    }
+
+    function updateDownloadState(id) {
+      for (const button of list.querySelectorAll('.card-download')) {
+        if (button.dataset.rankingId === id) renderDownloadState(button);
+      }
+    }
+
+    async function submitDownload(item, drama) {
       if (!drama?.id || submitted.has(item.id) || submitting.has(item.id)) return;
       submitting.add(item.id);
-      button.disabled = true;
-      button.textContent = '提交中';
+      updateDownloadState(item.id);
       try {
         await post('/api/ui/download', {ids: [drama.id], quality: getDownloadQuality()});
         submitted.add(item.id);
-        button.textContent = '已提交';
         $('rankingActionStatus').textContent = '已将《' + (item.title || drama.title || '短剧') + '》加入下载队列';
         onDownloadsChanged?.();
       } catch (error) {
-        button.disabled = false;
-        button.textContent = '下载';
         $('rankingActionStatus').textContent = '加入下载失败：' + error.message;
       } finally {
         submitting.delete(item.id);
+        updateDownloadState(item.id);
       }
     }
 

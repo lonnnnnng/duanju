@@ -70,6 +70,8 @@ export function createFollowing(app) {
     if ($('followingPage').hidden) return;
     const keyword = $('followingSearch').value.trim().toLocaleLowerCase();
     const list = lists[tab].filter(entry => (entry.title + ' ' + sourceLabel(entry.source)).toLocaleLowerCase().includes(keyword));
+    $('followingListTitle').textContent = keyword ? '搜索结果' : tab === 'saved' ? '想看的剧' : '看过的故事';
+    $('followingResultCount').textContent = loaded ? (keyword ? '找到 ' : '共 ') + list.length + ' 部' : loading ? '正在读取…' : '暂未读取';
     withFocus($('followingList'), () => {
       const fragment = document.createDocumentFragment();
       for (const record of list.slice(0, visibleLimit)) {
@@ -79,11 +81,11 @@ export function createFollowing(app) {
         const description = element('div', 'following-description');
         const name = button(record.title, () => app.details.open(record.id), false, 'following-title');
         name.dataset.focusKey = 'following-title-' + record.id;
-        const progress = record.completed ? '已看完' : '已加入想看';
-        description.append(name, element('p', 'small', [sourceLabel(record.source), progress, record.total ? record.total + ' 集' : '集数待补充'].join(' · ')));
+        description.append(name, element('p', 'small', [sourceLabel(record.source), record.total ? record.total + ' 集' : '集数待补充'].filter(Boolean).join(' · ')));
         if (record.newEpisodes) description.appendChild(element('p', 'following-update', '剧库新增 ' + record.newEpisodes + ' 集'));
         const actions = element('div', 'following-actions');
-        const play = button(record.completed ? '重看' : '播放', () => app.play(record.id, record.title), false, 'subtle');
+        const play = button(record.completed ? '再看一次' : '开始观看', () => app.play(record.id, record.title), false, 'subtle button-content');
+        play.prepend(icon('play'));
         play.dataset.focusKey = 'following-play-' + record.id;
         const save = saveButton(record.id, record.title);
         actions.append(play, save);
@@ -94,7 +96,7 @@ export function createFollowing(app) {
       if (!list.length) {
         const empty = element('div', 'empty');
         const title = loading ? '正在读取追剧清单…' : !loaded ? '追剧清单暂未读取' : keyword ? '没有匹配的剧集' : {saved: '还没有想看的剧', completed: '还没有已看完的剧集'}[tab];
-        empty.append(element('strong', '', title), element('p', '', keyword ? '试试其他关键词。' : tab === 'saved' ? '在剧集卡片或详情中点击收藏，就能在这里找到。' : '在详情里手动标记已看后，会出现在这里。'));
+        empty.append(icon(loading ? 'refresh' : keyword ? 'search' : tab === 'saved' ? 'bookmark' : 'check'), element('strong', '', title), element('p', '', keyword ? '试试其他关键词。' : tab === 'saved' ? '在剧集卡片或详情中点击收藏，就能在这里找到。' : '在详情里手动标记已看后，会出现在这里。'));
         empty.appendChild(button('去剧库看看', () => window.DuanjuDialogs.navigate('library'), false, 'secondary'));
         fragment.appendChild(empty);
       }
