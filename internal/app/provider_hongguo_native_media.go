@@ -20,7 +20,10 @@ const (
 	hongguoPlaybackOfficialInstallID = "1342981674659067"
 )
 
-var errHongguoNoCompatibleMedia = errors.New(" App 未返回兼容的媒体，已跳过不支持的编码")
+var (
+	errHongguoNoCompatibleMedia = errors.New(" App 未返回兼容的媒体，已跳过不支持的编码")
+	errHongguoEmptyPlaybackBody = errors.New(" App 接口返回空正文（HTTP 200）")
+)
 
 func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoID string) (providerMedia, error) {
 	if !hongguoNumericID.MatchString(videoID) {
@@ -43,26 +46,30 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	deviceID, installID := hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID
 	for rotations := 0; ; {
 		result, err := downloader.hongguoPlaybackV5Request(ctx, body, deviceID, installID)
-		if err != nil {
+		if err != nil && !errors.Is(err, errHongguoEmptyPlaybackBody) {
 			return providerMedia{}, err
 		}
-		data := nestedMap(result, "data")
-		if data == nil {
-			return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+		mediaErr := err
+		var media providerMedia
+		if err == nil {
+			data := nestedMap(result, "data")
+			if data == nil {
+				return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+			}
+			bucket := data
+			if nested := nestedMap(data, "1004"); len(nested) > 0 {
+				bucket = nested
+			}
+			media, mediaErr = parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
 		}
-		bucket := data
-		if nested := nestedMap(data, "1004"); len(nested) > 0 {
-			bucket = nested
-		}
-		media, err := parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
-		if !errors.Is(err, errHongguoNoCompatibleMedia) {
-			return media, err
+		if !errors.Is(mediaErr, errHongguoNoCompatibleMedia) && !errors.Is(mediaErr, errHongguoEmptyPlaybackBody) {
+			return media, mediaErr
 		}
 		if rotations >= hongguoDeviceRotations {
-			return providerMedia{}, err
+			return providerMedia{}, mediaErr
 		}
 		if switchErr := downloader.ensureHongguoDevice(ctx, deviceID); switchErr != nil {
-			return providerMedia{}, fmt.Errorf("%w（辅助设备切换失败：%v）", err, switchErr)
+			return providerMedia{}, fmt.Errorf("%w（辅助设备切换失败：%v）", mediaErr, switchErr)
 		}
 		deviceID, installID, _ = downloader.hongguoDevice()
 		rotations++
@@ -124,7 +131,7 @@ func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body
 			continue
 		}
 		if len(content) == 0 || len(content) > providerMaxBodyBytes {
-			lastErr = errors.New(" App 接口返回空正文（HTTP 200）")
+			lastErr = errHongguoEmptyPlaybackBody
 			continue
 		}
 		decoder := json.NewDecoder(bytes.NewReader(content))

@@ -130,6 +130,39 @@ func TestHongguoModelDoesNotRetryMalformedMedia(t *testing.T) {
 	}
 }
 
+func TestHongguoModelRetriesEmptyBodyWithAuxiliaryDevice(t *testing.T) {
+	const episode = "7704572437853113406"
+	const deviceID, installID = "8000000000000000001", "8000000000000011"
+	var used []string
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		current := request.URL.Query().Get("device_id")
+		used = append(used, current)
+		if current == hongguoPlaybackOfficialDeviceID {
+			return rankingHTTPResponse(request, http.StatusOK, ""), nil
+		}
+		model := map[string]any{"video_duration": 40.0, "video_list": []any{map[string]any{
+			"main_url": "https://media.example.test/empty-body-retry.mp4", "video_meta": map[string]any{"codec_type": "h264", "definition": "1080p"},
+		}}}
+		body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{"1004": map[string]any{
+			episode: map[string]any{"video_model": model}}}})
+		return rankingHTTPResponse(request, http.StatusOK, string(body)), nil
+	})
+	client := d.hongguoClient()
+	client.mu.Lock()
+	client.state.DeviceID, client.state.InstallID, client.state.Registered = deviceID, installID, true
+	client.state.Devices = []hongguoDevice{{DeviceID: deviceID, InstallID: installID}}
+	client.mu.Unlock()
+
+	media, err := d.resolveHongguoAppMedia(context.Background(), episode)
+	if err != nil || media.URL != "https://media.example.test/empty-body-retry.mp4" {
+		t.Fatalf("empty primary response should fall back to auxiliary media: media=%+v error=%v", media, err)
+	}
+	want := []string{hongguoPlaybackOfficialDeviceID, deviceID}
+	if len(used) != len(want) || used[0] != want[0] || used[1] != want[1] {
+		t.Fatalf("empty body did not rotate to the registered auxiliary device: %v", used)
+	}
+}
+
 func TestLiveHongguoModelPlayback(t *testing.T) {
 	if os.Getenv("DUANJU_LIVE_PLAYBACK") != "1" {
 		t.Skip("仅在手动验收站源播放时启用")
@@ -194,15 +227,20 @@ func TestLiveHongguoAuxiliaryDeviceDownload(t *testing.T) {
 	if os.Getenv("DUANJU_LIVE_AUXILIARY_DOWNLOAD") != "1" {
 		t.Skip("仅在手动验收辅助设备重试及原失败分集时启用")
 	}
-	const videoID = "7704572665582849049"
+	const seriesID = "7704572437853113406"
 	cfg := defaultConfig()
 	cfg.dataDir, cfg.OutputDir, cfg.Retries = t.TempDir(), t.TempDir(), 1
 	d := NewDownloader(cfg)
 	ctx, cancel := context.WithTimeout(context.Background(), 240*time.Second)
 	defer cancel()
+	_, chapters, err := d.fetchHongguoChapters(ctx, seriesID)
+	if err != nil || len(chapters) < 491 {
+		t.Fatalf("原失败分集列表不可用：chapters=%d error=%v", len(chapters), publicError(err))
+	}
+	t.Logf("第491集媒体 ID：%s", strings.TrimPrefix(chapters[490].VideoURL, "hongguo-cenc://"))
 	task := Task{
-		DramaID: "hongguo:491", Index: 491, Total: 491,
-		Chapter: Chapter{Source: sourceHongguo, Title: "第491集", VideoURL: "hongguo-cenc://" + videoID, CurrentEpisode: json.RawMessage("491")},
+		DramaID: "hongguo:" + seriesID, Index: 491, Total: len(chapters),
+		Chapter: chapters[490],
 		OutPath: filepath.Join(t.TempDir(), "episode-491.mp4"),
 	}
 	if err := d.DownloadEpisode(ctx, task); err != nil {
