@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -157,8 +158,8 @@ func TestHongguoModelRetriesEmptyBodyWithAuxiliaryDevice(t *testing.T) {
 	if err != nil || media.URL != "https://media.example.test/empty-body-retry.mp4" {
 		t.Fatalf("empty primary response should fall back to auxiliary media: media=%+v error=%v", media, err)
 	}
-	want := []string{hongguoPlaybackOfficialDeviceID, deviceID}
-	if len(used) != len(want) || used[0] != want[0] || used[1] != want[1] {
+	want := []string{hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialDeviceID, deviceID}
+	if !slices.Equal(used, want) {
 		t.Fatalf("empty body did not rotate to the registered auxiliary device: %v", used)
 	}
 }
@@ -256,5 +257,69 @@ func TestLiveHongguoAuxiliaryDeviceDownload(t *testing.T) {
 	info, err := probeMergeMedia(ctx, ffmpeg, task.OutPath)
 	if err != nil || info.videoCodec == "" || info.audioCodec == "" {
 		t.Fatalf("下载文件音视频校验失败: %v", err)
+	}
+}
+
+func TestLiveHongguoPlaybackRecovery(t *testing.T) {
+	if os.Getenv("DUANJU_LIVE_PLAYBACK_RECOVERY") != "1" {
+		t.Skip("仅在手动验收播放空响应修复时启用")
+	}
+	cfg := defaultConfig()
+	cfg.dataDir, cfg.OutputDir, cfg.Retries = t.TempDir(), t.TempDir(), 1
+	d := NewDownloader(cfg)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+	defer cancel()
+	ffmpeg, err := d.ensureFFmpeg(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, series := range []string{"7708355462780947518", "7705407023201913918"} {
+		_, chapters, err := d.fetchHongguoChapters(ctx, series)
+		if err != nil || len(chapters) == 0 {
+			t.Fatalf("chapters %d error %v", len(chapters), publicError(err))
+		}
+		for _, episode := range []int{1, len(chapters) / 2, len(chapters)} {
+			t.Run(fmt.Sprintf("%s/%d", series, episode), func(t *testing.T) {
+				task := Task{DramaID: "hongguo:" + series, Index: episode, Chapter: chapters[episode-1], OutPath: filepath.Join(t.TempDir(), "episode.mp4")}
+				media, err := d.resolveHongguoAppMedia(ctx, strings.TrimPrefix(task.Chapter.VideoURL, "hongguo-cenc://"))
+				if err != nil {
+					t.Fatal(publicError(err))
+				}
+				t.Logf("resolved quality=%d duration=%.3fs", media.Quality, media.Duration.Seconds())
+				if media.Quality != 1080 {
+					t.Fatal("expected 1080p")
+				}
+				proxy, err := d.newHLSProxy(ctx, media, nil)
+				if err != nil {
+					t.Fatal(publicError(err))
+				}
+				defer proxy.Close()
+				for _, offset := range []float64{0, media.Duration.Seconds() / 2} {
+					args := append([]string{"-xerror"}, playbackInputArgs(proxy.inputMedia(media), proxy.root, offset)...)
+					args = append(args, "-t", "3", "-f", "null", "-")
+					command := ffmpegMediaCommand(ctx, ffmpeg, args...)
+					log := &playbackLog{text: cappedStringWriter{limit: 64 * 1024}, ready: make(chan struct{})}
+					command.Stderr = log
+					if err := command.Run(); err != nil {
+						t.Fatal(playbackStreamError(ctx, proxy, log, media, err, nil))
+					}
+					_, detail := log.snapshot()
+					if !strings.Contains(detail, "Video:") || !strings.Contains(detail, "Audio:") {
+						t.Fatal("missing decoded tracks")
+					}
+				}
+				if episode == 1 {
+					if err := d.downloadMediaWithProgress(ctx, task, nil); err != nil {
+						t.Fatal(publicError(err))
+					}
+					info, err := probeMergeMedia(ctx, ffmpeg, task.OutPath)
+					if err != nil || info.videoCodec == "" || info.audioCodec == "" {
+						t.Fatalf("download verification: %v", err)
+					}
+					t.Logf("downloaded full episode video=%s audio=%s", info.videoCodec, info.audioCodec)
+				}
+				t.Log("decoded audio and video at start and midpoint")
+			})
+		}
 	}
 }

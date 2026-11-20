@@ -82,11 +82,11 @@ func normalizeHongguoDevicesLocked(client *hongguoAppClient) {
 	client.state.Devices = devices
 }
 
-// useHongguoDeviceLocked 切换到池中任意一个不是 rejected 的已注册设备。
-func useHongguoDeviceLocked(client *hongguoAppClient, rejected string) bool {
+// useHongguoDeviceLocked 跳过本次请求已尝试失败的全部设备，避免 A → B → A 循环。
+func useHongguoDeviceLocked(client *hongguoAppClient, rejected map[string]bool) bool {
 	normalizeHongguoDevicesLocked(client)
 	for _, device := range client.state.Devices {
-		if rejected != "" && device.DeviceID == rejected {
+		if rejected[device.DeviceID] {
 			continue
 		}
 		client.state.DeviceID, client.state.InstallID, client.state.Registered = device.DeviceID, device.InstallID, true
@@ -205,16 +205,21 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 	comment, _ := ctx.Value(hongguoCommentKey{}).(bool)
 	signed := !comment
 	var registerErr error
+	var device hongguoDevice
+	rejected := make(map[string]bool)
 	if signed {
 		// long: 红果要求设备先注册，未注册的随机设备号会被判为无效并返回空正文。
-		if registerErr = downloader.ensureHongguoDevice(ctx, ""); registerErr != nil {
-			return nil, fmt.Errorf(" App 接口不可用（设备注册失败：%v）", registerErr)
+		if device, registerErr = downloader.ensureHongguoDevice(ctx, rejected); registerErr != nil {
+			return nil, fmt.Errorf(" App 接口不可用（设备注册失败：%w）", registerErr)
 		}
 	}
 	client := downloader.hongguoClient()
 	client.mu.Lock()
 	base, deviceID, installID := client.baseURL, client.state.DeviceID, client.state.InstallID
 	client.mu.Unlock()
+	if signed {
+		deviceID, installID = device.DeviceID, device.InstallID
+	}
 	query := hongguoAppQuery(deviceID, installID)
 	for key, values := range extra {
 		query[key] = append([]string(nil), values...)
@@ -267,7 +272,7 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 		if payload != nil {
 			request.Header.Set("Content-Type", "application/json; charset=utf-8")
 		}
-		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, func(prepared *http.Request) {
+		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, func(prepared *http.Request) error {
 			now := time.Now()
 			query.Set("_rticket", strconv.FormatInt(now.UnixMilli(), 10))
 			prepared.URL.RawQuery = query.Encode()
@@ -276,6 +281,7 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 			} else {
 				signHongguoPlayerRequest(prepared, body, now)
 			}
+			return nil
 		})
 		if err != nil {
 			lastErr = err
@@ -307,17 +313,18 @@ func (downloader *Downloader) hongguoAppRequest(ctx context.Context, method, pat
 				Host: request.URL.Hostname(), HTTPStatus: response.StatusCode, TotalBytes: int64(len(content)), Message: path + ":" + message})
 			lastErr = errors.New(message)
 			// long: 空正文可能是设备号被上游判为无效，换一个已注册设备再试。
-			if signed && rotations < hongguoDeviceRotations {
-				if registerErr = downloader.ensureHongguoDevice(ctx, deviceID); registerErr == nil {
+			if signed && len(content) == 0 && rotations < hongguoDeviceRotations {
+				rejected[deviceID] = true
+				if device, registerErr = downloader.ensureHongguoDevice(ctx, rejected); registerErr == nil {
 					rotations++
-					deviceID, installID, _ = downloader.hongguoDevice()
+					deviceID, installID = device.DeviceID, device.InstallID
 					query.Set("device_id", deviceID)
 					query.Set("iid", installID)
 					attempt--
 					continue
 				}
 				if registerErr != nil {
-					lastErr = fmt.Errorf(" App 接口未返回有效数据（设备注册失败：%v）", registerErr)
+					lastErr = fmt.Errorf(" App 接口未返回有效数据（设备注册失败：%w）", registerErr)
 				}
 			}
 			return nil, lastErr

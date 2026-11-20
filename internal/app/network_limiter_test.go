@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 func TestCatalogBlockReasonSurvivesCooldown(t *testing.T) {
@@ -24,6 +25,31 @@ func TestCatalogBlockReasonSurvivesCooldown(t *testing.T) {
 	}
 	if calls.Load() != 1 {
 		t.Fatal("cooldown repeated an upstream request")
+	}
+}
+
+func TestCatalogPreparationFailureReleasesSlot(t *testing.T) {
+	calls := 0
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		calls++
+		return rankingHTTPResponse(request, 200, "ok"), nil
+	})
+	d.limiter = newRequestLimiter(1, 0)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	request, _ := http.NewRequestWithContext(ctx, http.MethodGet, "https://catalog.example/", nil)
+	preparationErr := errors.New("signature unavailable")
+	_, err := d.doPreparedCatalogRequest(request, time.Second, func(*http.Request) error { return preparationErr })
+	if !errors.Is(err, preparationErr) || calls != 0 {
+		t.Fatal("sent unsigned request after preparation failure", calls, err)
+	}
+	response, err := d.doCatalogRequestWithTimeout(request, time.Second)
+	if err != nil {
+		t.Fatal("preparation failure leaked request slot", err)
+	}
+	response.Body.Close()
+	if calls != 1 {
+		t.Fatal("unexpected transport calls", calls)
 	}
 }
 

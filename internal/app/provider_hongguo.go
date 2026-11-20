@@ -198,8 +198,8 @@ func (d *Downloader) resolveHongguoMedia(ctx context.Context, task Task) (provid
 	if !hongguoNumericID.MatchString(videoID) || !hongguoNumericID.MatchString(seriesID) {
 		return providerMedia{}, fmt.Errorf("章节 ID 无效，请重新获取章节")
 	}
-	// long: 与上游客户端一致，只使用 App 单集接口：它返回全部分辨率档位，
-	// 播放与下载都取最高档（1080p HEVC + HE-AACv2），保证同一部剧的产物编码一致。
+	// App 两个取流入口都返回完整分辨率档位，共用编码筛选与清晰度选择逻辑。
+	// 不回退到最高只有 720p 的网页 play-info，避免下载合并时混入低清晰度分集。
 	media, nativeErr := d.resolveHongguoAppMedia(ctx, videoID)
 	if nativeErr == nil {
 		return media, nil

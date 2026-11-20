@@ -22,20 +22,20 @@ func TestHongguoDevicePoolNormalizeAndRotate(t *testing.T) {
 	if len(client.state.Devices) != 2 {
 		t.Fatalf("设备池应去重并剔除无效项，实际 %v", client.state.Devices)
 	}
-	if !useHongguoDeviceLocked(client, "8000000000000000001") {
+	if !useHongguoDeviceLocked(client, map[string]bool{"8000000000000000001": true}) {
 		t.Fatal("应能切换到池中其它设备")
 	}
 	if client.state.DeviceID != "8000000000000000002" {
 		t.Fatalf("轮换目标错误: %s", client.state.DeviceID)
 	}
-	if !useHongguoDeviceLocked(client, "8000000000000000002") || client.state.DeviceID != "8000000000000000001" {
+	if !useHongguoDeviceLocked(client, map[string]bool{"8000000000000000002": true}) || client.state.DeviceID != "8000000000000000001" {
 		t.Fatalf("应切回未被拒绝的设备: %s", client.state.DeviceID)
 	}
 	solo := &hongguoAppClient{state: hongguoCatalogState{
 		Version: 1, DeviceID: "8000000000000000005", InstallID: "8000000000000000015", Registered: true,
 		Devices: []hongguoDevice{{DeviceID: "8000000000000000005", InstallID: "8000000000000000015"}},
 	}}
-	if useHongguoDeviceLocked(solo, "8000000000000000005") {
+	if useHongguoDeviceLocked(solo, map[string]bool{"8000000000000000005": true}) {
 		t.Fatal("只剩被拒绝设备时不应切换")
 	}
 }
@@ -80,6 +80,32 @@ func TestHongguoAppRequestRotatesDeviceOnEmptyBody(t *testing.T) {
 	}
 	if len(used) < 2 || used[0] != "8000000000000000001" || used[len(used)-1] != "8000000000000000002" {
 		t.Fatalf("空正文后未切换设备: %v", used)
+	}
+}
+
+func TestHongguoAppRequestSkipsAllRejectedDevices(t *testing.T) {
+	var used []string
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		id := request.URL.Query().Get("device_id")
+		used = append(used, id)
+		if id != "8003" {
+			return rankingHTTPResponse(request, 200, ""), nil
+		}
+		return rankingHTTPResponse(request, 200, `{"code":0}`), nil
+	})
+	client := d.hongguoClient()
+	client.state.DeviceID, client.state.InstallID = "8001", "9001"
+	client.state.Devices = []hongguoDevice{{"8001", "9001"}, {"8002", "9002"}, {"8003", "9003"}}
+	if _, err := d.hongguoAppRequest(context.Background(), "POST", "/novel/player/video_detail/v1/", nil, nil); err != nil {
+		t.Fatal(err)
+	}
+	if len(used) != 3 || used[0] != "8001" || used[1] != "8002" || used[2] != "8003" {
+		t.Fatal("revisited a failed device before trying the third", used)
+	}
+	// 失败设备只在本次请求中排除，下次请求可以重新使用。
+	device, err := d.ensureHongguoDevice(context.Background(), map[string]bool{"8003": true})
+	if err != nil || device.DeviceID != "8001" {
+		t.Fatal("device rejection leaked into another request", device, err)
 	}
 }
 

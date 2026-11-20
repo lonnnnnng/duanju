@@ -21,6 +21,7 @@ var hongguoV5HashTable = [64]uint32{0xebb64faf, 0x07aadcc2, 0xcf3187bf, 0xe01138
 
 const hongguoPlaybackBaseURL = "https://api5-normal-sinfonlinea.fqnovel.com"
 const hongguoPlaybackPath = "/novel/player/multi_video_model/player/v1/"
+const hongguoPlaybackFallbackPath = "/novel/player/multi_video_model/v1/"
 const hongguoPlaybackUserAgent = "com.phoenix.read/73932 (Linux; U; Android 12; zh_CN_#Hans; PGT-AN10; Build/V417IR;tt-ok/3.12.13.20)"
 const hongguoV5License = "646637794"
 

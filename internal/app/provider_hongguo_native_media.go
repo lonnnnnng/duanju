@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,8 +45,12 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 		return providerMedia{}, err
 	}
 	deviceID, installID := hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID
+	rejected := make(map[string]bool)
 	for rotations := 0; ; {
 		result, err := downloader.hongguoPlaybackV5Request(ctx, body, deviceID, installID)
+		if ctx.Err() != nil {
+			return providerMedia{}, ctx.Err()
+		}
 		if err != nil && !errors.Is(err, errHongguoEmptyPlaybackBody) {
 			return providerMedia{}, err
 		}
@@ -68,16 +73,30 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 		if rotations >= hongguoDeviceRotations {
 			return providerMedia{}, mediaErr
 		}
-		if switchErr := downloader.ensureHongguoDevice(ctx, deviceID); switchErr != nil {
+		rejected[deviceID] = true
+		device, switchErr := downloader.ensureHongguoDevice(ctx, rejected)
+		if switchErr != nil {
 			return providerMedia{}, fmt.Errorf("%w（辅助设备切换失败：%v）", mediaErr, switchErr)
 		}
-		deviceID, installID, _ = downloader.hongguoDevice()
+		deviceID, installID = device.DeviceID, device.InstallID
 		rotations++
 	}
 }
 
 func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body []byte, deviceID, installID string) (map[string]any, error) {
-	address := hongguoPlaybackBaseURL + hongguoPlaybackPath
+	result, err := downloader.hongguoPlaybackV5RequestPath(ctx, body, deviceID, installID, hongguoPlaybackPath)
+	if !errors.Is(err, errHongguoEmptyPlaybackBody) || ctx.Err() != nil {
+		return result, err
+	}
+	// 同一 App 的批量入口仍接受 V5 签名，返回完整清晰度与加密信息。
+	// 主入口空响应时先换入口，再换设备；不回退到只有低清晰度的网页接口。
+	downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.playback_fallback", Source: sourceHongguo,
+		Message: "播放主入口返回空正文，尝试 App 批量取流入口"})
+	return downloader.hongguoPlaybackV5RequestPath(ctx, body, deviceID, installID, hongguoPlaybackFallbackPath)
+}
+
+func (downloader *Downloader) hongguoPlaybackV5RequestPath(ctx context.Context, body []byte, deviceID, installID, path string) (map[string]any, error) {
+	address := hongguoPlaybackBaseURL + path
 	attempts := downloader.cfg.Retries
 	if attempts < 1 {
 		attempts = 1
@@ -95,20 +114,27 @@ func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body
 			}
 		}
 		query := hongguoPlaybackQuery(deviceID, installID)
-		signedURL, headers, err := hongguoV5Sign(address, query, body, time.Now())
+		request, err := http.NewRequestWithContext(ctx, http.MethodPost, address, bytes.NewReader(body))
 		if err != nil {
 			return nil, err
-		}
-		request, err := http.NewRequestWithContext(ctx, http.MethodPost, signedURL, bytes.NewReader(body))
-		if err != nil {
-			return nil, err
-		}
-		for name, value := range headers {
-			request.Header.Set(name, value)
 		}
 		request.Header.Set("User-Agent", hongguoPlaybackUserAgent)
 		request.Header.Set("Accept", "application/json")
-		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, nil)
+		response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, func(prepared *http.Request) error {
+			// 限流队列可能等待较久，必须在真正发送前生成时间戳和签名。
+			signedURL, headers, err := hongguoV5Sign(address, query, body, time.Now())
+			if err != nil {
+				return err
+			}
+			prepared.URL, err = url.Parse(signedURL)
+			if err != nil {
+				return err
+			}
+			for name, value := range headers {
+				prepared.Header.Set(name, value)
+			}
+			return nil
+		})
 		if err != nil {
 			lastErr = err
 			var backoff *requestBackoff
@@ -130,16 +156,24 @@ func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body
 			}
 			continue
 		}
-		if len(content) == 0 || len(content) > providerMaxBodyBytes {
-			lastErr = errHongguoEmptyPlaybackBody
-			continue
+		if len(content) == 0 {
+			downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.playback_response", Source: sourceHongguo,
+				Host: request.URL.Hostname(), HTTPStatus: response.StatusCode, Attempt: attempt + 1, Message: path + ":" + errHongguoEmptyPlaybackBody.Error()})
+			return nil, errHongguoEmptyPlaybackBody
+		}
+		if len(content) > providerMaxBodyBytes {
+			return nil, errors.New(" App 接口响应超出大小限制")
 		}
 		decoder := json.NewDecoder(bytes.NewReader(content))
 		decoder.UseNumber()
 		var result map[string]any
-		if err := decoder.Decode(&result); err != nil {
+		if err := decoder.Decode(&result); err != nil || result == nil || decoder.Decode(new(any)) != io.EOF {
 			lastErr = errors.New(" App 接口返回格式异常")
 			continue
+		}
+		code := firstNonEmpty(mapString(result, "code", "Code", "status_code"), mapString(nestedMap(result, "BaseResp"), "StatusCode"))
+		if code != "" && code != "0" {
+			return nil, fmt.Errorf(" App 接口暂不可用（%s）", truncate(code, 20))
 		}
 		return result, nil
 	}

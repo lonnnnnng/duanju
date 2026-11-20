@@ -52,35 +52,39 @@ func (downloader *Downloader) hongguoDevice() (string, string, bool) {
 }
 
 // ensureHongguoDevice 确保有一个可用的已注册设备。
-// rejected 是被上游判为无效的设备号：优先切换到设备池中的其它设备，池中没有时才注册新设备。
-func (downloader *Downloader) ensureHongguoDevice(ctx context.Context, rejected string) error {
+// rejected 只记录本次请求中失败的设备；返回锁内选中的身份，避免并发轮换改变请求设备。
+func (downloader *Downloader) ensureHongguoDevice(ctx context.Context, rejected map[string]bool) (hongguoDevice, error) {
+	if err := ctx.Err(); err != nil {
+		return hongguoDevice{}, err
+	}
 	client := downloader.hongguoClient()
-	client.mu.Lock()
-	if rejected == "" && client.state.Registered {
-		client.mu.Unlock()
-		return nil
+	pick := func() (hongguoDevice, bool) {
+		client.mu.Lock()
+		defer client.mu.Unlock()
+		current := hongguoDevice{DeviceID: client.state.DeviceID, InstallID: client.state.InstallID}
+		if len(rejected) == 0 && client.state.Registered && validHongguoDevice(current) {
+			return current, true
+		}
+		if useHongguoDeviceLocked(client, rejected) {
+			return hongguoDevice{DeviceID: client.state.DeviceID, InstallID: client.state.InstallID}, true
+		}
+		return hongguoDevice{}, false
 	}
-	if useHongguoDeviceLocked(client, rejected) {
-		client.mu.Unlock()
-		return nil
+	if device, ok := pick(); ok {
+		return device, nil
 	}
-	client.mu.Unlock()
 
 	client.deviceMu.Lock()
 	defer client.deviceMu.Unlock()
 	// long: 并发请求可能已经注册好新设备，拿到锁后必须重新判断。
-	client.mu.Lock()
-	if rejected == "" && client.state.Registered {
-		client.mu.Unlock()
-		return nil
+	if err := ctx.Err(); err != nil {
+		return hongguoDevice{}, err
 	}
-	if useHongguoDeviceLocked(client, rejected) {
-		client.mu.Unlock()
-		return nil
+	if device, ok := pick(); ok {
+		return device, nil
 	}
-	client.mu.Unlock()
 	if time.Now().Before(client.registerPausedUntil) {
-		return fmt.Errorf("红果设备注册暂不可用：%v", client.registerPauseErr)
+		return hongguoDevice{}, fmt.Errorf("红果设备注册暂不可用：%v", client.registerPauseErr)
 	}
 	deviceID, installID, err := downloader.registerHongguoDevice(ctx)
 	if err != nil {
@@ -88,13 +92,16 @@ func (downloader *Downloader) ensureHongguoDevice(ctx context.Context, rejected 
 		if errors.As(err, &rejection) {
 			client.registerPausedUntil, client.registerPauseErr = time.Now().Add(hongguoDeviceRegisterPause), err
 		}
-		return err
+		return hongguoDevice{}, err
+	}
+	if rejected[deviceID] {
+		return hongguoDevice{}, errors.New("红果设备注册返回了本次请求已失败的设备")
 	}
 	client.mu.Lock()
 	addHongguoDeviceLocked(client, deviceID, installID)
 	client.mu.Unlock()
 	downloader.persistHongguoDevicePool()
-	return nil
+	return hongguoDevice{DeviceID: deviceID, InstallID: installID}, nil
 }
 
 func (downloader *Downloader) registerHongguoDevice(ctx context.Context) (string, string, error) {

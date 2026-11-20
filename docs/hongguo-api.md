@@ -10,14 +10,17 @@
 
 | 顺序 | 链路 | 返回编码 | 说明 |
 | --- | --- | --- | --- |
-| 1 | App `POST /novel/player/video_model/v1/` | 1080p HEVC（`hvc1`）+ HE-AACv2 | 与上游客户端一致，返回全部档位并取最高，播放与下载共用 |
-| 2 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | 仅在站点仍保留 SSR 数据时可用 |
+| 1 | App `POST /novel/player/multi_video_model/player/v1/` | 完整清晰度档位，筛除 `bytevc2` | 使用 V5 签名，播放与下载共用 |
+| 2 | App `POST /novel/player/multi_video_model/v1/` | 同上 | 主入口 HTTP 200 空正文时使用，同一分集、设备、请求体及 V5 签名 |
+| 3 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | App 取流失败后的最后回退 |
 
-**只保留一条主链路的原因**：站点 `play-info` 只接受 `360p/480p/720p`（传 `1080p` 返回
-HTTP 400），返回 H.264 + AAC-LC；App 接口返回 `1080/720/540/480/360` 全部档位，
-产物是 HEVC + HE-AACv2。两条链路交替命中会让同一部剧出现混合编码，合并时被迫转码。
-2026-11-14 起移除 `play-info` 兜底，播放与下载都固定走 App 主链路，
-产物统一为 1080p HEVC + HE-AACv2，合并无需转码。
+两个 App 入口共用媒体解析、编码筛选和清晰度选择逻辑。默认选择最高可用档位，
+下载遵守既有清晰度设置，合并仍校验实际编码与分辨率。`play-info` 最高只有 720p，
+2026-11-14 起已移除，避免与 App 返回的 1080p 媒体混用。
+
+同一设备的两个入口均返回空正文，或只返回不兼容编码时，最多切换三次辅助设备。
+每次解析独立记录已失败的设备，池中未尝试的设备用尽后才注册新设备，避免 A → B → A 循环。
+参见 [2026-11-20 播放修复](2026-11-20-playback-recovery.md)。
 
 播放端若浏览器不支持 HEVC，会在计划阶段标记 `video_codec_unsupported` 并由服务端转码为 H.264。
 
@@ -102,19 +105,26 @@ POST /novel/player/video_detail/v1/
 
 ### 3.4 单集取流
 
+基地址：`https://api5-normal-sinfonlinea.fqnovel.com`。使用独立的 7.4.3.32
+播放参数及 V5 签名；不要套用目录接口的 7.3.5.32 签名。
+
 ```http
-POST /novel/player/video_model/v1/
-{"video_id": "<分集 ID>", "content_type": 1,
- "biz_param": {"need_all_video_definition": true, "video_platform": 3}}
+POST /novel/player/multi_video_model/player/v1/
+{"mixed_video_id_map":{"1004":["<分集 ID>"]},"dr_scene":"player",
+ "biz_param":{"detail_page_version":0,"device_level":1,
+ "disable_digg_stat":false,"disable_video_relate_book":false,
+ "need_all_video_definition":true,"need_mp4_align":false,
+ "use_os_player":false,"use_server_dns":false,"video_platform":1024}}
 ```
 
-响应 `data.video_model` 可能是对象或 JSON 字符串（也可能再套一层 base64），
+主入口空正文时改用 `/novel/player/multi_video_model/v1/`，其余参数相同。
+响应按 `data.1004.<分集 ID>` 或 `data.<分集 ID>` 定位，`video_model` 可能是对象或 JSON 字符串（也可能再套一层 base64），
 解析后取 `video_list`：每个档位包含 `main_url`、`backup_url*`、`url_list`、
 `video_meta.codec_type`/`definition`/`vheight`、`encrypt_info.spade_a`。
 
 要点：
 
-- `video_platform=3` 当前只返回 HEVC，`bytevc2`（H.266）档位会被跳过；
+- `bytevc2` 档位会被跳过；同一清晰度优先 H.264，其他兼容编码由既有播放流程处理；
 - 地址可能是 base64 编码，需要解码后判断；
 - 同一档位的多个备用地址按主机健康度排序后使用；
 - `spade_a` 解出 16 字节 AES-128 密钥，供 FFmpeg `-decryption_key` 解密。
@@ -154,22 +164,24 @@ GET /reading/bookapi/bookmall/cell/change/v/
 
 | 路径 | 签名 |
 | --- | --- |
-| `/novel/player/*` | 播放器签名：`X-Gorgon`（`84 04 40 1c` 前缀）、`X-Argus`、`X-Ladon`、`X-Khronos`、`X-SS-Req-Ticket`，有请求体时带 `X-SS-STUB` |
+| 两个 `multi_video_model` 取流入口 | V5：`X-Helios`、`X-Medusa`、`X-Khronos`、`X-SS-STUB` |
+| `video_detail` 等其他 App 接口 | 播放器签名：`X-Gorgon`、`X-Argus`、`X-Ladon`、`X-Khronos`、`X-SS-Req-Ticket`，有请求体时带 `X-SS-STUB` |
 | `/novel/commentapi/*` | 评论签名（同上头部，参数与非随机种子不同） |
 | 站点接口 | 无需签名，靠 Cookie/Referer/`X-Xs-From-Web` |
 
 签名对 `RawQuery` 与请求体字节级敏感：换设备、改参数、改编码后必须重新签名。
-任何 `query` 变更都要在发送前完成，不能先签名再改 URL。
+任何 `query` 变更都要在发送前完成，不能先签名再改 URL。所有签名在请求限流队列放行后生成，避免等待导致签名过期。
 
 ## 5. 故障判定
 
 | 现象 | 含 义 | 处理 |
 | --- | --- | --- |
-| `200` + 0 字节 | 签名/设备号无效，或高频限流 | 轮换设备池中的其它设备；仍失败则等待冷却 |
+| `200` + 0 字节 | 接口入口、签名或设备不被接受，也可能是限流；单凭空响应无法区分 | 播放主入口先切批量入口，再尝试本次未失败的辅助设备 |
 | `200` + `{"code":101116}` | 上游业务抖动 | 退避重试 |
 | `403` | 站点频率限制 | 该域名进入冷却，换域名或等冷却 |
 | `444` | 注册/接口风控 | 冷却 10 分钟后重新注册 |
 | `404`/`500`（页面） | 站点改版或只公开部分分集 | 依赖 App 链路 |
 
 诊断日志事件：`provider.hongguo.app_response`、`provider.hongguo.web_playback`、
-`provider.hongguo.device_pool`。日志只记录结果与结构，不记录临时直链和密钥。
+`provider.hongguo.device_pool`、`provider.hongguo.playback_response`、
+`provider.hongguo.playback_fallback`。日志只记录结果与结构，不记录设备身份、临时直链和密钥。
