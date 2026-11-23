@@ -1,10 +1,13 @@
 package app
 
 import (
+	"bytes"
 	"context"
+	"crypto/md5"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"slices"
 	"strconv"
@@ -23,26 +26,48 @@ func hongguoPlaybackResponseFixture(episode, codec string) string {
 func TestHongguoPlaybackFallbackPreservesEpisodeAndQuality(t *testing.T) {
 	const episode = "7708355462780947518"
 	var paths []string
+	var bodies [][]byte
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		paths = append(paths, request.URL.Path)
 		if request.URL.Query().Get("device_id") != hongguoPlaybackOfficialDeviceID {
 			t.Fatal("fallback should try the same device before rotating")
 		}
-		if request.Header.Get("X-Medusa") == "" || request.Header.Get("X-Helios") == "" || request.Header.Get("X-SS-STUB") == "" {
+		if request.Header.Get("X-Medusa") == "" || request.Header.Get("X-SS-STUB") == "" {
 			t.Fatal("fallback lost V5 signature or body digest")
+		}
+		query := request.URL.Query()
+		if query.Get("version_code") != "74332" || query.Get("version_name") != "7.4.3.32" ||
+			query.Get("manifest_version_code") != query.Get("version_code") || query.Get("update_version_code") != query.Get("version_code") {
+			t.Fatal("playback version fields are incomplete or inconsistent")
+		}
+		body, err := io.ReadAll(request.Body)
+		if err != nil {
+			t.Fatal(err)
+		}
+		bodies = append(bodies, body)
+		digest := md5.Sum(body)
+		if request.Header.Get("X-SS-STUB") != hexUpper(digest[:]) {
+			t.Fatal("signature does not cover the exact request body")
 		}
 		var payload struct {
 			IDs map[string][]string `json:"mixed_video_id_map"`
 			Biz map[string]any      `json:"biz_param"`
 		}
-		if json.NewDecoder(request.Body).Decode(&payload) != nil || !slices.Equal(payload.IDs["1004"], []string{episode}) || payload.Biz["need_all_video_definition"] != true {
+		if json.Unmarshal(body, &payload) != nil || !slices.Equal(payload.IDs["1004"], []string{episode}) || payload.Biz["need_all_video_definition"] != true {
 			t.Fatal("fallback changed the episode or discarded full quality variants")
 		}
 		if request.URL.Path == hongguoPlaybackPath {
+			if request.Header.Get("X-Helios") == "" {
+				t.Fatal("legacy player signature must retain Helios")
+			}
 			return rankingHTTPResponse(request, 200, ""), nil
 		}
 		if request.URL.Path != hongguoPlaybackFallbackPath {
 			t.Fatal("unexpected fallback endpoint", request.URL.Path)
+		}
+		if request.Header.Get("X-Helios") != "" {
+			// long: 模拟当前服务端对批量入口旧签名头组合返回空正文，修复前无法取得媒体。
+			return rankingHTTPResponse(request, 200, ""), nil
 		}
 		return rankingHTTPResponse(request, 200, hongguoPlaybackResponseFixture(episode, "hevc")), nil
 	})
@@ -53,6 +78,9 @@ func TestHongguoPlaybackFallbackPreservesEpisodeAndQuality(t *testing.T) {
 	}
 	if !slices.Equal(paths, []string{hongguoPlaybackPath, hongguoPlaybackFallbackPath}) {
 		t.Fatal("empty response should switch endpoints immediately", paths)
+	}
+	if !bytes.Equal(bodies[0], bodies[1]) {
+		t.Fatal("fallback changed the signed request body")
 	}
 }
 

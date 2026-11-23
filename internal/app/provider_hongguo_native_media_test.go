@@ -273,7 +273,7 @@ func TestLiveHongguoPlaybackRecovery(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, series := range []string{"7708355462780947518", "7705407023201913918"} {
+	for _, series := range []string{"7709114780467858456", "7708355462780947518", "7705407023201913918"} {
 		_, chapters, err := d.fetchHongguoChapters(ctx, series)
 		if err != nil || len(chapters) == 0 {
 			t.Fatalf("chapters %d error %v", len(chapters), publicError(err))

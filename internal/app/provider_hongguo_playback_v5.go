@@ -37,7 +37,8 @@ func mustHexBytes(value string) []byte {
 func hongguoPlaybackQuery(deviceID, installID string) url.Values {
 	return url.Values{
 		"aid": {"8662"}, "app_name": {"novelread"}, "version_code": {"74332"}, "version_name": {"7.4.3.32"},
-		"channel": {"vivo_8662_64"}, "device_platform": {"android"}, "device_type": {"PGT-AN10"},
+		"manifest_version_code": {"74332"},
+		"channel":               {"vivo_8662_64"}, "device_platform": {"android"}, "device_type": {"PGT-AN10"},
 		"os_version": {"12"}, "update_version_code": {"74332"}, "iid": {installID},
 		"cdid": {newHongguoUUID()}, "device_id": {deviceID},
 	}

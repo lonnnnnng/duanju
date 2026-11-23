@@ -11,7 +11,7 @@
 | 顺序 | 链路 | 返回编码 | 说明 |
 | --- | --- | --- | --- |
 | 1 | App `POST /novel/player/multi_video_model/player/v1/` | 完整清晰度档位，筛除 `bytevc2` | 使用 V5 签名，播放与下载共用 |
-| 2 | App `POST /novel/player/multi_video_model/v1/` | 同上 | 主入口 HTTP 200 空正文时使用，同一分集、设备、请求体及 V5 签名 |
+| 2 | App `POST /novel/player/multi_video_model/v1/` | 同上 | 主入口 HTTP 200 空正文时使用，同一分集、设备和请求体；V5 签名不发送 `X-Helios` |
 | 3 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | App 取流失败后的最后回退 |
 
 两个 App 入口共用媒体解析、编码筛选和清晰度选择逻辑。默认选择最高可用档位，
@@ -107,6 +107,8 @@ POST /novel/player/video_detail/v1/
 
 基地址：`https://api5-normal-sinfonlinea.fqnovel.com`。使用独立的 7.4.3.32
 播放参数及 V5 签名；不要套用目录接口的 7.3.5.32 签名。
+`version_code`、`manifest_version_code`、`update_version_code` 均为 `74332`，
+与 `version_name=7.4.3.32` 一致。版本字段在签名前补齐。
 
 ```http
 POST /novel/player/multi_video_model/player/v1/
@@ -117,7 +119,8 @@ POST /novel/player/multi_video_model/player/v1/
  "use_os_player":false,"use_server_dns":false,"video_platform":1024}}
 ```
 
-主入口空正文时改用 `/novel/player/multi_video_model/v1/`，其余参数相同。
+主入口空正文时改用 `/novel/player/multi_video_model/v1/`，请求体及设备相同；
+批量入口发送 `X-Medusa`、`X-Khronos`、`X-SS-STUB`，不发送 `X-Helios`。
 响应按 `data.1004.<分集 ID>` 或 `data.<分集 ID>` 定位，`video_model` 可能是对象或 JSON 字符串（也可能再套一层 base64），
 解析后取 `video_list`：每个档位包含 `main_url`、`backup_url*`、`url_list`、
 `video_meta.codec_type`/`definition`/`vheight`、`encrypt_info.spade_a`。
@@ -164,7 +167,8 @@ GET /reading/bookapi/bookmall/cell/change/v/
 
 | 路径 | 签名 |
 | --- | --- |
-| 两个 `multi_video_model` 取流入口 | V5：`X-Helios`、`X-Medusa`、`X-Khronos`、`X-SS-STUB` |
+| `multi_video_model/player/v1/` | V5：`X-Helios`、`X-Medusa`、`X-Khronos`、`X-SS-STUB` |
+| `multi_video_model/v1/` 批量入口 | V5：`X-Medusa`、`X-Khronos`、`X-SS-STUB`；省略 `X-Helios` |
 | `video_detail` 等其他 App 接口 | 播放器签名：`X-Gorgon`、`X-Argus`、`X-Ladon`、`X-Khronos`、`X-SS-Req-Ticket`，有请求体时带 `X-SS-STUB` |
 | `/novel/commentapi/*` | 评论签名（同上头部，参数与非随机种子不同） |
 | 站点接口 | 无需签名，靠 Cookie/Referer/`X-Xs-From-Web` |
@@ -185,3 +189,33 @@ GET /reading/bookapi/bookmall/cell/change/v/
 诊断日志事件：`provider.hongguo.app_response`、`provider.hongguo.web_playback`、
 `provider.hongguo.device_pool`、`provider.hongguo.playback_response`、
 `provider.hongguo.playback_fallback`。日志只记录结果与结构，不记录设备身份、临时直链和密钥。
+
+### 2026-11-23 再次空响应
+
+线上 v0.2.20 在《谁让这个文盲修仙的第七季》第 1 集播放失败：主入口和批量入口均返回
+HTTP 200、0 字节，尝试辅助设备仍失败。独立临时设备池也复现，故障发生在获取媒体地址阶段。
+
+对照 `guoapp-modules/hongguo` 当前 `cdf8a24` 及 [PR #5](https://github.com/guoapp-modules/hongguo/pull/5)
+的线索后，对同一身份、分集与请求体做真实请求对照：
+
+| 批量入口请求 | 故障剧与对照剧《0174号奖券》 |
+| --- | --- |
+| 原参数、完整 V5 头 | HTTP 200，0 字节 |
+| 补齐 `manifest_version_code`，完整 V5 头 | HTTP 200，0 字节 |
+| 补齐版本字段，同时省略 `X-Helios` | HTTP 200，约 24–25 KiB，1080p、5 个清晰度档位及有效内容密钥 |
+
+参考项目的新 `video_tab` 入口用 Go 与原版 JavaScript 签名均为空，未将其接入。
+本次只修正播放请求字段与批量入口头部组合，保留 V5 签名算法、清晰度选择、合并约束和有界设备重试。
+证据说明当前请求组合已不被上游接受；空正文没有原因码，无法推断其内部具体规则。
+
+手动联网验证 `TestLiveHongguoPlaybackRecovery` 已加入本次故障剧，使用独立临时设备池；
+普通测试仍默认跳过该联网用例。部署前后的真实验证结果应以当次执行为准。
+
+本次修复后验证：
+
+- 故障剧第 1/105/210 集、《公路求生榜一说她要走到公路尽头第三季》第 1/103/207 集、
+  《0174号奖券》第 1/44/88 集均取得 1080p，开头和中段的音视频解码通过。
+- 三部首集完整下载成功，媒体包含 HEVC 视频和 AAC 音频。
+- 故障剧和《0174号奖券》在 Chromium 桌面 1280×900、手机模拟 390×844 下均实际出画、
+  播放进度前进且可关闭弹框；测试服务和设备池均独立于线上目录。
+- `go test ./... -count=1 -timeout=10m`、`go vet ./...` 通过。

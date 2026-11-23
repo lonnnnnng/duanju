@@ -88,8 +88,8 @@ func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body
 	if !errors.Is(err, errHongguoEmptyPlaybackBody) || ctx.Err() != nil {
 		return result, err
 	}
-	// 同一 App 的批量入口仍接受 V5 签名，返回完整清晰度与加密信息。
-	// 主入口空响应时先换入口，再换设备；不回退到只有低清晰度的网页接口。
+	// long: 批量入口接受不带 Helios 的 V5 请求，保留完整清晰度与加密信息。
+	// 先换入口及其签名头组合，再换设备；避免把参数不兼容误判为身份失效。
 	downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.playback_fallback", Source: sourceHongguo,
 		Message: "播放主入口返回空正文，尝试 App 批量取流入口"})
 	return downloader.hongguoPlaybackV5RequestPath(ctx, body, deviceID, installID, hongguoPlaybackFallbackPath)
@@ -125,6 +125,11 @@ func (downloader *Downloader) hongguoPlaybackV5RequestPath(ctx context.Context, 
 			signedURL, headers, err := hongguoV5Sign(address, query, body, time.Now())
 			if err != nil {
 				return err
+			}
+			// long: 2026-11-23 同身份实测：批量入口补齐版本仍为空，去掉 Helios 后恢复。
+			// 只调整这个入口，Medusa、时间戳和精确请求体摘要仍随每次请求重新生成。
+			if path == hongguoPlaybackFallbackPath {
+				delete(headers, "X-Helios")
 			}
 			prepared.URL, err = url.Parse(signedURL)
 			if err != nil {
