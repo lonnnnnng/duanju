@@ -47,25 +47,36 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 	deviceID, installID := hongguoPlaybackOfficialDeviceID, hongguoPlaybackOfficialInstallID
 	rejected := make(map[string]bool)
 	for rotations := 0; ; {
-		result, err := downloader.hongguoPlaybackV5Request(ctx, body, deviceID, installID)
+		media, tabErr := downloader.hongguoVideoTabMedia(ctx, videoID, deviceID, installID)
+		if tabErr == nil {
+			return media, nil
+		}
 		if ctx.Err() != nil {
 			return providerMedia{}, ctx.Err()
 		}
-		if err != nil && !errors.Is(err, errHongguoEmptyPlaybackBody) {
-			return providerMedia{}, err
-		}
-		mediaErr := err
-		var media providerMedia
-		if err == nil {
-			data := nestedMap(result, "data")
-			if data == nil {
-				return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+		mediaErr := tabErr
+		// long: 上游遇到不兼容编码时轮换辅助设备；其它 video_tab 故障回退 player V5。
+		if !errors.Is(tabErr, errHongguoNoCompatibleMedia) {
+			result, playerErr := downloader.hongguoPlaybackV5Request(ctx, body, deviceID, installID)
+			if ctx.Err() != nil {
+				return providerMedia{}, ctx.Err()
 			}
-			bucket := data
-			if nested := nestedMap(data, "1004"); len(nested) > 0 {
-				bucket = nested
+			if playerErr != nil && !errors.Is(playerErr, errHongguoEmptyPlaybackBody) {
+				return providerMedia{}, playerErr
 			}
-			media, mediaErr = parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
+			if playerErr == nil {
+				data := nestedMap(result, "data")
+				if data == nil {
+					return providerMedia{}, errors.New(" App 未返回所请求分集的播放信息")
+				}
+				bucket := data
+				if nested := nestedMap(data, "1004"); len(nested) > 0 {
+					bucket = nested
+				}
+				media, mediaErr = parseHongguoAppPreloadMediaOrdered(map[string]any{"data": bucket}, videoID, downloader.hostHealth)
+			} else {
+				mediaErr = playerErr
+			}
 		}
 		if !errors.Is(mediaErr, errHongguoNoCompatibleMedia) && !errors.Is(mediaErr, errHongguoEmptyPlaybackBody) {
 			return media, mediaErr
@@ -81,6 +92,83 @@ func (downloader *Downloader) resolveHongguoAppMedia(ctx context.Context, videoI
 		deviceID, installID = device.DeviceID, device.InstallID
 		rotations++
 	}
+}
+
+func (downloader *Downloader) hongguoVideoTabMedia(ctx context.Context, videoID, deviceID, installID string) (providerMedia, error) {
+	result, err := downloader.hongguoVideoTabRequest(ctx, videoID, deviceID, installID)
+	if err != nil {
+		return providerMedia{}, err
+	}
+	entry := nestedMap(nestedMap(nestedMap(result, "data"), "video_model_data"), videoID)
+	if len(entry) == 0 {
+		return providerMedia{}, errors.New(" App video_tab 未返回所请求分集的播放信息")
+	}
+	return parseHongguoAppPreloadMediaOrdered(map[string]any{"data": entry}, videoID, downloader.hostHealth)
+}
+
+// hongguoVideoTabRequest 使用上游 video_tab 配方；其域名和查询版本不同于 player V5。
+func (downloader *Downloader) hongguoVideoTabRequest(ctx context.Context, videoID, deviceID, installID string) (map[string]any, error) {
+	query := hongguoAppQuery(deviceID, installID)
+	query.Set("video_id", videoID)
+	query.Set("video_id_type", "0")
+	query.Set("device_level", "1")
+	query.Set("need_all_video_definition", "1")
+	query.Set("need_mp4_align", "0")
+	query.Set("use_os_player", "0")
+	query.Set("video_platform", "1024")
+	query.Set("source", "0")
+	query.Set("from_video_id", "")
+	address := hongguoAppBaseURL + hongguoVideoTabPath
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	if err != nil {
+		return nil, err
+	}
+	request.Header.Set("User-Agent", hongguoPlaybackUserAgent)
+	request.Header.Set("Accept", "application/json")
+	response, err := downloader.doPreparedCatalogRequest(request, 20*time.Second, func(prepared *http.Request) error {
+		signedURL, headers, err := hongguoV5Sign(address, query, nil, time.Now())
+		if err != nil {
+			return err
+		}
+		prepared.URL, err = url.Parse(signedURL)
+		if err != nil {
+			return err
+		}
+		for name, value := range headers {
+			prepared.Header.Set(name, value)
+		}
+		return nil
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+	content, err := io.ReadAll(io.LimitReader(response.Body, providerMaxBodyBytes+1))
+	if err != nil {
+		return nil, err
+	}
+	if response.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("video_tab HTTP %d", response.StatusCode)
+	}
+	if len(content) == 0 {
+		downloader.recordDiagnostic(diagnosticEvent{Level: "warn", Event: "provider.hongguo.playback_response", Source: sourceHongguo,
+			Host: request.URL.Hostname(), HTTPStatus: response.StatusCode, TotalBytes: 0, Message: hongguoVideoTabPath + ": App 接口返回空正文（HTTP 200）"})
+		return nil, errHongguoEmptyPlaybackBody
+	}
+	if len(content) > providerMaxBodyBytes {
+		return nil, errors.New("video_tab 响应超出大小限制")
+	}
+	var result map[string]any
+	decoder := json.NewDecoder(bytes.NewReader(content))
+	decoder.UseNumber()
+	if err := decoder.Decode(&result); err != nil || result == nil || decoder.Decode(new(any)) != io.EOF {
+		return nil, errors.New("video_tab 响应格式异常")
+	}
+	code := firstNonEmpty(mapString(result, "code", "Code", "status_code"), mapString(nestedMap(result, "BaseResp"), "StatusCode"))
+	if code != "" && code != "0" {
+		return nil, fmt.Errorf("video_tab 业务错误（%s）", truncate(code, 20))
+	}
+	return result, nil
 }
 
 func (downloader *Downloader) hongguoPlaybackV5Request(ctx context.Context, body []byte, deviceID, installID string) (map[string]any, error) {

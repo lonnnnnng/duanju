@@ -22,6 +22,9 @@ func TestHongguoModelRequestsExactEpisode(t *testing.T) {
 	for _, format := range []string{"object", "string"} {
 		t.Run(format, func(t *testing.T) {
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path == hongguoVideoTabPath {
+					return rankingHTTPResponse(request, http.StatusOK, ""), nil
+				}
 				var payload struct {
 					Biz   map[string]any `json:"biz_param"`
 					Map   map[string]any `json:"mixed_video_id_map"`
@@ -72,6 +75,9 @@ func TestHongguoModelRetriesIncompatibleMediaWithAuxiliaryDevices(t *testing.T) 
 	const secondID, secondInstall = "8000000000000000002", "8000000000000012"
 	var used []string
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == hongguoVideoTabPath {
+			return rankingHTTPResponse(request, http.StatusOK, ""), nil
+		}
 		deviceID := request.URL.Query().Get("device_id")
 		used = append(used, deviceID)
 		codec := "bytevc2"
@@ -114,6 +120,9 @@ func TestHongguoModelDoesNotRetryMalformedMedia(t *testing.T) {
 	var requests int
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		requests++
+		if request.URL.Path == hongguoVideoTabPath {
+			return rankingHTTPResponse(request, http.StatusOK, ""), nil
+		}
 		body := fmt.Sprintf(`{"code":0,"data":{"1004":{"%s":{"video_model":"not-json"}}}}`, episode)
 		return rankingHTTPResponse(request, http.StatusOK, body), nil
 	})
@@ -126,7 +135,7 @@ func TestHongguoModelDoesNotRetryMalformedMedia(t *testing.T) {
 	if _, err := d.resolveHongguoAppMedia(context.Background(), episode); err == nil {
 		t.Fatal("malformed media should fail")
 	}
-	if requests != 1 {
+	if requests != 2 {
 		t.Fatalf("malformed media must not trigger an auxiliary retry, got %d requests", requests)
 	}
 }
@@ -136,6 +145,9 @@ func TestHongguoModelRetriesEmptyBodyWithAuxiliaryDevice(t *testing.T) {
 	const deviceID, installID = "8000000000000000001", "8000000000000011"
 	var used []string
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == hongguoVideoTabPath {
+			return rankingHTTPResponse(request, http.StatusOK, ""), nil
+		}
 		current := request.URL.Query().Get("device_id")
 		used = append(used, current)
 		if current == hongguoPlaybackOfficialDeviceID {

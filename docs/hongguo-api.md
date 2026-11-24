@@ -10,15 +10,16 @@
 
 | 顺序 | 链路 | 返回编码 | 说明 |
 | --- | --- | --- | --- |
-| 1 | App `POST /novel/player/multi_video_model/player/v1/` | 完整清晰度档位，筛除 `bytevc2` | 使用 V5 签名，播放与下载共用 |
-| 2 | App `POST /novel/player/multi_video_model/v1/` | 同上 | 主入口 HTTP 200 空正文时使用，同一分集、设备和请求体；V5 签名不发送 `X-Helios` |
-| 3 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | App 取流失败后的最后回退 |
+| 1 | App `GET /reading/bookapi/video_tab/multi_video_model/v1/` | 完整清晰度档位，筛除 `bytevc2` | api5 B 域、7.3.5.32 目录 query、无 body V5 签名 |
+| 2 | App `POST /novel/player/multi_video_model/player/v1/` | 同上 | api5 A 域、7.4.3.32 播放 query/body、完整 V5 签名 |
+| 3 | App `POST /novel/player/multi_video_model/v1/` | 同上 | player 主入口空正文时使用；V5 签名不发送 `X-Helios` |
+| 4 | 站点播放页 `GET /player/<series_id>/<video_id>` | 页面内 `_ROUTER_DATA` | App 取流失败后的最后回退 |
 
-两个 App 入口共用媒体解析、编码筛选和清晰度选择逻辑。默认选择最高可用档位，
+三个 App 入口共用媒体解析、编码筛选和清晰度选择逻辑。默认选择最高可用档位，
 下载遵守既有清晰度设置，合并仍校验实际编码与分辨率。`play-info` 最高只有 720p，
 2026-11-14 起已移除，避免与 App 返回的 1080p 媒体混用。
 
-同一设备的两个入口均返回空正文，或只返回不兼容编码时，最多切换三次辅助设备。
+同一设备的三个入口均返回空正文，或只返回不兼容编码时，最多切换三次辅助设备。
 每次解析独立记录已失败的设备，池中未尝试的设备用尽后才注册新设备，避免 A → B → A 循环。
 参见 [2026-11-20 播放修复](2026-11-20-playback-recovery.md)。
 
@@ -105,12 +106,14 @@ POST /novel/player/video_detail/v1/
 
 ### 3.4 单集取流
 
-基地址：`https://api5-normal-sinfonlinea.fqnovel.com`。使用独立的 7.4.3.32
+player 基地址：`https://api5-normal-sinfonlinea.fqnovel.com`。使用独立的 7.4.3.32
 播放参数及 V5 签名；不要套用目录接口的 7.3.5.32 签名。
 `version_code`、`manifest_version_code`、`update_version_code` 均为 `74332`，
 与 `version_name=7.4.3.32` 一致。版本字段在签名前补齐。
 
 ```http
+GET https://api5-normal-sinfonlineb.fqnovel.com/reading/bookapi/video_tab/multi_video_model/v1/?<7.3.5.32 App query>&video_id=<分集 ID>&video_id_type=0&device_level=1&need_all_video_definition=1&need_mp4_align=0&use_os_player=0&video_platform=1024&source=0&from_video_id=
+
 POST /novel/player/multi_video_model/player/v1/
 {"mixed_video_id_map":{"1004":["<分集 ID>"]},"dr_scene":"player",
  "biz_param":{"detail_page_version":0,"device_level":1,
@@ -119,7 +122,9 @@ POST /novel/player/multi_video_model/player/v1/
  "use_os_player":false,"use_server_dns":false,"video_platform":1024}}
 ```
 
-主入口空正文时改用 `/novel/player/multi_video_model/v1/`，请求体及设备相同；
+首选 `video_tab` 使用 GET 和 7.3.5.32 App query，V5 对空 body 签名，不带 `X-SS-STUB`。
+响应从 `data.video_model_data.<分集 ID>` 定位，条目传入共用媒体解析器。入口不可用时回退 player V5。
+player 主入口空正文时改用 `/novel/player/multi_video_model/v1/`，请求体及设备相同；
 批量入口发送 `X-Medusa`、`X-Khronos`、`X-SS-STUB`，不发送 `X-Helios`。
 响应按 `data.1004.<分集 ID>` 或 `data.<分集 ID>` 定位，`video_model` 可能是对象或 JSON 字符串（也可能再套一层 base64），
 解析后取 `video_list`：每个档位包含 `main_url`、`backup_url*`、`url_list`、
@@ -169,6 +174,7 @@ GET /reading/bookapi/bookmall/cell/change/v/
 | --- | --- |
 | `multi_video_model/player/v1/` | V5：`X-Helios`、`X-Medusa`、`X-Khronos`、`X-SS-STUB` |
 | `multi_video_model/v1/` 批量入口 | V5：`X-Medusa`、`X-Khronos`、`X-SS-STUB`；省略 `X-Helios` |
+| `video_tab/multi_video_model/v1/` | V5：`X-Helios`、`X-Medusa`、`X-Khronos`；GET 无 body，不带 `X-SS-STUB` |
 | `video_detail` 等其他 App 接口 | 播放器签名：`X-Gorgon`、`X-Argus`、`X-Ladon`、`X-Khronos`、`X-SS-Req-Ticket`，有请求体时带 `X-SS-STUB` |
 | `/novel/commentapi/*` | 评论签名（同上头部，参数与非随机种子不同） |
 | 站点接口 | 无需签名，靠 Cookie/Referer/`X-Xs-From-Web` |
@@ -219,3 +225,31 @@ HTTP 200、0 字节，尝试辅助设备仍失败。独立临时设备池也复�
 - 故障剧和《0174号奖券》在 Chromium 桌面 1280×900、手机模拟 390×844 下均实际出画、
   播放进度前进且可关闭弹框；测试服务和设备池均独立于线上目录。
 - `go test ./... -count=1 -timeout=10m`、`go vet ./...` 通过。
+
+### 2026-11-24 上游取流入口迁移
+
+线上日志再次确认 player 主入口 `/novel/player/multi_video_model/player/v1/` 和批量入口
+`/novel/player/multi_video_model/v1/` 均返回 HTTP 200、0 字节；辅助设备轮换后仍相同。
+安卓同一新注册身份也复现，说明问题发生在上游取流接口，不在 Web 播放器或本服务进程。
+
+对照上游红果模块 v1.0.6（2026-11-20）的实现，取流已改为先用
+`GET /reading/bookapi/video_tab/multi_video_model/v1/`：它走
+`api5-normal-sinfonlineb.fqnovel.com`，使用 7.3.5.32 / `73532` 目录 query 和无 body V5 签名；
+player 旧链仍走 api5 A 域的 7.4.3.32 / `74332`。此前我们只试过把 `video_tab` 路径接到 A 域，
+因此继续得到空正文；正确域名和 query 组合才是关键。
+
+用已注册设备身份和当前分集对 api5 B 发起 V5 `video_tab` 请求，收到约 23 KiB JSON，
+`data.video_model_data[vid]` 可解析到 1080p 模型。Web 现以 `video_tab` 为首选，失败后回退
+player 双 V5 入口，再在均无可用模型时轮换设备。设备注册和签名仍经请求限流器，
+接口诊断不记录签名 URL、媒体地址或内容密钥。
+
+代码修改后，`DUANJU_LIVE_PLAYBACK_RECOVERY=1 go test ./internal/app -run '^TestLiveHongguoPlaybackRecovery$' -count=1 -v -timeout 8m`
+通过：三部剧第 1/中间/末集共 9 集均取到 1080p，Range/CENC 开头与中段解密并用 FFmpeg 解码通过；
+三部首集完整下载后均确认 HEVC 视频与 AAC 音频。测试使用临时设备池，不更改线上设备数据。
+
+### 2026-11-24 安卓媒体跳转
+
+安卓 `video_tab` 已恢复返回 1080p 播放模型后，Range 验收发现部分 CDN 媒体地址会返回 HTTP 302。
+安卓原生 librempeg 之前禁用了所有重定向，导致播放器打不开这类分段地址；当前将只对 HTTPS 媒体
+允许最多 5 次 HTTPS 跳转，并拒绝降级到 HTTP。该修复与接口取流恢复分开验证，避免把模型获取成功
+误当成媒体已经可播放。

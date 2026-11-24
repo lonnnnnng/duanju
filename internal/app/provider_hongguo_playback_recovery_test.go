@@ -29,6 +29,18 @@ func TestHongguoPlaybackFallbackPreservesEpisodeAndQuality(t *testing.T) {
 	var bodies [][]byte
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 		paths = append(paths, request.URL.Path)
+		if request.URL.Path == hongguoVideoTabPath {
+			query := request.URL.Query()
+			if request.Method != http.MethodGet || request.URL.Host != "api5-normal-sinfonlineb.fqnovel.com" ||
+				query.Get("video_id") != episode || query.Get("video_id_type") != "0" || query.Get("device_level") != "1" ||
+				query.Get("version_code") != "73532" || query.Get("manifest_version_code") != "73532" || query.Get("channel") != "update_64" {
+				t.Fatal("video_tab did not use the upstream host, query, or app version")
+			}
+			if request.Header.Get("X-Medusa") == "" || request.Header.Get("X-Helios") == "" || request.Header.Get("X-SS-STUB") != "" {
+				t.Fatal("video_tab V5 GET signature does not match the empty-body request")
+			}
+			return rankingHTTPResponse(request, 200, ""), nil
+		}
 		if request.URL.Query().Get("device_id") != hongguoPlaybackOfficialDeviceID {
 			t.Fatal("fallback should try the same device before rotating")
 		}
@@ -76,11 +88,33 @@ func TestHongguoPlaybackFallbackPreservesEpisodeAndQuality(t *testing.T) {
 	if err != nil || media.Quality != 1080 || len(media.Variants) != 2 {
 		t.Fatalf("fallback lost full quality media: quality=%d variants=%d error=%v", media.Quality, len(media.Variants), err)
 	}
-	if !slices.Equal(paths, []string{hongguoPlaybackPath, hongguoPlaybackFallbackPath}) {
+	if !slices.Equal(paths, []string{hongguoVideoTabPath, hongguoPlaybackPath, hongguoPlaybackFallbackPath}) {
 		t.Fatal("empty response should switch endpoints immediately", paths)
 	}
-	if !bytes.Equal(bodies[0], bodies[1]) {
+	if len(bodies) != 2 || !bytes.Equal(bodies[0], bodies[1]) {
 		t.Fatal("fallback changed the signed request body")
+	}
+}
+
+func TestHongguoVideoTabParsesRequestedEpisodeBeforePlayerFallback(t *testing.T) {
+	const episode = "7708355462780947518"
+	model := map[string]any{"video_duration": 40.0, "video_list": []any{map[string]any{
+		"main_url": "https://media.example.test/video-tab.mp4", "video_meta": map[string]any{"codec_type": "h264", "definition": "1080p"},
+	}}}
+	body, _ := json.Marshal(map[string]any{"code": 0, "data": map[string]any{
+		"video_model_data": map[string]any{episode: map[string]any{"video_model": model}},
+	}})
+	calls := 0
+	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		calls++
+		if request.URL.Path != hongguoVideoTabPath {
+			t.Fatalf("video_tab success must not call legacy player endpoint: %s", request.URL.Path)
+		}
+		return rankingHTTPResponse(request, 200, string(body)), nil
+	})
+	media, err := d.resolveHongguoAppMedia(context.Background(), episode)
+	if err != nil || media.URL != "https://media.example.test/video-tab.mp4" || media.Quality != 1080 || calls != 1 {
+		t.Fatalf("video_tab did not resolve exact episode: media=%+v calls=%d error=%v", media, calls, err)
 	}
 }
 
@@ -100,10 +134,13 @@ func TestHongguoPlaybackFallbackDoesNotMaskOtherFailures(t *testing.T) {
 			calls := 0
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
 				calls++
+				if request.URL.Path == hongguoVideoTabPath {
+					return rankingHTTPResponse(request, 200, ""), nil
+				}
 				return rankingHTTPResponse(request, test.status, test.body), nil
 			})
 			_, err := d.resolveHongguoAppMedia(context.Background(), "7708355462780947518")
-			if err == nil || errors.Is(err, errHongguoEmptyPlaybackBody) || calls != 1 {
+			if err == nil || errors.Is(err, errHongguoEmptyPlaybackBody) || calls != 2 {
 				t.Fatalf("failure was retried as an empty response: calls=%d error=%v", calls, err)
 			}
 		})
@@ -117,6 +154,9 @@ func TestHongguoPlaybackDoesNotRevisitFailedDevices(t *testing.T) {
 			var used []string
 			registrations := 0
 			d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+				if request.URL.Path == hongguoVideoTabPath {
+					return rankingHTTPResponse(request, 200, ""), nil
+				}
 				if request.URL.Path == "/service/2/device_register/" {
 					registrations++
 					if !slices.Equal(used, []string{hongguoPlaybackOfficialDeviceID, "8001", "8002"}) {
@@ -149,6 +189,9 @@ func TestHongguoPlaybackDoesNotRevisitFailedDevices(t *testing.T) {
 func TestHongguoPlaybackAllEmptyAttemptsAreBounded(t *testing.T) {
 	var used []string
 	d := rankingTestDownloader(t, func(request *http.Request) (*http.Response, error) {
+		if request.URL.Path == hongguoVideoTabPath {
+			return rankingHTTPResponse(request, 200, ""), nil
+		}
 		if request.URL.Path != hongguoPlaybackPath && request.URL.Path != hongguoPlaybackFallbackPath {
 			t.Fatal("attempted registration after exhausting the rotation budget")
 		}
