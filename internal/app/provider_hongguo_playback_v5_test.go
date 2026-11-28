@@ -75,7 +75,28 @@ func TestHongguoV5CarrierVectors(t *testing.T) {
 	}
 }
 
+// long: 期望值由上游发布包内 JS 独立生成，覆盖首次 POST 和复用同一进程标识的无 body GET。
 func TestHongguoV5SignMatchesUpstreamDeterministic(t *testing.T) {
+	raw, err := os.ReadFile("testdata/v5/signing-v5-upstream.json")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var fixture struct {
+		Cases []struct {
+			NowMs   int64             `json:"nowMs"`
+			Base    string            `json:"base"`
+			Values  map[string]string `json:"values"`
+			Body    *string           `json:"body"`
+			URL     string            `json:"url"`
+			Headers map[string]string `json:"headers"`
+		} `json:"cases"`
+	}
+	if err := json.Unmarshal(raw, &fixture); err != nil {
+		t.Fatal(err)
+	}
+	if len(fixture.Cases) != 2 {
+		t.Fatal("expected POST and GET vectors")
+	}
 	previous := hongguoV5Rand
 	seq := 0
 	hongguoV5Rand = func(out []byte) {
@@ -86,29 +107,26 @@ func TestHongguoV5SignMatchesUpstreamDeterministic(t *testing.T) {
 	}
 	defer func() { hongguoV5Rand = previous; resetHongguoV5ProcessForTest() }()
 	resetHongguoV5ProcessForTest()
-	values := urlValues(map[string]string{
-		"aid": "8662", "device_id": "123", "iid": "456", "cdid": "synthetic",
-		"version_name": "7.4.3.32", "channel": "vivo_8662_64", "os_version": "12", "device_type": "PGT-AN10",
-	})
-	signedURL, headers, err := hongguoV5Sign("https://example.invalid/model", values, []byte(`{"fixture":true}`), time.Unix(1800000000, 0))
-	if err != nil {
-		t.Fatal(err)
-	}
-	wantURL := "https://example.invalid/model?_rticket=1800000000011&aid=8662&cdid=synthetic&channel=vivo_8662_64&device_id=123&device_type=PGT-AN10&iid=456&os_version=12&version_name=7.4.3.32"
-	if signedURL != wantURL {
-		t.Fatalf("url=%s", signedURL)
-	}
-	if headers["X-Khronos"] != "1800000000" {
-		t.Fatalf("khronos=%s", headers["X-Khronos"])
-	}
-	if headers["X-SS-STUB"] != "82E9FB28C6B069812973D69832368531" {
-		t.Fatalf("stub=%s", headers["X-SS-STUB"])
-	}
-	if headers["X-Helios"] != "AAECAxjnWC5DAsxQ2/mnLKzNFrul71BYsp3J36XftUuWs5HI" {
-		t.Fatalf("helios=%s", headers["X-Helios"])
-	}
-	if headers["X-Medusa"] != "BdJJay2ZBqFJp0QoP2fnRyK/hT0aGwABlMo+FyAlAXkBGAAn+Vb/jHu8Ny6MD7ujH6v/yrvMv4L3jUi2I35RrElnT1kRjreYGZVaVKfG+vZQl4DIFKaSX/K5QbU/S2QgIDMNhHHNKMCYxnx0S9Pa3ffTGFl/7GBn2+53QwzBVhPnBHOg59WGVZP2+QjUxSU/ntURHRLE/EcMzYgCHzQCnzQSnxjNo3U7iX1l1nszM8BaJGyQ2uXXI+y67JJZN7AMKWgXtII/08i+LCv07p06m2eR/BfnkNqjK1fxuXzuYAp9nnCmrdjOzap2zp4v7nJXpc7cgzD1CiDD0ZKwOuSdQKPaDDBfw2okXYqtKjX/n89zIFvDA0yvIze5XDjjJLCMHYg9DP2IfL1hfSAohyGOpTR6fMODAMTjK8tTHI8y3O5kYxGTFglK36ls+rqrfarp/Rj3CT1J4tPsoFnojaCKl0bN78t/jgTVy6bh4zPfYafTWmb8boVzvLCepR694pA55Nk36QBUZBLzR2aJMAtcxr/+2cV3e6SPViZy357YAFppLoUEe8aIuP54NxEHGg1GteUBAtn1U5rgmpLIZtZYOOFRQ3pMXBtwH/7//x/+//8cHQ==" {
-		t.Fatalf("medusa=%s", headers["X-Medusa"])
+	for i, row := range fixture.Cases {
+		var body []byte
+		if row.Body != nil {
+			body = []byte(*row.Body)
+		}
+		address, headers, err := hongguoV5Sign(row.Base, urlValues(row.Values), body, time.UnixMilli(row.NowMs))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if address != row.URL {
+			t.Fatalf("case %d signed URL mismatch", i)
+		}
+		if len(headers) != len(row.Headers) {
+			t.Fatalf("case %d header count mismatch", i)
+		}
+		for name, want := range row.Headers {
+			if headers[name] != want {
+				t.Fatalf("case %d %s differs from upstream", i, name)
+			}
+		}
 	}
 }
 

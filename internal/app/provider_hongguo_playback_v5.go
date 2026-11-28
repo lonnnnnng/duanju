@@ -477,7 +477,8 @@ func hongguoV5ProcessNonce(nowMs int64) (string, int64) {
 	defer hongguoV5Process.mu.Unlock()
 	if !hongguoV5Process.ready {
 		raw, _ := hongguoV5Random(18)
-		hongguoV5Process.nonce = base64.RawURLEncoding.EncodeToString(raw)
+		// long: 当前上游使用带 A 前缀的进程标识，且在 Medusa 顶层与设备环境中保持一致。
+		hongguoV5Process.nonce = "A" + base64.RawURLEncoding.EncodeToString(raw)
 		hongguoV5Process.started = nowMs
 		hongguoV5Process.ready = true
 	}
@@ -510,7 +511,7 @@ func hongguoV5Medusa(queryHash, f13 []byte, ts uint32, who map[string]string, no
 		hongguoV5Num(9, 0x040a0300), hongguoV5Bytes(10, flags), hongguoV5Num(12, uint64(ts)),
 		hongguoV5Bytes(13, f13), hongguoV5Bytes(14, queryHash[0:6]),
 		hongguoV5Bytes(15, hongguoV5Proto([]hongguoV5Field{hongguoV5Num(1, 1), hongguoV5Num(2, 1), hongguoV5Num(3, 1), hongguoV5Num(5, 1)})),
-		hongguoV5Num(17, uint64(ts)), hongguoV5Text(20, "none"), hongguoV5Num(21, 377),
+		hongguoV5Text(16, nonceText), hongguoV5Num(17, uint64(ts)), hongguoV5Text(20, "none"), hongguoV5Num(21, 312),
 		hongguoV5Bytes(23, env),
 		hongguoV5Text(24, `{"cmr":16777216,"cmr2":16777216,"un_h":11,"vpn":0,"kd":0,"dyn":"","do":1,"tk":true}`),
 	})

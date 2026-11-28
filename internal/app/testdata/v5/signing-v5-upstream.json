@@ -1,0 +1,51 @@
+{
+  "source": "Xanerix/guoapp app-v2.0.4-116 arm64-v8a APK bundled hongguo/main.js",
+  "sourceSha256": "bbb1d37012c51bad6a2785752969ae0640072ca0ce84b65d9abd0175b5bdae6e",
+  "random": "sequential bytes starting at 0, shared process across cases",
+  "cases": [
+    {
+      "nowMs": 1800000000000,
+      "base": "https://example.invalid/model",
+      "values": {
+        "aid": "8662",
+        "device_id": "123",
+        "iid": "456",
+        "cdid": "synthetic",
+        "version_name": "7.4.3.32",
+        "channel": "vivo_8662_64",
+        "os_version": "12",
+        "device_type": "PGT-AN10"
+      },
+      "body": "{\"fixture\":true}",
+      "url": "https://example.invalid/model?_rticket=1800000000011&aid=8662&cdid=synthetic&channel=vivo_8662_64&device_id=123&device_type=PGT-AN10&iid=456&os_version=12&version_name=7.4.3.32",
+      "headers": {
+        "X-Khronos": "1800000000",
+        "X-Helios": "AAECAxjnWC5DAsxQ2/mnLKzNFrul71BYsp3J36XftUuWs5HI",
+        "X-Medusa": "BdJJay2ZBqFJp0QoP2fnRyK/hT0aGwABDsoeHyAhgXkBWH5RynSsLzsIUmWa36AcZ8heAFUg9UFt7yMnBdGtyTjo4lv5kpzUW8blF6Ha3xjlc70h37hajlsmx4qr+yaXMM3JYL3iljObesQoRsq0mEgc8K4/GAQpMgaKOb3bwn4nxJQy+/5IST70G7Rk/Qc3rilafvlXajuDkPnhpjeunm7mhihsIzOQ9ORW3VVkQE39clvtS9EsE8+JaSubnSeJEejUgmbAOoS6SsnNUrD0kNIeYLZ8rmAvJ3AGdvi+7E9giHBPNiY0Yio2TgagUwaqvxiju7QufiwgoPH3+2dU1mpzlEfJwFmtNqQUwX9T4Lq1xYa2vvvD3UiWCLbq81cAlZKdYRJ46PjHR/Zg0jrC53KOAjkmlM7VzSsOG7u2z3XBqj4yhQZpLkkRcTkSFyvuCeKyDb/fmyZbNV+KNAt8IybOh2U6TInVWjGEME3NoL37LGwr/Mbhrjaseuu2UddvJUW2PfTGVMDYql9xqQaVZnvvcXtqslVO98tJiWB6axPqmbwX7VmYNXauk8pcqlGCeAyWoQ6pD3/Zlf2Wzo2Qo4KBopS4MK9IMrOH1o1i7ZXnqgqCo8q/ujQBHFUWLzaRzevVZaP+//8f/v//Hxwd",
+        "X-SS-STUB": "82E9FB28C6B069812973D69832368531",
+        "Content-Type": "application/json; charset=utf-8"
+      }
+    },
+    {
+      "nowMs": 1800000060000,
+      "base": "https://example.invalid/model",
+      "values": {
+        "aid": "8662",
+        "device_id": "123",
+        "iid": "456",
+        "cdid": "synthetic",
+        "version_name": "7.4.3.32",
+        "channel": "vivo_8662_64",
+        "os_version": "12",
+        "device_type": "PGT-AN10"
+      },
+      "body": null,
+      "url": "https://example.invalid/model?_rticket=1800000060008&aid=8662&cdid=synthetic&channel=vivo_8662_64&device_id=123&device_type=PGT-AN10&iid=456&os_version=12&version_name=7.4.3.32",
+      "headers": {
+        "X-Khronos": "1800000060",
+        "X-Helios": "IiMkJWZmA7S6RnDtjPBTo7WsFtVNuw/qkTVWJjPl3rQPeO9P",
+        "X-Medusa": "OdJJaxGZBqF1p0QoA2fnRx6/hT0qKwABkMouLyAxAdcBGJK4vg4buCc+47N/rRCIwAI2lcWboCd5OBhB9opCxtFVlNlb5mWPyz6cgOSl83pFn/j1LtMOKt1tw32gGvDh5rRTqPWQtxjk0/kaNEdA6gXxAHu6JV4m1eE6xlJnIjajsW0CCtIuQLx6exn3QBPuwpHH9vIi2wosFFFwUCeCDyfXqe09ExLnaEqlMmdOxVinNq+KIIejFd5ekFMyu3mATuiJBmpHWMj1P2UJ32Tl7LbKvzHO5Vj5Wqig6DrFRXNe6tDgez2rLcnrFTyKZfufhZ/eOp0kGXehZhK2BXloaYsoU1qs9vPjyOR6bdTOSYBrcKs2qVPDnOZr/yBDkZ97SHTuplvKYgpIdJebjs7pBgixa2n7Dinc6AaA7mvKtH94Jh6Fn1+XFe4wOb6uX4UvGXTtWotmILyODNx6umaIQl15MEsn0RaeeabKXaT2EtlMWDkyDBLnPoL4/SdSww/bpPZ4CK4i73XAPCnu40BrHx7+Y+Y4F0j6pUbNrHlUMevv7kTLt7fZGdi6T7x3ZMIU0bp4hpkA9008uauMhBEsBkdXhwOp+46zRvCP3ZXP2FAOHaDAY1pp8OICbC3trAOUspBaYWb///6f///+nywt"
+      }
+    }
+  ]
+}
